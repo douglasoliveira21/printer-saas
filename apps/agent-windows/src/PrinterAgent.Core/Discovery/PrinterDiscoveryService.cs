@@ -25,14 +25,24 @@ public class PrinterDiscoveryService
 
     public async Task<List<DiscoveredDevice>> ScanAsync(AgentOptions options, CancellationToken ct)
     {
-        if (options.Networks.Count == 0)
+        var networks = options.Networks;
+        if (networks.Count == 0)
         {
-            _logger.LogInformation("No discovery networks configured yet — skipping scan");
-            return [];
+            // Sensible default instead of doing nothing (spec §15 still
+            // requires this to be overridable — GET /agent-api/v1/config or
+            // the installer's "Redes para varredura" field always win over
+            // this auto-detected fallback once set).
+            networks = LocalNetwork.GetLocalIPv4Cidrs();
+            if (networks.Count == 0)
+            {
+                _logger.LogInformation("No discovery networks configured and none could be auto-detected — skipping scan");
+                return [];
+            }
+            _logger.LogInformation("No discovery networks configured — auto-detected local network(s): {Networks}", string.Join(", ", networks));
         }
 
-        var targets = options.Networks.SelectMany(NetworkRange.Expand).Distinct().ToList();
-        _logger.LogInformation("Scanning {Count} hosts across {Networks} network target(s)", targets.Count, options.Networks.Count);
+        var targets = networks.SelectMany(NetworkRange.Expand).Distinct().ToList();
+        _logger.LogInformation("Scanning {Count} hosts across {Networks} network target(s)", targets.Count, networks.Count);
 
         var channel = Channel.CreateUnbounded<DiscoveredDevice>();
         using var throttle = new SemaphoreSlim(options.DiscoveryConcurrency);

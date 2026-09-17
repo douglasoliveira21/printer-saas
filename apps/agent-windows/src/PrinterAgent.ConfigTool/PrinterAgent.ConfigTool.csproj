@@ -15,4 +15,8 @@
     <PackageReference Include="System.ServiceProcess.ServiceController" Version="10.0.0" />
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\PrinterAgent.Core\PrinterAgent.Core.csproj" />
+  </ItemGroup>
+
 </Project>

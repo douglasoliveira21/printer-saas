@@ -1,6 +1,7 @@
 using System.Windows;
 using System.Windows.Media;
 using System.Windows.Threading;
+using PrinterAgent.Core.Discovery;
 
 namespace PrinterAgent.ConfigTool;
 
@@ -22,6 +23,16 @@ public partial class MainWindow : Window
         if (!string.IsNullOrWhiteSpace(existingNetworks))
         {
             NetworksTextBox.Text = existingNetworks;
+        }
+        else
+        {
+            // Not configured yet — suggest this machine's own subnet(s)
+            // instead of leaving the field blank or guessing "192.168.1.0/24".
+            var detected = LocalNetwork.GetLocalIPv4Cidrs();
+            if (detected.Count > 0)
+            {
+                NetworksTextBox.Text = string.Join(", ", detected);
+            }
         }
 
         RefreshStatus();

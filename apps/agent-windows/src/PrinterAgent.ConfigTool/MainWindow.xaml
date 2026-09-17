@@ -47,7 +47,7 @@
         <StackPanel Grid.Row="4" Margin="0,0,0,10">
             <TextBlock Text="Redes para varredura (discovery)" FontWeight="SemiBold" Margin="0,0,0,4"/>
             <TextBlock Text="Separe por vírgula. Ex.: 192.168.1.0/24, 192.168.2.100-192.168.2.200" Foreground="Gray" FontSize="11" Margin="0,0,0,4" TextWrapping="Wrap"/>
-            <TextBox x:Name="NetworksTextBox" Padding="6" Text="192.168.1.0/24"/>
+            <TextBox x:Name="NetworksTextBox" Padding="6"/>
         </StackPanel>
 
         <StackPanel Grid.Row="5" Orientation="Horizontal" Margin="0,10,0,16">
