@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { useIgnorePrinter, usePrinters } from "@/hooks/use-printers";
+import { useIgnorePrinter, usePrinters, useRestorePrinter } from "@/hooks/use-printers";
 import { getApiErrorMessage } from "@/lib/api-client";
 import type { Printer } from "@/lib/types";
 import { ClaimPrinterDialog } from "./claim-printer-dialog";
@@ -50,6 +50,7 @@ export default function ImpressorasPage() {
   const [claiming, setClaiming] = useState<Printer | null>(null);
   const { data, isLoading } = usePrinters({ search: search || undefined, status: status === "all" ? undefined : status });
   const ignorePrinter = useIgnorePrinter();
+  const restorePrinter = useRestorePrinter();
 
   async function handleIgnore(printer: Printer) {
     try {
@@ -57,6 +58,15 @@ export default function ImpressorasPage() {
       toast.success("Impressora ignorada");
     } catch (error) {
       toast.error(getApiErrorMessage(error, "Erro ao ignorar impressora"));
+    }
+  }
+
+  async function handleRestore(printer: Printer) {
+    try {
+      await restorePrinter.mutateAsync(printer.id);
+      toast.success("Impressora restaurada para Descoberta");
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, "Erro ao restaurar impressora"));
     }
   }
 
@@ -73,7 +83,13 @@ export default function ImpressorasPage() {
           <SelectTrigger className="w-48">
             <SelectValue>
               {(value: string) =>
-                ({ all: "Todos os status", DISCOVERED: "Descobertas", MONITORED: "Monitoradas", IGNORED: "Ignoradas" })[value] ?? value
+                ({
+                  all: "Todos os status",
+                  DISCOVERED: "Descobertas",
+                  MONITORED: "Monitoradas",
+                  IGNORED: "Ignoradas",
+                  DECOMMISSIONED: "Desativadas",
+                })[value] ?? value
               }
             </SelectValue>
           </SelectTrigger>
@@ -82,6 +98,7 @@ export default function ImpressorasPage() {
             <SelectItem value="DISCOVERED">Descobertas</SelectItem>
             <SelectItem value="MONITORED">Monitoradas</SelectItem>
             <SelectItem value="IGNORED">Ignoradas</SelectItem>
+            <SelectItem value="DECOMMISSIONED">Desativadas</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -132,16 +149,23 @@ export default function ImpressorasPage() {
                 </TableCell>
                 <TableCell>{printer.lastCollectedAt ? new Date(printer.lastCollectedAt).toLocaleString("pt-BR") : "Nunca"}</TableCell>
                 <TableCell className="text-right">
-                  {printer.status === "DISCOVERED" && (
-                    <div className="flex justify-end gap-2">
-                      <Button size="sm" onClick={() => setClaiming(printer)}>
-                        Adicionar
+                  <div className="flex justify-end gap-2">
+                    {printer.status === "DISCOVERED" && (
+                      <>
+                        <Button size="sm" onClick={() => setClaiming(printer)}>
+                          Adicionar
+                        </Button>
+                        <Button size="sm" variant="outline" onClick={() => handleIgnore(printer)}>
+                          Ignorar
+                        </Button>
+                      </>
+                    )}
+                    {(printer.status === "IGNORED" || printer.status === "DECOMMISSIONED") && (
+                      <Button size="sm" variant="outline" onClick={() => handleRestore(printer)}>
+                        Restaurar
                       </Button>
-                      <Button size="sm" variant="outline" onClick={() => handleIgnore(printer)}>
-                        Ignorar
-                      </Button>
-                    </div>
-                  )}
+                    )}
+                  </div>
                 </TableCell>
               </TableRow>
             ))}

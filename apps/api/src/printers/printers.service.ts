@@ -81,4 +81,22 @@ export class PrintersService {
     await this.findOne(id);
     return this.tenantPrisma.client.printer.update({ where: { id }, data: { status: 'IGNORED' } });
   }
+
+  /** Un-ignores / un-decommissions a printer back to DISCOVERED, so it can be claimed again. */
+  async restore(id: string) {
+    await this.findOne(id);
+    return this.tenantPrisma.client.printer.update({ where: { id }, data: { status: 'DISCOVERED' } });
+  }
+
+  /** Retires equipment that's been physically removed/replaced (spec §70) — history stays, just stops appearing as active. */
+  async decommission(id: string) {
+    await this.findOne(id);
+    return this.tenantPrisma.client.printer.update({ where: { id }, data: { status: 'DECOMMISSIONED' } });
+  }
+
+  /** Manual correction of vendor-reported fields (spec §18: not every device reports these accurately). */
+  async update(id: string, dto: { manufacturer?: string; model?: string; hostname?: string }) {
+    await this.findOne(id);
+    return this.tenantPrisma.client.printer.update({ where: { id }, data: dto });
+  }
 }

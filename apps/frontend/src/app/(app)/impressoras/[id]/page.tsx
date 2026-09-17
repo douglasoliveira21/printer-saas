@@ -1,13 +1,25 @@
 "use client";
 
-import { use } from "react";
+import { use, useState } from "react";
 import Link from "next/link";
-import { AlertTriangle, ArrowLeft, Droplet, FileStack, Info, ShieldAlert } from "lucide-react";
+import { toast } from "sonner";
+import { AlertTriangle, ArrowLeft, Ban, Droplet, FileStack, Info, ShieldAlert } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { usePrinter } from "@/hooks/use-printers";
+import { useDecommissionPrinter, usePrinter } from "@/hooks/use-printers";
 import { useAlerts } from "@/hooks/use-alerts";
+import { getApiErrorMessage } from "@/lib/api-client";
+import { EditPrinterDialog } from "./edit-printer-dialog";
 
 function formatPages(value: number | null | undefined) {
   return value === null || value === undefined ? "Não disponível" : value.toLocaleString("pt-BR");
@@ -30,6 +42,18 @@ export default function PrinterDetailPage({ params }: { params: Promise<{ id: st
   const { id } = use(params);
   const { data: printer, isLoading } = usePrinter(id);
   const { data: alerts } = useAlerts(undefined, id);
+  const [decommissioning, setDecommissioning] = useState(false);
+  const decommissionPrinter = useDecommissionPrinter();
+
+  async function handleDecommission() {
+    try {
+      await decommissionPrinter.mutateAsync(id);
+      toast.success("Impressora desativada");
+      setDecommissioning(false);
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, "Erro ao desativar impressora"));
+    }
+  }
 
   if (isLoading) {
     return <p className="text-neutral-400">Carregando...</p>;
@@ -70,13 +94,36 @@ export default function PrinterDetailPage({ params }: { params: Promise<{ id: st
             {printer.location ? ` — ${printer.location.name}` : ""}
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex items-center gap-2">
           <Badge variant={printer.onlineStatus === "ONLINE" ? "default" : "destructive"}>
             {printer.onlineStatus === "ONLINE" ? "Online" : printer.onlineStatus === "OFFLINE" ? "Offline" : "Desconhecido"}
           </Badge>
           <Badge variant="outline">{printer.status === "MONITORED" ? "Monitorada" : printer.status}</Badge>
+          <EditPrinterDialog printer={printer} />
+          {printer.status !== "DECOMMISSIONED" && (
+            <Button variant="outline" size="sm" className="text-red-600 hover:text-red-600" onClick={() => setDecommissioning(true)}>
+              <Ban className="mr-2 h-4 w-4" />
+              Desativar
+            </Button>
+          )}
         </div>
       </div>
+
+      <Dialog open={decommissioning} onOpenChange={setDecommissioning}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Desativar impressora</DialogTitle>
+            <DialogDescription>
+              Marca este equipamento como desativado (removido/substituído). O histórico de contadores e OS é preservado.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="destructive" onClick={handleDecommission} disabled={decommissionPrinter.isPending}>
+              Desativar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Card>

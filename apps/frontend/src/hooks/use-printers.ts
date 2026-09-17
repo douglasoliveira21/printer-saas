@@ -51,3 +51,39 @@ export function useIgnorePrinter() {
     },
   });
 }
+
+export function useRestorePrinter() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { data } = await apiClient.patch<Printer>(`/printers/${id}/restore`);
+      return data;
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["printers"] }),
+  });
+}
+
+export function useDecommissionPrinter() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { data } = await apiClient.patch<Printer>(`/printers/${id}/decommission`);
+      return data;
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["printers"] }),
+  });
+}
+
+export function useUpdatePrinter() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, ...input }: { id: string; manufacturer?: string; model?: string; hostname?: string }) => {
+      const { data } = await apiClient.patch<Printer>(`/printers/${id}`, input);
+      return data;
+    },
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["printers"] });
+      queryClient.invalidateQueries({ queryKey: ["printers", variables.id] });
+    },
+  });
+}
