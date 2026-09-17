@@ -17,6 +17,13 @@ RUN npm run build --workspace=apps/frontend
 
 FROM base AS runtime
 ENV NODE_ENV=production
+# Next.js standalone server.js only binds to HOSTNAME if it's set — without
+# it, some versions bind to localhost/127.0.0.1 inside the container, which
+# passes this Dockerfile's own HEALTHCHECK (runs inside the container's
+# network namespace) but is unreachable from EasyPanel's reverse proxy
+# (connects via the container's internal IP, not localhost).
+ENV HOSTNAME=0.0.0.0
+ENV PORT=3000
 COPY --from=build /repo/apps/frontend/public apps/frontend/public
 COPY --from=build /repo/apps/frontend/.next/standalone apps/frontend
 COPY --from=build /repo/apps/frontend/.next/static apps/frontend/apps/frontend/.next/static
