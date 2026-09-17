@@ -6,7 +6,8 @@
         xmlns:local="clr-namespace:PrinterAgent.ConfigTool"
         mc:Ignorable="d"
         Title="Printer SaaS Agent" Height="640" Width="620"
-        WindowStartupLocation="CenterScreen">
+        WindowStartupLocation="CenterScreen"
+        Icon="agent.ico">
     <Grid Margin="20">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
@@ -19,7 +20,7 @@
         </Grid.RowDefinitions>
 
         <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,16">
-            <TextBlock Text="🖨" FontSize="28" Margin="0,0,10,0"/>
+            <Image Source="Assets/logo.png" Width="36" Height="36" Margin="0,0,10,0"/>
             <StackPanel>
                 <TextBlock Text="Printer SaaS Agent" FontSize="20" FontWeight="Bold"/>
                 <TextBlock Text="Descoberta e monitoramento de impressoras na rede local" Foreground="Gray"/>

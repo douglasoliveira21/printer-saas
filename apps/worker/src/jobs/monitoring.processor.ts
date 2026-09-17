@@ -34,11 +34,21 @@ export class MonitoringProcessor extends WorkerHost {
   }
 
   private async checkOffline() {
-    const thresholdSeconds = this.config.get<number>('AGENT_OFFLINE_THRESHOLD_SECONDS', 120);
-    const cutoff = new Date(Date.now() - thresholdSeconds * 1000);
+    // Agent staleness is based on heartbeat, which the Agent sends every ~30s
+    // regardless of its SNMP collection cadence, so a short threshold is safe.
+    const agentThresholdSeconds = this.config.get<number>('AGENT_OFFLINE_THRESHOLD_SECONDS', 120);
+    const agentCutoff = new Date(Date.now() - agentThresholdSeconds * 1000);
+
+    // Printer staleness is based on lastSeenAt, which only advances once per
+    // SNMP collection cycle (CollectionIntervalSeconds, default 900s/15min).
+    // Reusing the short agent threshold here false-flagged healthy printers
+    // as offline between collection cycles, so this needs its own, longer
+    // default that tolerates at least one missed cycle.
+    const printerThresholdSeconds = this.config.get<number>('PRINTER_OFFLINE_THRESHOLD_SECONDS', 2400);
+    const printerCutoff = new Date(Date.now() - printerThresholdSeconds * 1000);
 
     const staleAgents = await this.prisma.agent.findMany({
-      where: { status: 'ONLINE', lastHeartbeatAt: { lt: cutoff } },
+      where: { status: 'ONLINE', lastHeartbeatAt: { lt: agentCutoff } },
     });
 
     for (const agent of staleAgents) {
@@ -48,13 +58,13 @@ export class MonitoringProcessor extends WorkerHost {
           tenantId: agent.tenantId,
           type: 'AGENT_OFFLINE',
           level: 'WARNING',
-          message: `Agent "${agent.name}" está offline (sem heartbeat há mais de ${thresholdSeconds}s).`,
+          message: `Agent "${agent.name}" está offline (sem heartbeat há mais de ${agentThresholdSeconds}s).`,
         },
       });
     }
 
     const stalePrinters = await this.prisma.printer.findMany({
-      where: { status: 'MONITORED', onlineStatus: 'ONLINE', lastSeenAt: { lt: cutoff } },
+      where: { status: 'MONITORED', onlineStatus: 'ONLINE', lastSeenAt: { lt: printerCutoff } },
     });
 
     for (const printer of stalePrinters) {
