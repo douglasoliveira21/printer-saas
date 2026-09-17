@@ -1,8 +1,9 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Printer, ShieldCheck } from "lucide-react";
+import { ShieldCheck } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth-context";
 import { NAV_ITEMS } from "./nav-items";
@@ -14,7 +15,7 @@ export function Sidebar({ className }: { className?: string }) {
   return (
     <nav className={cn("flex h-full w-64 flex-col border-r bg-white dark:bg-neutral-950", className)}>
       <div className="flex h-16 items-center gap-2 border-b px-6">
-        <Printer className="h-6 w-6 text-blue-600" />
+        <Image src="/logo.png" alt="Printer SaaS" width={28} height={28} className="rounded" />
         <span className="font-semibold text-lg tracking-tight">Printer SaaS</span>
       </div>
       <div className="flex-1 space-y-1 overflow-y-auto p-3">

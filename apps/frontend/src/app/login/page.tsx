@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
-import { Printer } from "lucide-react";
+import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -32,8 +32,8 @@ export default function LoginPage() {
     <div className="flex min-h-screen flex-1 items-center justify-center bg-neutral-50 p-4 dark:bg-neutral-900">
       <Card className="w-full max-w-sm">
         <CardHeader className="items-center text-center">
-          <div className="mb-2 flex h-12 w-12 items-center justify-center rounded-full bg-blue-600">
-            <Printer className="h-6 w-6 text-white" />
+          <div className="mb-2 flex h-14 w-14 items-center justify-center overflow-hidden rounded-full bg-blue-600">
+            <Image src="/logo.png" alt="Printer SaaS" width={56} height={56} className="object-cover" />
           </div>
           <CardTitle className="text-xl">Printer SaaS</CardTitle>
           <CardDescription>Entre com sua conta para continuar</CardDescription>
