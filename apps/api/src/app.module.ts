@@ -20,6 +20,7 @@ import { InventoryModule } from './inventory/inventory.module';
 import { ReportsModule } from './reports/reports.module';
 import { PortalModule } from './portal/portal.module';
 import { PlatformModule } from './platform/platform.module';
+import { RolesModule } from './roles/roles.module';
 import { HealthController } from './health/health.controller';
 
 @Module({
@@ -48,6 +49,7 @@ import { HealthController } from './health/health.controller';
     ReportsModule,
     PortalModule,
     PlatformModule,
+    RolesModule,
   ],
   controllers: [HealthController],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],

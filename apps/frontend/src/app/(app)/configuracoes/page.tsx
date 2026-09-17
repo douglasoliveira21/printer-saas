@@ -6,6 +6,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useTenantUsers } from "@/hooks/use-users";
 import { ComingSoon } from "@/components/layout/coming-soon";
+import { CreateUserDialog } from "./create-user-dialog";
+import { UserActionsMenu } from "./user-actions-menu";
 
 export default function ConfiguracoesPage() {
   const { data: users, isLoading } = useTenantUsers();
@@ -20,7 +22,10 @@ export default function ConfiguracoesPage() {
           <TabsTrigger value="empresa">Empresa</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="usuarios" className="mt-4">
+        <TabsContent value="usuarios" className="mt-4 space-y-4">
+          <div className="flex justify-end">
+            <CreateUserDialog />
+          </div>
           <Card className="overflow-hidden py-0">
             <Table>
               <TableHeader>
@@ -30,12 +35,13 @@ export default function ConfiguracoesPage() {
                   <TableHead>Perfil</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Último acesso</TableHead>
+                  <TableHead />
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {isLoading && (
                   <TableRow>
-                    <TableCell colSpan={5} className="text-center text-neutral-400">
+                    <TableCell colSpan={6} className="text-center text-neutral-400">
                       Carregando...
                     </TableCell>
                   </TableRow>
@@ -51,6 +57,9 @@ export default function ConfiguracoesPage() {
                       </Badge>
                     </TableCell>
                     <TableCell>{user.lastLoginAt ? new Date(user.lastLoginAt).toLocaleString("pt-BR") : "Nunca"}</TableCell>
+                    <TableCell className="text-right">
+                      <UserActionsMenu user={user} />
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
