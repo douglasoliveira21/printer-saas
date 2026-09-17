@@ -52,15 +52,65 @@ public class SnmpDeviceReader
         device.Hostname = await TryGetAsync(endpoint, communityOctet, PrinterMibOids.SysName, timeoutMs, retries, ct);
         device.Serial = await TryGetAsync(endpoint, communityOctet, PrinterMibOids.PrtGeneralSerialNumber, timeoutMs, retries, ct);
 
-        var totalPages = await TryGetIntAsync(endpoint, communityOctet, PrinterMibOids.PrtMarkerLifeCountTotal, timeoutMs, retries, ct);
-        if (totalPages is not null)
-        {
-            device.Counters = new DeviceCounters { Total = totalPages };
-        }
+        device.Counters = await ReadCountersAsync(endpoint, communityOctet, timeoutMs, retries, ct);
 
         device.Consumables = await ReadSuppliesAsync(endpoint, communityOctet, timeoutMs, retries, ct);
 
         return device;
+    }
+
+    /// <summary>
+    /// Walks the Printer-MIB marker table to split the life count into
+    /// black &amp; white vs. color, using prtMarkerProcessColorants (RFC 3805)
+    /// to classify each marker — a marker whose colorants are just "black"
+    /// (or equivalent single-colorant mono description) counts toward
+    /// BlackWhite, anything with more than one colorant counts toward
+    /// Color. Devices with a single marker (the common case) get Total
+    /// only, same as before. "Copies" (walk-up copier usage, as opposed to
+    /// driver-submitted prints) and duplex sheet counts have no standard
+    /// Printer-MIB OID — they're vendor-specific and not read here.
+    /// </summary>
+    private async Task<DeviceCounters?> ReadCountersAsync(IPEndPoint endpoint, OctetString community, int timeoutMs, int retries, CancellationToken ct)
+    {
+        var lifeCounts = await WalkAsync(endpoint, community, PrinterMibOids.PrtMarkerLifeCountTable, timeoutMs, ct);
+        if (lifeCounts.Count == 0)
+        {
+            // Table walk unsupported/empty — fall back to the single total OID some devices only expose directly.
+            var fallbackTotal = await TryGetIntAsync(endpoint, community, PrinterMibOids.PrtMarkerLifeCountTotal, timeoutMs, retries, ct);
+            return fallbackTotal is null ? null : new DeviceCounters { Total = fallbackTotal };
+        }
+
+        var colorants = await WalkAsync(endpoint, community, PrinterMibOids.PrtMarkerProcessColorantsTable, timeoutMs, ct);
+
+        int? total = null, blackWhite = null, color = null;
+        foreach (var (oid, raw) in lifeCounts)
+        {
+            if (!int.TryParse(raw, out var count))
+            {
+                continue;
+            }
+            total = (total ?? 0) + count;
+
+            var index = oid[(oid.LastIndexOf('.') + 1)..];
+            var colorant = colorants.GetValueOrDefault($"{PrinterMibOids.PrtMarkerProcessColorantsTable}.{index}");
+            if (colorant is null)
+            {
+                // No colorant info for this marker — can't classify it, only Total reflects it.
+                continue;
+            }
+
+            var isMono = !new[] { "cyan", "magenta", "yellow" }.Any(c => colorant.Contains(c, StringComparison.OrdinalIgnoreCase));
+            if (isMono)
+            {
+                blackWhite = (blackWhite ?? 0) + count;
+            }
+            else
+            {
+                color = (color ?? 0) + count;
+            }
+        }
+
+        return new DeviceCounters { Total = total, BlackWhite = blackWhite, Color = color };
     }
 
     private async Task<List<DeviceConsumable>?> ReadSuppliesAsync(IPEndPoint endpoint, OctetString community, int timeoutMs, int retries, CancellationToken ct)
