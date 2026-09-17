@@ -1,0 +1,602 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+// PLATFORM / TENANCY
+// ---------------------------------------------------------------------------
+
+enum TenantStatus {
+  ACTIVE
+  SUSPENDED
+  CANCELLED
+}
+
+model Tenant {
+  id         String       @id @default(uuid())
+  name       String
+  legalName  String?
+  document   String? // CNPJ
+  email      String?
+  phone      String?
+  address    String?
+  timezone   String       @default("America/Sao_Paulo")
+  currency   String       @default("BRL")
+  logoUrl    String?
+  status     TenantStatus @default(ACTIVE)
+  isDemo     Boolean      @default(false)
+  planId     String?
+  plan       Plan?        @relation(fields: [planId], references: [id])
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+
+  users             User[]
+  roles             Role[]
+  customers         Customer[]
+  agents            Agent[]
+  printers          Printer[]
+  serviceOrders     ServiceOrder[]
+  contracts         Contract[]
+  auditLogs         AuditLog[]
+  alerts            Alert[]
+  inventoryItems    InventoryItem[]
+  inventoryMovements InventoryMovement[]
+  financialEntries  FinancialEntry[]
+
+  @@map("tenants")
+}
+
+/**
+ * Platform-level plan/limits (spec §78). No automatic billing/enforcement
+ * yet — deliberately deferred by the spec itself ("não precisa implementar
+ * cobrança automática... mas o banco deverá permitir isso futuramente").
+ * A null limit means unlimited.
+ */
+model Plan {
+  id           String   @id @default(uuid())
+  name         String   @unique
+  maxUsers     Int?
+  maxCustomers Int?
+  maxPrinters  Int?
+  maxAgents    Int?
+  priceMonthly Decimal? @db.Decimal(12, 2)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  tenants Tenant[]
+
+  @@map("plans")
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  INVITED
+}
+
+model User {
+  id           String     @id @default(uuid())
+  tenantId     String
+  tenant       Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name         String
+  email        String
+  passwordHash String
+  status       UserStatus @default(ACTIVE)
+  lastLoginAt  DateTime?
+  roleId       String?
+  role         Role?      @relation(fields: [roleId], references: [id])
+  isSuperAdmin Boolean    @default(false)
+  // Set only for customer-portal users (spec §34): scopes every portal
+  // query to this single customer, on top of the normal tenant scoping.
+  // NULL for regular tenant staff (admin/technician/finance/...).
+  customerId   String?
+  customer     Customer?  @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  refreshTokens RefreshToken[]
+  auditLogs     AuditLog[]
+  technicianServiceOrders ServiceOrder[] @relation("technician")
+
+  @@unique([tenantId, email])
+  @@index([tenantId])
+  @@map("users")
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String
+  expiresAt DateTime
+  revokedAt DateTime?
+  replacedBy String?
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@map("refresh_tokens")
+}
+
+model Role {
+  id          String   @id @default(uuid())
+  tenantId    String?
+  tenant      Tenant?  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name        String
+  isSystem    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  users       User[]
+  permissions RolePermission[]
+
+  @@unique([tenantId, name])
+  @@map("roles")
+}
+
+model Permission {
+  id          String @id @default(uuid())
+  key         String @unique // e.g. "printers.view"
+  description String?
+
+  roles RolePermission[]
+
+  @@map("permissions")
+}
+
+model RolePermission {
+  roleId       String
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permissionId String
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+  @@map("role_permissions")
+}
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  tenantId   String
+  tenant     Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  userId     String?
+  user       User?    @relation(fields: [userId], references: [id])
+  action     String
+  entity     String
+  entityId   String?
+  ipAddress  String?
+  before     Json?
+  after      Json?
+  createdAt  DateTime @default(now())
+
+  @@index([tenantId, entity, entityId])
+  @@map("audit_logs")
+}
+
+// ---------------------------------------------------------------------------
+// CUSTOMERS / LOCATIONS
+// ---------------------------------------------------------------------------
+
+enum CustomerStatus {
+  ACTIVE
+  INACTIVE
+}
+
+model Customer {
+  id             String         @id @default(uuid())
+  tenantId       String
+  tenant         Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  legalName      String
+  tradeName      String?
+  document       String? // CNPJ
+  stateRegistration String?
+  email          String?
+  phone          String?
+  address        String?
+  notes          String?
+  status         CustomerStatus @default(ACTIVE)
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  locations     Location[]
+  printers      Printer[]
+  contracts     Contract[]
+  serviceOrders ServiceOrder[]
+  financialEntries FinancialEntry[]
+  portalUsers   User[]
+
+  @@index([tenantId])
+  @@map("customers")
+}
+
+model Location {
+  id         String   @id @default(uuid())
+  tenantId   String
+  customerId String
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  name       String
+  address    String?
+  contactName String?
+  contactPhone String?
+  notes      String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  agents        Agent[]
+  printers      Printer[]
+  serviceOrders ServiceOrder[]
+
+  @@index([tenantId])
+  @@index([customerId])
+  @@map("locations")
+}
+
+// ---------------------------------------------------------------------------
+// AGENTS
+// ---------------------------------------------------------------------------
+
+enum AgentStatus {
+  PENDING // token generated, not yet enrolled
+  ONLINE
+  OFFLINE
+  DISABLED
+}
+
+model Agent {
+  id                String      @id @default(uuid())
+  tenantId          String
+  tenant            Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  locationId        String?
+  location          Location?   @relation(fields: [locationId], references: [id])
+  name              String
+  enrollmentToken   String?     @unique // single-use, cleared after enrollment
+  enrollmentTokenExpiresAt DateTime?
+  apiKeyHash        String?     // credential issued after enrollment
+  status            AgentStatus @default(PENDING)
+  hostname          String?
+  localIp           String?
+  osVersion         String?
+  agentVersion      String?
+  lastHeartbeatAt   DateTime?
+  discoveryConfig   Json?       // subnets / ip ranges / snmp settings
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+
+  printers Printer[]
+
+  @@index([tenantId])
+  @@map("agents")
+}
+
+// ---------------------------------------------------------------------------
+// PRINTERS
+// ---------------------------------------------------------------------------
+
+enum PrinterStatus {
+  DISCOVERED // seen by agent, not yet claimed
+  MONITORED
+  IGNORED
+  DECOMMISSIONED
+}
+
+enum PrinterOnlineStatus {
+  UNKNOWN
+  ONLINE
+  OFFLINE
+}
+
+model Printer {
+  id             String              @id @default(uuid())
+  tenantId       String
+  tenant         Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  agentId        String
+  agent          Agent               @relation(fields: [agentId], references: [id])
+  customerId     String?
+  customer       Customer?           @relation(fields: [customerId], references: [id])
+  locationId     String?
+  location       Location?           @relation(fields: [locationId], references: [id])
+
+  status         PrinterStatus       @default(DISCOVERED)
+  onlineStatus   PrinterOnlineStatus @default(UNKNOWN)
+
+  ip             String?
+  mac            String?
+  hostname       String?
+  serial         String? // primary identity when available
+  manufacturer   String?
+  model          String?
+  firmware       String?
+  sysDescr       String?
+
+  fingerprint    String // stable dedup key: serial || mac || (agentId+ip)
+
+  lastSeenAt     DateTime?
+  lastCollectedAt DateTime?
+
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+
+  counters      CounterReading[]
+  consumables   ConsumableReading[]
+  alerts        Alert[]
+  serviceOrders ServiceOrder[]
+  contracts     Contract[]
+
+  @@unique([tenantId, fingerprint])
+  @@index([tenantId])
+  @@index([tenantId, status])
+  @@map("printers")
+}
+
+// Raw + derived counter snapshot per collection
+model CounterReading {
+  id           String   @id @default(uuid())
+  printerId    String
+  printer      Printer  @relation(fields: [printerId], references: [id], onDelete: Cascade)
+  total        Int?
+  blackWhite   Int?
+  color        Int?
+  copies       Int?
+  raw          Json?    // original values + OIDs as received from agent
+  collectedAt  DateTime @default(now())
+
+  @@index([printerId, collectedAt])
+  @@map("counter_readings")
+}
+
+model ConsumableReading {
+  id          String   @id @default(uuid())
+  printerId   String
+  printer     Printer  @relation(fields: [printerId], references: [id], onDelete: Cascade)
+  type        String // toner, drum, waste_toner, etc.
+  color       String? // black, cyan, magenta, yellow
+  levelPercent Int?
+  capacity    String?
+  name        String?
+  serial      String?
+  collectedAt DateTime @default(now())
+
+  @@index([printerId, collectedAt])
+  @@map("consumable_readings")
+}
+
+// ---------------------------------------------------------------------------
+// ALERTS
+// ---------------------------------------------------------------------------
+
+enum AlertLevel {
+  INFO
+  WARNING
+  CRITICAL
+}
+
+enum AlertType {
+  PRINTER_OFFLINE
+  AGENT_OFFLINE
+  TONER_LOW
+  TONER_CRITICAL
+  COUNTER_STALE
+  DEVICE_ERROR
+  CONTRACT_EXPIRING
+  SERVICE_ORDER_LATE
+  SLA_EXPIRING
+  COLLECTION_FAILED
+}
+
+enum AlertStatus {
+  OPEN
+  ACKNOWLEDGED
+  RESOLVED
+}
+
+model Alert {
+  id          String      @id @default(uuid())
+  tenantId    String
+  tenant      Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  printerId   String?
+  printer     Printer?    @relation(fields: [printerId], references: [id])
+  type        AlertType
+  level       AlertLevel
+  status      AlertStatus @default(OPEN)
+  message     String
+  metadata    Json?
+  createdAt   DateTime    @default(now())
+  resolvedAt  DateTime?
+
+  @@index([tenantId, status])
+  @@map("alerts")
+}
+
+// ---------------------------------------------------------------------------
+// SERVICE ORDERS
+// ---------------------------------------------------------------------------
+
+enum ServiceOrderStatus {
+  OPEN
+  SCHEDULED
+  IN_PROGRESS
+  WAITING_PART
+  WAITING_CUSTOMER
+  DONE
+  CANCELLED
+}
+
+enum ServiceOrderPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+model ServiceOrder {
+  id           String               @id @default(uuid())
+  tenantId     String
+  tenant       Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  number       Int
+  customerId   String
+  customer     Customer             @relation(fields: [customerId], references: [id])
+  locationId   String?
+  location     Location?            @relation(fields: [locationId], references: [id])
+  printerId    String?
+  printer      Printer?             @relation(fields: [printerId], references: [id])
+  technicianId String?
+  technician   User?                @relation("technician", fields: [technicianId], references: [id])
+
+  type         String?
+  priority     ServiceOrderPriority @default(MEDIUM)
+  status       ServiceOrderStatus   @default(OPEN)
+  description  String?
+  diagnosis    String?
+  solution     String?
+
+  scheduledAt  DateTime?
+  startedAt    DateTime?
+  completedAt  DateTime?
+  slaDueAt     DateTime?
+
+  createdAt    DateTime             @default(now())
+  updatedAt    DateTime             @updatedAt
+
+  financialEntries FinancialEntry[]
+  inventoryMovements InventoryMovement[]
+
+  @@unique([tenantId, number])
+  @@index([tenantId, status])
+  @@map("service_orders")
+}
+
+// ---------------------------------------------------------------------------
+// CONTRACTS
+// ---------------------------------------------------------------------------
+
+enum ContractStatus {
+  DRAFT
+  ACTIVE
+  SUSPENDED
+  ENDED
+  EXPIRED
+}
+
+model Contract {
+  id                String         @id @default(uuid())
+  tenantId          String
+  tenant            Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  number            Int
+  customerId        String
+  customer          Customer       @relation(fields: [customerId], references: [id])
+  printerId         String?
+  printer           Printer?       @relation(fields: [printerId], references: [id])
+
+  startDate         DateTime
+  endDate           DateTime?
+  monthlyFee        Decimal        @db.Decimal(12, 2)
+  franchisePages    Int            @default(0)
+  overagePriceBw    Decimal        @db.Decimal(12, 4) @default(0)
+  overagePriceColor Decimal        @db.Decimal(12, 4) @default(0)
+  billingDay        Int            @default(1)
+  slaHours          Int?
+  readjustmentIndex String?
+  status            ContractStatus @default(DRAFT)
+  notes             String?
+
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+
+  financialEntries FinancialEntry[]
+
+  @@unique([tenantId, number])
+  @@index([tenantId])
+  @@map("contracts")
+}
+
+// ---------------------------------------------------------------------------
+// INVENTORY
+// ---------------------------------------------------------------------------
+
+model InventoryItem {
+  id           String   @id @default(uuid())
+  tenantId     String
+  tenant       Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name         String
+  type         String
+  quantity     Int      @default(0)
+  minQuantity  Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  movements InventoryMovement[]
+
+  @@index([tenantId])
+  @@map("inventory_items")
+}
+
+enum InventoryMovementType {
+  IN
+  OUT
+  ADJUSTMENT
+}
+
+model InventoryMovement {
+  id             String                 @id @default(uuid())
+  tenantId       String
+  tenant         Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  itemId         String
+  item           InventoryItem          @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  type           InventoryMovementType
+  quantity       Int
+  reason         String?
+  serviceOrderId String?
+  serviceOrder   ServiceOrder?          @relation(fields: [serviceOrderId], references: [id])
+  createdAt      DateTime               @default(now())
+
+  @@index([tenantId])
+  @@index([itemId])
+  @@map("inventory_movements")
+}
+
+// ---------------------------------------------------------------------------
+// FINANCIAL
+// ---------------------------------------------------------------------------
+
+enum FinancialEntryType {
+  RECEIVABLE
+  PAYABLE
+}
+
+enum FinancialEntryStatus {
+  PENDING
+  PAID
+  OVERDUE
+  CANCELLED
+}
+
+model FinancialEntry {
+  id             String               @id @default(uuid())
+  tenantId       String
+  tenant         Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  type           FinancialEntryType
+  category       String
+  costCenter     String?
+  description    String?
+  amount         Decimal              @db.Decimal(12, 2)
+  dueDate        DateTime
+  paidAt         DateTime?
+  status         FinancialEntryStatus @default(PENDING)
+
+  customerId     String?
+  customer       Customer?            @relation(fields: [customerId], references: [id])
+  contractId     String?
+  contract       Contract?            @relation(fields: [contractId], references: [id])
+  serviceOrderId String?
+  serviceOrder   ServiceOrder?        @relation(fields: [serviceOrderId], references: [id])
+
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
+
+  @@index([tenantId, type, status])
+  @@index([tenantId, dueDate])
+  @@map("financial_entries")
+}

@@ -1,0 +1,29 @@
+FROM node:22-alpine AS base
+WORKDIR /repo
+
+FROM base AS deps
+COPY package.json package-lock.json ./
+COPY apps/api/package.json apps/api/package.json
+COPY apps/worker/package.json apps/worker/package.json
+COPY apps/frontend/package.json apps/frontend/package.json
+COPY packages/shared packages/shared
+RUN npm ci --workspace=apps/frontend --include-workspace-root
+
+FROM deps AS build
+COPY apps/frontend apps/frontend
+ARG NEXT_PUBLIC_API_URL
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+RUN npm run build --workspace=apps/frontend
+
+FROM base AS runtime
+ENV NODE_ENV=production
+COPY --from=build /repo/apps/frontend/public apps/frontend/public
+COPY --from=build /repo/apps/frontend/.next/standalone apps/frontend
+COPY --from=build /repo/apps/frontend/.next/static apps/frontend/apps/frontend/.next/static
+
+WORKDIR /repo/apps/frontend
+EXPOSE 3000
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+  CMD node -e "require('http').get('http://localhost:3000/', r => process.exit(r.statusCode < 500 ? 0 : 1)).on('error', () => process.exit(1))"
+
+CMD ["node", "apps/frontend/server.js"]

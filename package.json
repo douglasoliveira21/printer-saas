@@ -1,0 +1,22 @@
+{
+  "name": "printer-saas",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "postinstall": "npm run build -w packages/shared",
+    "build:shared": "npm run build -w packages/shared",
+    "dev:api": "npm run start:dev -w apps/api",
+    "dev:worker": "npm run start:dev -w apps/worker",
+    "dev:frontend": "npm run dev -w apps/frontend",
+    "prisma:generate": "npm run prisma:generate -w apps/api",
+    "prisma:migrate": "npm run prisma:migrate -w apps/api",
+    "prisma:seed": "npm run prisma:seed -w apps/api"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

@@ -1,0 +1,28 @@
+node_modules/
+dist/
+build/
+.next/
+out/
+coverage/
+
+.env
+.env.local
+.env.*.local
+
+*.log
+npm-debug.log*
+
+.DS_Store
+Thumbs.db
+
+*.tsbuildinfo
+
+# IDE
+.vscode/
+.idea/
+
+# Agent (C#/.NET)
+apps/agent-windows/**/bin/
+apps/agent-windows/**/obj/
+apps/agent-windows/**/*.user
+apps/agent-windows/publish/
