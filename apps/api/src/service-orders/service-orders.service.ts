@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { resolveSlaHours } from '@printer-saas/shared';
 import { TenantPrismaService } from '../prisma/tenant-prisma.service';
 import { paginated } from '../common/dto/pagination.dto';
 import type { CreateServiceOrderDto } from './dto/create-service-order.dto';
@@ -10,9 +11,9 @@ export class ServiceOrdersService {
   constructor(private readonly tenantPrisma: TenantPrismaService) {}
 
   async create(dto: CreateServiceOrderDto) {
-    await this.assertCustomerBelongsToTenant(dto.customerId);
-    if (dto.locationId) await this.assertBelongsToTenant('location', dto.locationId);
-    if (dto.printerId) await this.assertBelongsToTenant('printer', dto.printerId);
+    const customer = await this.assertCustomerBelongsToTenant(dto.customerId);
+    const location = dto.locationId ? await this.assertBelongsToTenant('location', dto.locationId) : null;
+    const printer = dto.printerId ? await this.assertBelongsToTenant('printer', dto.printerId) : null;
     if (dto.technicianId) await this.assertBelongsToTenant('user', dto.technicianId);
 
     // Per-tenant sequential number. Race-safe enough for MVP volume via a
@@ -23,6 +24,9 @@ export class ServiceOrdersService {
       orderBy: { number: 'desc' },
       select: { number: true },
     });
+
+    const startsAt = dto.scheduledAt ? new Date(dto.scheduledAt) : new Date();
+    const slaDueAt = dto.slaDueAt ? new Date(dto.slaDueAt) : await this.computeSlaDueAt(startsAt, customer, location, printer, dto.printerId);
 
     return this.tenantPrisma.client.serviceOrder.create({
       data: {
@@ -35,15 +39,44 @@ export class ServiceOrdersService {
         priority: dto.priority,
         description: dto.description,
         scheduledAt: dto.scheduledAt ? new Date(dto.scheduledAt) : undefined,
-        slaDueAt: dto.slaDueAt ? new Date(dto.slaDueAt) : undefined,
+        slaDueAt,
       } as any,
     });
+  }
+
+  /** Resolves the applicable SLA (printer > location > customer > contract) and turns it into a due date, or null if none applies. */
+  private async computeSlaDueAt(
+    from: Date,
+    customer: { id: string; slaHours: number | null },
+    location: { slaHours: number | null } | null,
+    printer: { slaHours: number | null } | null,
+    printerId: string | undefined,
+  ) {
+    const contract = await this.tenantPrisma.client.contract.findFirst({
+      where: {
+        customerId: customer.id,
+        OR: printerId ? [{ printerId }, { printerId: null }] : [{ printerId: null }],
+        status: 'ACTIVE',
+      },
+      orderBy: { printerId: 'desc' }, // printer-specific contracts (non-null) sort first
+      select: { slaHours: true },
+    });
+
+    const slaHours = resolveSlaHours({
+      printerSlaHours: printer?.slaHours,
+      locationSlaHours: location?.slaHours,
+      customerSlaHours: customer.slaHours,
+      contractSlaHours: contract?.slaHours,
+    });
+
+    return slaHours === null ? undefined : new Date(from.getTime() + slaHours * 60 * 60 * 1000);
   }
 
   async findAll(query: ListServiceOrdersQueryDto) {
     const where = {
       ...(query.status ? { status: query.status as any } : {}),
       ...(query.customerId ? { customerId: query.customerId } : {}),
+      ...(query.technicianId ? { technicianId: query.technicianId } : {}),
     };
 
     const [data, total] = await Promise.all([
@@ -104,6 +137,7 @@ export class ServiceOrdersService {
     if (!customer) {
       throw new NotFoundException('Cliente não encontrado');
     }
+    return customer;
   }
 
   private async assertBelongsToTenant(model: 'location' | 'printer' | 'user', id: string) {
@@ -111,5 +145,6 @@ export class ServiceOrdersService {
     if (!record) {
       throw new NotFoundException(`Registro (${model}) não encontrado`);
     }
+    return record;
   }
 }

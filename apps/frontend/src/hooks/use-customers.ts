@@ -32,6 +32,7 @@ export interface CreateCustomerInput {
   email?: string;
   phone?: string;
   address?: string;
+  slaHours?: number;
 }
 
 export function useCreateCustomer() {
@@ -100,6 +101,7 @@ export function useUpdateLocation() {
       address?: string;
       contactName?: string;
       contactPhone?: string;
+      slaHours?: number;
     }) => {
       const { data } = await apiClient.patch<Location>(`/locations/${id}`, input);
       return data;

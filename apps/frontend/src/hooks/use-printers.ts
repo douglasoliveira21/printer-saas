@@ -77,7 +77,7 @@ export function useDecommissionPrinter() {
 export function useUpdatePrinter() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id, ...input }: { id: string; manufacturer?: string; model?: string; hostname?: string }) => {
+    mutationFn: async ({ id, ...input }: { id: string; manufacturer?: string; model?: string; hostname?: string; slaHours?: number }) => {
       const { data } = await apiClient.patch<Printer>(`/printers/${id}`, input);
       return data;
     },

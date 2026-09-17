@@ -9,4 +9,8 @@ export class ListServiceOrdersQueryDto extends PaginationDto {
   @IsOptional()
   @IsUUID()
   customerId?: string;
+
+  @IsOptional()
+  @IsUUID()
+  technicianId?: string;
 }

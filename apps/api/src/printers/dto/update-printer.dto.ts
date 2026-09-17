@@ -1,4 +1,5 @@
-import { IsOptional, IsString } from 'class-validator';
+import { IsInt, IsOptional, IsString, Min } from 'class-validator';
+import { Type } from 'class-transformer';
 
 export class UpdatePrinterDto {
   @IsOptional()
@@ -12,4 +13,10 @@ export class UpdatePrinterDto {
   @IsOptional()
   @IsString()
   hostname?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  slaHours?: number;
 }

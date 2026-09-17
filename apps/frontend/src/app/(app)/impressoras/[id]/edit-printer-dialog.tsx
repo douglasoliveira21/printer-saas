@@ -23,12 +23,18 @@ export function EditPrinterDialog({ printer }: { printer: Printer }) {
   const [open, setOpen] = useState(false);
   const [manufacturer, setManufacturer] = useState(printer.manufacturer ?? "");
   const [model, setModel] = useState(printer.model ?? "");
+  const [slaHours, setSlaHours] = useState(printer.slaHours?.toString() ?? "");
   const updatePrinter = useUpdatePrinter();
 
   async function handleSave(event: FormEvent) {
     event.preventDefault();
     try {
-      await updatePrinter.mutateAsync({ id: printer.id, manufacturer: manufacturer || undefined, model: model || undefined });
+      await updatePrinter.mutateAsync({
+        id: printer.id,
+        manufacturer: manufacturer || undefined,
+        model: model || undefined,
+        slaHours: slaHours ? Number(slaHours) : undefined,
+      });
       toast.success("Impressora atualizada");
       setOpen(false);
     } catch (error) {
@@ -56,6 +62,17 @@ export function EditPrinterDialog({ printer }: { printer: Printer }) {
             <div className="space-y-2">
               <Label htmlFor="model">Modelo</Label>
               <Input id="model" value={model} onChange={(e) => setModel(e.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="slaHours">SLA (horas) — sobrescreve o padrão do cliente/contrato</Label>
+              <Input
+                id="slaHours"
+                type="number"
+                min={0}
+                value={slaHours}
+                onChange={(e) => setSlaHours(e.target.value)}
+                placeholder="Herdado do cliente/contrato"
+              />
             </div>
           </div>
           <DialogFooter>

@@ -1,4 +1,5 @@
-import { IsOptional, IsString, IsUUID, MinLength } from 'class-validator';
+import { IsInt, IsOptional, IsString, IsUUID, Min, MinLength } from 'class-validator';
+import { Type } from 'class-transformer';
 
 export class CreateLocationDto {
   @IsUUID()
@@ -23,4 +24,10 @@ export class CreateLocationDto {
   @IsOptional()
   @IsString()
   notes?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  slaHours?: number;
 }

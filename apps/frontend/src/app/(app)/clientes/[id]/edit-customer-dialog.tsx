@@ -28,6 +28,7 @@ export function EditCustomerDialog({ customer }: { customer: Customer }) {
   const [email, setEmail] = useState(customer.email ?? "");
   const [phone, setPhone] = useState(customer.phone ?? "");
   const [status, setStatus] = useState<Customer["status"]>(customer.status);
+  const [slaHours, setSlaHours] = useState(customer.slaHours?.toString() ?? "");
   const updateCustomer = useUpdateCustomer();
 
   async function handleSubmit(event: FormEvent) {
@@ -41,6 +42,7 @@ export function EditCustomerDialog({ customer }: { customer: Customer }) {
         email: email || undefined,
         phone: phone || undefined,
         status,
+        slaHours: slaHours ? Number(slaHours) : undefined,
       });
       toast.success("Cliente atualizado");
       setOpen(false);
@@ -95,6 +97,17 @@ export function EditCustomerDialog({ customer }: { customer: Customer }) {
                   <SelectItem value="INACTIVE">Inativo</SelectItem>
                 </SelectContent>
               </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="slaHours">SLA padrão (horas) — sobrescreve o do contrato</Label>
+              <Input
+                id="slaHours"
+                type="number"
+                min={0}
+                value={slaHours}
+                onChange={(e) => setSlaHours(e.target.value)}
+                placeholder="Herdado do contrato"
+              />
             </div>
           </div>
           <DialogFooter>

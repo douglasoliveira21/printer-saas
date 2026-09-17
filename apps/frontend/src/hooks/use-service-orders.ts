@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiClient } from "@/lib/api-client";
 import type { PaginatedResponse, ServiceOrder, ServiceOrderPriority, ServiceOrderStatus } from "@/lib/types";
 
-export function useServiceOrders(params: { status?: string } = {}) {
+export function useServiceOrders(params: { status?: string; technicianId?: string } = {}) {
   return useQuery({
     queryKey: ["service-orders", params],
     queryFn: async () => {

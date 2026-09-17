@@ -10,8 +10,12 @@ export class AlertsController {
 
   @Get()
   @RequirePermissions('dashboard.view')
-  findAll(@Query('status') status?: string, @Query('printerId') printerId?: string) {
-    return this.alertsService.findAll(status, printerId);
+  findAll(
+    @Query('status') status?: string,
+    @Query('printerId') printerId?: string,
+    @Query('serviceOrderId') serviceOrderId?: string,
+  ) {
+    return this.alertsService.findAll(status, printerId, serviceOrderId);
   }
 
   @Patch(':id/acknowledge')

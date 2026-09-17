@@ -1,21 +1,14 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiClient } from "@/lib/api-client";
+import type { Alert } from "@/lib/types";
 
-export interface Alert {
-  id: string;
-  type: string;
-  level: "INFO" | "WARNING" | "CRITICAL";
-  status: "OPEN" | "ACKNOWLEDGED" | "RESOLVED";
-  message: string;
-  createdAt: string;
-  printer?: { id: string; model: string | null; ip: string | null; customer?: { legalName: string } | null } | null;
-}
+export type { Alert };
 
-export function useAlerts(status?: string, printerId?: string) {
+export function useAlerts(status?: string, printerId?: string, serviceOrderId?: string) {
   return useQuery({
-    queryKey: ["alerts", status ?? "all", printerId ?? "all"],
+    queryKey: ["alerts", status ?? "all", printerId ?? "all", serviceOrderId ?? "all"],
     queryFn: async () => {
-      const { data } = await apiClient.get<Alert[]>("/alerts", { params: { status, printerId } });
+      const { data } = await apiClient.get<Alert[]>("/alerts", { params: { status, printerId, serviceOrderId } });
       return data;
     },
     refetchInterval: 30_000,

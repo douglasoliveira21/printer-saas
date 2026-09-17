@@ -26,6 +26,7 @@ export function LocationCard({ location, customerId }: { location: Location; cus
   const [address, setAddress] = useState(location.address ?? "");
   const [contactName, setContactName] = useState(location.contactName ?? "");
   const [contactPhone, setContactPhone] = useState(location.contactPhone ?? "");
+  const [slaHours, setSlaHours] = useState(location.slaHours?.toString() ?? "");
 
   const updateLocation = useUpdateLocation();
   const deleteLocation = useDeleteLocation();
@@ -40,6 +41,7 @@ export function LocationCard({ location, customerId }: { location: Location; cus
         address: address || undefined,
         contactName: contactName || undefined,
         contactPhone: contactPhone || undefined,
+        slaHours: slaHours ? Number(slaHours) : undefined,
       });
       toast.success("Local atualizado");
       setEditing(false);
@@ -101,6 +103,17 @@ export function LocationCard({ location, customerId }: { location: Location; cus
                   <Label htmlFor="contactPhone">Telefone</Label>
                   <Input id="contactPhone" value={contactPhone} onChange={(e) => setContactPhone(e.target.value)} />
                 </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="slaHours">SLA (horas) — sobrescreve o do cliente</Label>
+                <Input
+                  id="slaHours"
+                  type="number"
+                  min={0}
+                  value={slaHours}
+                  onChange={(e) => setSlaHours(e.target.value)}
+                  placeholder="Herdado do cliente"
+                />
               </div>
             </div>
             <DialogFooter>

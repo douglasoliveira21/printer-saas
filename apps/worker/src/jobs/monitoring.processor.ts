@@ -7,9 +7,12 @@ import { PrismaService } from '../prisma/prisma.service';
 export const MONITORING_QUEUE = 'monitoring';
 export const CHECK_OFFLINE_JOB = 'check-offline';
 export const CHECK_TONER_JOB = 'check-toner';
+export const CHECK_SLA_JOB = 'check-sla';
 
 const TONER_WARNING_THRESHOLD = 20;
 const TONER_CRITICAL_THRESHOLD = 10;
+const SLA_EXPIRING_WARNING_MS = 2 * 60 * 60 * 1000; // warn once an OS is within 2h of breaching its SLA
+const OPEN_SERVICE_ORDER_STATUSES = ['OPEN', 'SCHEDULED', 'IN_PROGRESS', 'WAITING_PART', 'WAITING_CUSTOMER'] as const;
 
 @Processor(MONITORING_QUEUE)
 export class MonitoringProcessor extends WorkerHost {
@@ -28,6 +31,8 @@ export class MonitoringProcessor extends WorkerHost {
         return this.checkOffline();
       case CHECK_TONER_JOB:
         return this.checkToner();
+      case CHECK_SLA_JOB:
+        return this.checkServiceOrderSla();
       default:
         this.logger.warn(`Unknown job: ${job.name}`);
     }
@@ -156,5 +161,42 @@ export class MonitoringProcessor extends WorkerHost {
     }
 
     this.logger.log(`Toner check: ${alertsCreated} alerts created`);
+  }
+
+  private async checkServiceOrderSla() {
+    const now = Date.now();
+    const orders = await this.prisma.serviceOrder.findMany({
+      where: { slaDueAt: { not: null }, status: { in: [...OPEN_SERVICE_ORDER_STATUSES] } },
+      select: { id: true, tenantId: true, number: true, slaDueAt: true },
+    });
+
+    let alertsCreated = 0;
+    for (const order of orders) {
+      const dueAt = order.slaDueAt!.getTime();
+      const isLate = dueAt < now;
+      const isExpiringSoon = !isLate && dueAt - now <= SLA_EXPIRING_WARNING_MS;
+      if (!isLate && !isExpiringSoon) continue;
+
+      const type = isLate ? 'SERVICE_ORDER_LATE' : 'SLA_EXPIRING';
+      const existingOpenAlert = await this.prisma.alert.findFirst({
+        where: { serviceOrderId: order.id, type, status: 'OPEN' },
+      });
+      if (existingOpenAlert) continue;
+
+      await this.prisma.alert.create({
+        data: {
+          tenantId: order.tenantId,
+          serviceOrderId: order.id,
+          type,
+          level: isLate ? 'CRITICAL' : 'WARNING',
+          message: isLate
+            ? `OS #${order.number} está com o SLA vencido.`
+            : `OS #${order.number} vence o SLA em menos de 2 horas.`,
+        },
+      });
+      alertsCreated++;
+    }
+
+    this.logger.log(`SLA check: ${alertsCreated} alerts created`);
   }
 }
