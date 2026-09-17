@@ -21,19 +21,34 @@ public class PrinterSaasApiClient
     };
 
     private readonly HttpClient _http;
+    private readonly AgentCredentialStore _credentialStore;
     private readonly ILogger<PrinterSaasApiClient> _logger;
 
-    public PrinterSaasApiClient(HttpClient http, ILogger<PrinterSaasApiClient> logger)
+    public PrinterSaasApiClient(HttpClient http, AgentCredentialStore credentialStore, ILogger<PrinterSaasApiClient> logger)
     {
         _http = http;
+        _credentialStore = credentialStore;
         _logger = logger;
     }
 
-    /// <summary>Sets the permanent Agent credential used by every call after enrollment.</summary>
-    public void SetCredentials(AgentCredentials credentials)
+    /// <summary>
+    /// Loads the stored credential fresh from disk and applies it to THIS
+    /// instance's HttpClient. Typed HttpClients are transient by default
+    /// (see AddHttpClient in Program.cs), so different call sites
+    /// (AgentEnrollmentService, AgentWorker) can each get their own
+    /// PrinterSaasApiClient/HttpClient pair — setting the header once on
+    /// one instance would silently leave the others unauthenticated. Doing
+    /// this per-call is a little wasteful (one file read) but correct
+    /// regardless of which instance is in play.
+    /// </summary>
+    private void ApplyStoredCredentials()
     {
-        _http.DefaultRequestHeaders.Authorization =
-            new AuthenticationHeaderValue("AgentKey", $"{credentials.AgentId}.{credentials.ApiKeySecret}");
+        var credentials = _credentialStore.Load();
+        if (credentials is not null)
+        {
+            _http.DefaultRequestHeaders.Authorization =
+                new AuthenticationHeaderValue("AgentKey", $"{credentials.AgentId}.{credentials.ApiKeySecret}");
+        }
     }
 
     public async Task<EnrollResponse> EnrollAsync(EnrollRequest request, CancellationToken ct)
@@ -48,6 +63,7 @@ public class PrinterSaasApiClient
     {
         try
         {
+            ApplyStoredCredentials();
             var response = await _http.PostAsJsonAsync("api/v1/agent-api/v1/heartbeat", request, JsonOptions, ct);
             return response.IsSuccessStatusCode;
         }
@@ -62,6 +78,7 @@ public class PrinterSaasApiClient
     {
         try
         {
+            ApplyStoredCredentials();
             var response = await _http.GetAsync("api/v1/agent-api/v1/config", ct);
             if (!response.IsSuccessStatusCode)
             {
@@ -81,6 +98,7 @@ public class PrinterSaasApiClient
     {
         try
         {
+            ApplyStoredCredentials();
             var response = await _http.PostAsJsonAsync("api/v1/agent-api/v1/devices", request, JsonOptions, ct);
             if (!response.IsSuccessStatusCode)
             {

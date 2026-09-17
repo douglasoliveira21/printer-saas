@@ -35,7 +35,6 @@ public class AgentEnrollmentService
         var existing = _store.Load();
         if (existing is not null)
         {
-            _apiClient.SetCredentials(existing);
             return existing;
         }
 
@@ -62,7 +61,6 @@ public class AgentEnrollmentService
         var credentials = new AgentCredentials(response.AgentId, secret);
 
         _store.Save(credentials);
-        _apiClient.SetCredentials(credentials);
         _logger.LogInformation("Enrollment successful. AgentId: {AgentId}", credentials.AgentId);
         return credentials;
     }
