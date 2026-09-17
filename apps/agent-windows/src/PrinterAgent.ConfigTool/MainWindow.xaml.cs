@@ -43,10 +43,10 @@ public partial class MainWindow : Window
         var state = _installer.GetState();
         (StatusText.Text, StatusDot.Fill, InstallButton.Content) = state switch
         {
-            AgentServiceState.Running => ("Agent instalado e rodando", (Brush)new SolidColorBrush(Color.FromRgb(0x16, 0xA3, 0x4A)), (object)"Reinstalar / Atualizar"),
-            AgentServiceState.Stopped => ("Agent instalado, mas parado", (Brush)new SolidColorBrush(Color.FromRgb(0xD9, 0x7B, 0x0E)), (object)"Reinstalar / Atualizar"),
-            AgentServiceState.NotInstalled => ("Agent não instalado nesta máquina", Brushes.Gray, (object)"Instalar e Iniciar"),
-            _ => ("Status desconhecido", Brushes.Gray, (object)"Reinstalar / Atualizar"),
+            AgentServiceState.Running => ("Agent instalado e rodando", (Brush)FindResource("SuccessBrush"), (object)"Reinstalar / Atualizar"),
+            AgentServiceState.Stopped => ("Agent instalado, mas parado", (Brush)FindResource("WarningBrush"), (object)"Reinstalar / Atualizar"),
+            AgentServiceState.NotInstalled => ("Agent não instalado nesta máquina", (Brush)FindResource("MutedBrush"), (object)"Instalar e Iniciar"),
+            _ => ("Status desconhecido", (Brush)FindResource("MutedBrush"), (object)"Reinstalar / Atualizar"),
         };
 
         StartButton.IsEnabled = state == AgentServiceState.Stopped;
