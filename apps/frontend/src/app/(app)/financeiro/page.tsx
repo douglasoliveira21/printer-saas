@@ -11,6 +11,7 @@ import { useFinancialEntries, useFinancialSummary, useMarkEntryPaid } from "@/ho
 import { getApiErrorMessage } from "@/lib/api-client";
 import type { FinancialEntry, FinancialEntryStatus } from "@/lib/types";
 import { CreateEntryDialog } from "./create-entry-dialog";
+import { EntryActionsMenu } from "./entry-actions-menu";
 
 function currency(value: number | string) {
   return Number(value).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -80,11 +81,14 @@ function EntriesTable({ type }: { type: "RECEIVABLE" | "PAYABLE" }) {
                 </Badge>
               </TableCell>
               <TableCell className="text-right">
-                {entry.status === "PENDING" && (
-                  <Button size="sm" variant="outline" onClick={() => handleMarkPaid(entry.id)}>
-                    Baixar
-                  </Button>
-                )}
+                <div className="flex justify-end gap-2">
+                  {entry.status === "PENDING" && (
+                    <Button size="sm" variant="outline" onClick={() => handleMarkPaid(entry.id)}>
+                      Baixar
+                    </Button>
+                  )}
+                  <EntryActionsMenu entry={entry} />
+                </div>
               </TableCell>
             </TableRow>
           ))}

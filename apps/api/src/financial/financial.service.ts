@@ -1,8 +1,9 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { TenantPrismaService } from '../prisma/tenant-prisma.service';
 import { paginated } from '../common/dto/pagination.dto';
 import type { CreateFinancialEntryDto } from './dto/create-financial-entry.dto';
 import type { ListFinancialEntriesQueryDto } from './dto/list-financial-entries-query.dto';
+import type { UpdateFinancialEntryDto } from './dto/update-financial-entry.dto';
 
 @Injectable()
 export class FinancialService {
@@ -50,6 +51,22 @@ export class FinancialService {
     ]);
 
     return paginated(data, total, query);
+  }
+
+  async update(id: string, dto: UpdateFinancialEntryDto) {
+    const entry = await this.findOne(id);
+    if (entry.status !== 'PENDING') {
+      throw new BadRequestException('Só é possível editar lançamentos pendentes');
+    }
+    return this.tenantPrisma.client.financialEntry.update({
+      where: { id },
+      data: {
+        category: dto.category,
+        description: dto.description,
+        amount: dto.amount,
+        dueDate: dto.dueDate ? new Date(dto.dueDate) : undefined,
+      },
+    });
   }
 
   async markPaid(id: string) {

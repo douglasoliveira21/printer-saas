@@ -2,6 +2,7 @@ import { Body, Controller, Get, HttpCode, HttpStatus, Param, Patch, Post, Query 
 import { ApiTags } from '@nestjs/swagger';
 import { FinancialService } from './financial.service';
 import { CreateFinancialEntryDto } from './dto/create-financial-entry.dto';
+import { UpdateFinancialEntryDto } from './dto/update-financial-entry.dto';
 import { ListFinancialEntriesQueryDto } from './dto/list-financial-entries-query.dto';
 import { RequirePermissions } from '../common/decorators/permissions.decorator';
 
@@ -26,6 +27,12 @@ export class FinancialController {
   @RequirePermissions('financial.view')
   summary() {
     return this.financialService.summary();
+  }
+
+  @Patch('entries/:id')
+  @RequirePermissions('financial.edit')
+  update(@Param('id') id: string, @Body() dto: UpdateFinancialEntryDto) {
+    return this.financialService.update(id, dto);
   }
 
   @Patch('entries/:id/pay')

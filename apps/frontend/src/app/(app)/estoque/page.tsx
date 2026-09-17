@@ -10,6 +10,7 @@ import { useInventoryItems } from "@/hooks/use-inventory";
 import type { InventoryItem } from "@/lib/types";
 import { CreateItemDialog } from "./create-item-dialog";
 import { MovementDialog } from "./movement-dialog";
+import { ItemActionsMenu } from "./item-actions-menu";
 
 export default function EstoquePage() {
   const { data: items, isLoading } = useInventoryItems();
@@ -67,9 +68,12 @@ export default function EstoquePage() {
                   </TableCell>
                   <TableCell>{item.minQuantity}</TableCell>
                   <TableCell className="text-right">
-                    <Button size="sm" variant="outline" onClick={() => setMoving(item)}>
-                      Movimentar
-                    </Button>
+                    <div className="flex justify-end gap-2">
+                      <Button size="sm" variant="outline" onClick={() => setMoving(item)}>
+                        Movimentar
+                      </Button>
+                      <ItemActionsMenu item={item} />
+                    </div>
                   </TableCell>
                 </TableRow>
               );

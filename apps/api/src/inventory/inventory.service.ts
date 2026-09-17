@@ -32,6 +32,19 @@ export class InventoryService {
     return item;
   }
 
+  async update(id: string, dto: Partial<CreateInventoryItemDto>) {
+    await this.findOne(id);
+    return this.tenantPrisma.client.inventoryItem.update({
+      where: { id },
+      data: { name: dto.name, type: dto.type, minQuantity: dto.minQuantity },
+    });
+  }
+
+  async remove(id: string) {
+    await this.findOne(id);
+    await this.tenantPrisma.client.inventoryItem.delete({ where: { id } });
+  }
+
   /**
    * Records a stock movement and updates the running quantity atomically.
    * Uses the raw (tenant-unscoped) client inside a transaction because

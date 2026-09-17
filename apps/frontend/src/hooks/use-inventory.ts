@@ -34,6 +34,27 @@ export function useCreateInventoryItem() {
   });
 }
 
+export function useUpdateInventoryItem() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, ...input }: { id: string; name?: string; type?: string; minQuantity?: number }) => {
+      const { data } = await apiClient.patch<InventoryItem>(`/inventory/items/${id}`, input);
+      return data;
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["inventory-items"] }),
+  });
+}
+
+export function useDeleteInventoryItem() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      await apiClient.delete(`/inventory/items/${id}`);
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["inventory-items"] }),
+  });
+}
+
 export function useCreateMovement() {
   const queryClient = useQueryClient();
   return useMutation({

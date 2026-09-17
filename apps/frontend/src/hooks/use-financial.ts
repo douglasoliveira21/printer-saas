@@ -47,6 +47,43 @@ export function useCreateFinancialEntry() {
   });
 }
 
+export function useUpdateFinancialEntry() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      id,
+      ...input
+    }: {
+      id: string;
+      category?: string;
+      description?: string;
+      amount?: number;
+      dueDate?: string;
+    }) => {
+      const { data } = await apiClient.patch<FinancialEntry>(`/financial/entries/${id}`, input);
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["financial-entries"] });
+      queryClient.invalidateQueries({ queryKey: ["financial-summary"] });
+    },
+  });
+}
+
+export function useCancelFinancialEntry() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { data } = await apiClient.patch<FinancialEntry>(`/financial/entries/${id}/cancel`);
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["financial-entries"] });
+      queryClient.invalidateQueries({ queryKey: ["financial-summary"] });
+    },
+  });
+}
+
 export function useMarkEntryPaid() {
   const queryClient = useQueryClient();
   return useMutation({
