@@ -1,5 +1,6 @@
 <Solution>
   <Folder Name="/src/">
+    <Project Path="src/PrinterAgent.ConfigTool/PrinterAgent.ConfigTool.csproj" />
     <Project Path="src/PrinterAgent.Core/PrinterAgent.Core.csproj" />
     <Project Path="src/PrinterAgent.Service/PrinterAgent.Service.csproj" />
   </Folder>
