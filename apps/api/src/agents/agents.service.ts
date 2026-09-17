@@ -121,6 +121,8 @@ export class AgentsService {
           ip: device.ip,
           mac: device.mac ?? undefined,
           hostname: device.hostname ?? undefined,
+          manufacturer: device.manufacturer ?? undefined,
+          model: device.model ?? undefined,
           firmware: device.firmware ?? undefined,
           sysDescr: device.sysDescr ?? undefined,
           onlineStatus: 'ONLINE',

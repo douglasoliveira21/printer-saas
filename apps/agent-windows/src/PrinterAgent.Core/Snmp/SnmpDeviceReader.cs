@@ -34,12 +34,19 @@ public class SnmpDeviceReader
             return null;
         }
 
+        var manufacturer = InferManufacturer(sysDescr);
         var device = new DiscoveredDevice
         {
             Ip = ip.ToString(),
             SysDescr = sysDescr,
-            Manufacturer = InferManufacturer(sysDescr),
-            Model = sysDescr,
+            Manufacturer = manufacturer,
+            // sysDescr is often a long ";"-delimited dump (model, firmware
+            // date, engine/NIC versions, serial...) — the raw string stays
+            // available in SysDescr for anyone who needs it, but as a
+            // "model" it just duplicates the manufacturer and buries the
+            // actually useful part behind noise (spec §66: normalize what
+            // we send, don't just forward the raw blob as-is).
+            Model = ExtractModel(sysDescr, manufacturer),
         };
 
         device.Hostname = await TryGetAsync(endpoint, communityOctet, PrinterMibOids.SysName, timeoutMs, retries, ct);
@@ -180,4 +187,24 @@ public class SnmpDeviceReader
 
     private static string? InferManufacturer(string sysDescr) =>
         PrinterMibOids.KnownManufacturers.FirstOrDefault(m => sysDescr.Contains(m, StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>
+    /// Best-effort "model" out of a raw sysDescr: take the first ";"-delimited
+    /// segment (many vendors format sysDescr as "Model; firmware; engine;
+    /// NIC; serial..."), then strip a leading manufacturer name so the UI
+    /// doesn't show "Samsung Samsung SL-M4070FR". Falls back to the full
+    /// string if that leaves nothing usable — never returns an empty model
+    /// when the device actually reported something (spec §67).
+    /// </summary>
+    private static string ExtractModel(string sysDescr, string? manufacturer)
+    {
+        var firstSegment = sysDescr.Split(';')[0].Trim();
+
+        if (manufacturer is not null && firstSegment.StartsWith(manufacturer, StringComparison.OrdinalIgnoreCase))
+        {
+            firstSegment = firstSegment[manufacturer.Length..].Trim();
+        }
+
+        return firstSegment.Length > 0 ? firstSegment : sysDescr;
+    }
 }
