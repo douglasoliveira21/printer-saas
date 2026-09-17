@@ -14,6 +14,7 @@ export interface Customer {
   phone: string | null;
   address: string | null;
   status: CustomerStatus;
+  slaHours: number | null;
   createdAt: string;
   locations?: Location[];
 }
@@ -25,6 +26,7 @@ export interface Location {
   address: string | null;
   contactName: string | null;
   contactPhone: string | null;
+  slaHours: number | null;
 }
 
 export type AgentStatus = "PENDING" | "ONLINE" | "OFFLINE" | "DISABLED";
@@ -56,11 +58,20 @@ export interface Printer {
   locationId: string | null;
   lastSeenAt: string | null;
   lastCollectedAt: string | null;
+  slaHours: number | null;
   customer?: { id: string; legalName: string } | null;
   location?: { id: string; name: string } | null;
   agent?: { id: string; name: string } | null;
   counters?: CounterReading[];
   consumables?: ConsumableReading[];
+}
+
+export interface SupplyForecast {
+  currentLevelPercent: number;
+  dailyDepletionRate: number;
+  daysRemaining: number;
+  predictedReplacementAt: string;
+  dataPoints: number;
 }
 
 export interface CounterReading {
@@ -79,6 +90,57 @@ export interface ConsumableReading {
   levelPercent: number | null;
   name: string | null;
   collectedAt: string;
+  forecast?: SupplyForecast | null;
+}
+
+export type ConsumableReplacementStatus = "PREDICTED" | "CONFIRMED" | "PREMATURE" | "DISMISSED";
+
+export interface ConsumableReplacement {
+  id: string;
+  type: string;
+  color: string | null;
+  predictedAt: string | null;
+  replacedAt: string | null;
+  levelPercentAtReplacement: number | null;
+  status: ConsumableReplacementStatus;
+  notes: string | null;
+  createdAt: string;
+  printer?: { id: string; model: string | null; ip: string | null; customer?: { id: string; legalName: string } | null } | null;
+}
+
+export interface SupplyForecastEntry {
+  printer: { id: string; model: string | null; ip: string | null };
+  customer: { id: string; legalName: string } | null;
+  type: string;
+  color: string | null;
+  currentLevelPercent: number;
+  daysRemaining: number;
+  predictedReplacementAt: string;
+}
+
+export type AlertType =
+  | "PRINTER_OFFLINE"
+  | "AGENT_OFFLINE"
+  | "TONER_LOW"
+  | "TONER_CRITICAL"
+  | "COUNTER_STALE"
+  | "DEVICE_ERROR"
+  | "CONTRACT_EXPIRING"
+  | "SERVICE_ORDER_LATE"
+  | "SLA_EXPIRING"
+  | "COLLECTION_FAILED";
+export type AlertLevel = "INFO" | "WARNING" | "CRITICAL";
+export type AlertStatus = "OPEN" | "ACKNOWLEDGED" | "RESOLVED";
+
+export interface Alert {
+  id: string;
+  type: AlertType;
+  level: AlertLevel;
+  status: AlertStatus;
+  message: string;
+  createdAt: string;
+  resolvedAt: string | null;
+  printer?: { id: string; model: string | null; ip: string | null; customer?: { legalName: string } | null } | null;
 }
 
 export interface DashboardSummary {

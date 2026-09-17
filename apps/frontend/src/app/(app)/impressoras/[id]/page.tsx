@@ -20,6 +20,13 @@ import { useDecommissionPrinter, usePrinter } from "@/hooks/use-printers";
 import { useAlerts } from "@/hooks/use-alerts";
 import { getApiErrorMessage } from "@/lib/api-client";
 import { EditPrinterDialog } from "./edit-printer-dialog";
+import { RegisterReplacementDialog } from "./register-replacement-dialog";
+
+function formatForecast(daysRemaining: number, predictedReplacementAt: string) {
+  const date = new Date(predictedReplacementAt).toLocaleDateString("pt-BR");
+  const days = Math.max(0, Math.round(daysRemaining));
+  return `Previsão de troca: ${date} (~${days} dia${days === 1 ? "" : "s"})`;
+}
 
 function formatPages(value: number | null | undefined) {
   return value === null || value === undefined ? "Não disponível" : value.toLocaleString("pt-BR");
@@ -222,6 +229,14 @@ export default function PrinterDetailPage({ params }: { params: Promise<{ id: st
                         </div>
                       </>
                     )}
+                    {c.forecast && (
+                      <p className="mt-2 text-xs text-neutral-500">
+                        {formatForecast(c.forecast.daysRemaining, c.forecast.predictedReplacementAt)}
+                      </p>
+                    )}
+                    <div className="mt-3">
+                      <RegisterReplacementDialog printerId={printer.id} type={c.type} color={c.color} />
+                    </div>
                   </CardContent>
                 </Card>
               );

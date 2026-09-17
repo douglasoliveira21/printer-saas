@@ -1,8 +1,10 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { calculateSupplyForecast } from '@printer-saas/shared';
 import { TenantPrismaService } from '../prisma/tenant-prisma.service';
 import { paginated } from '../common/dto/pagination.dto';
 import type { ListPrintersQueryDto } from './dto/list-printers-query.dto';
 import type { ClaimPrinterDto } from './dto/claim-printer.dto';
+import type { UpdatePrinterDto } from './dto/update-printer.dto';
 
 @Injectable()
 export class PrintersService {
@@ -52,7 +54,22 @@ export class PrintersService {
     if (!printer) {
       throw new NotFoundException('Impressora não encontrada');
     }
-    return printer;
+
+    // One forecast per type+color, using every fetched reading of that key
+    // (not just the latest) so the depletion-rate trend has real data points.
+    const readingsByKey = new Map<string, { levelPercent: number | null; collectedAt: Date }[]>();
+    for (const c of printer.consumables) {
+      const key = `${c.type}:${c.color ?? 'default'}`;
+      const list = readingsByKey.get(key) ?? [];
+      list.push({ levelPercent: c.levelPercent, collectedAt: c.collectedAt });
+      readingsByKey.set(key, list);
+    }
+    const consumablesWithForecast = printer.consumables.map((c) => ({
+      ...c,
+      forecast: calculateSupplyForecast(readingsByKey.get(`${c.type}:${c.color ?? 'default'}`) ?? []),
+    }));
+
+    return { ...printer, consumables: consumablesWithForecast };
   }
 
   /** Moves a DISCOVERED printer into MONITORED and links it to a customer/location (see spec §23). */
@@ -94,8 +111,8 @@ export class PrintersService {
     return this.tenantPrisma.client.printer.update({ where: { id }, data: { status: 'DECOMMISSIONED' } });
   }
 
-  /** Manual correction of vendor-reported fields (spec §18: not every device reports these accurately). */
-  async update(id: string, dto: { manufacturer?: string; model?: string; hostname?: string }) {
+  /** Manual correction of vendor-reported fields (spec §18: not every device reports these accurately), plus SLA override. */
+  async update(id: string, dto: UpdatePrinterDto) {
     await this.findOne(id);
     return this.tenantPrisma.client.printer.update({ where: { id }, data: dto });
   }

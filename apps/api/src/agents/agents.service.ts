@@ -9,6 +9,11 @@ import type { CreateAgentDto } from './dto/create-agent.dto';
 import type { EnrollAgentDto, HeartbeatDto, SubmitDevicesDto } from './dto/agent-payloads.dto';
 
 const ENROLLMENT_TOKEN_TTL_MS = 24 * 60 * 60 * 1000;
+// A level jump this large between consecutive readings can't be explained by
+// normal usage (levels only go down between polls) — treat it as a physical swap.
+const REPLACEMENT_JUMP_THRESHOLD = 40;
+// Swapped while still above this level = likely premature (wasted remaining life).
+const PREMATURE_REPLACEMENT_LEVEL = 25;
 
 @Injectable()
 export class AgentsService {
@@ -180,22 +185,55 @@ export class AgentsService {
       }
 
       if (device.consumables?.length) {
-        await this.prisma.consumableReading.createMany({
-          data: device.consumables.map((c) => ({
-            printerId: printer.id,
-            type: c.type,
-            color: c.color,
-            levelPercent: c.levelPercent ? Math.round(c.levelPercent) : undefined,
-            capacity: c.capacity,
-            name: c.name,
-            serial: c.serial,
-          })),
-        });
+        for (const c of device.consumables) {
+          const levelPercent = c.levelPercent !== undefined ? Math.round(c.levelPercent) : undefined;
+          if (levelPercent !== undefined) {
+            await this.detectReplacement(agent.tenantId, printer.id, c.type, c.color ?? null, levelPercent);
+          }
+          await this.prisma.consumableReading.create({
+            data: {
+              printerId: printer.id,
+              type: c.type,
+              color: c.color,
+              levelPercent,
+              capacity: c.capacity,
+              name: c.name,
+              serial: c.serial,
+            },
+          });
+        }
       }
 
       results.push({ fingerprint, printerId: printer.id, status: printer.status });
     }
     return { processed: results.length, results };
+  }
+
+  /**
+   * A physical consumable swap shows up as the level jumping back up between
+   * two consecutive readings (levels only ever fall between agent polls
+   * otherwise). Confirms/creates a ConsumableReplacement record when that
+   * happens, flagging it PREMATURE if there was still plenty of life left.
+   */
+  private async detectReplacement(tenantId: string, printerId: string, type: string, color: string | null, newLevel: number) {
+    const previous = await this.prisma.consumableReading.findFirst({
+      where: { printerId, type, color },
+      orderBy: { collectedAt: 'desc' },
+      select: { levelPercent: true },
+    });
+    if (previous?.levelPercent === null || previous?.levelPercent === undefined) return;
+    if (newLevel - previous.levelPercent < REPLACEMENT_JUMP_THRESHOLD) return;
+
+    const status = previous.levelPercent > PREMATURE_REPLACEMENT_LEVEL ? 'PREMATURE' : 'CONFIRMED';
+    const updated = await this.prisma.consumableReplacement.updateMany({
+      where: { printerId, type, color, status: 'PREDICTED' },
+      data: { status, replacedAt: new Date(), levelPercentAtReplacement: previous.levelPercent },
+    });
+    if (updated.count === 0) {
+      await this.prisma.consumableReplacement.create({
+        data: { tenantId, printerId, type, color, replacedAt: new Date(), levelPercentAtReplacement: previous.levelPercent, status },
+      });
+    }
   }
 
   private computeFingerprint(agentId: string, device: { serial?: string; mac?: string; ip?: string }): string | null {

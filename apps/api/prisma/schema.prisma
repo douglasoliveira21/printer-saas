@@ -47,6 +47,7 @@ model Tenant {
   inventoryItems    InventoryItem[]
   inventoryMovements InventoryMovement[]
   financialEntries  FinancialEntry[]
+  consumableReplacements ConsumableReplacement[]
 
   @@map("tenants")
 }
@@ -198,6 +199,7 @@ model Customer {
   address        String?
   notes          String?
   status         CustomerStatus @default(ACTIVE)
+  slaHours       Int? // overrides the applicable contract's SLA for this customer's service orders
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt
 
@@ -222,6 +224,7 @@ model Location {
   contactName String?
   contactPhone String?
   notes      String?
+  slaHours   Int? // overrides customer/contract SLA for service orders at this location
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
@@ -316,6 +319,8 @@ model Printer {
   lastSeenAt     DateTime?
   lastCollectedAt DateTime?
 
+  slaHours       Int? // overrides location/customer/contract SLA for service orders on this printer
+
   createdAt      DateTime            @default(now())
   updatedAt      DateTime            @updatedAt
 
@@ -324,6 +329,7 @@ model Printer {
   alerts        Alert[]
   serviceOrders ServiceOrder[]
   contracts     Contract[]
+  replacements  ConsumableReplacement[]
 
   @@unique([tenantId, fingerprint])
   @@index([tenantId])
@@ -363,6 +369,43 @@ model ConsumableReading {
   @@map("consumable_readings")
 }
 
+enum ConsumableReplacementStatus {
+  PREDICTED // forecast computed, no replacement seen yet
+  CONFIRMED // level jumped back up — treated as an actual physical replacement
+  PREMATURE // confirmed, but swapped with plenty of life left (possible waste)
+  DISMISSED // manually discarded by the user
+}
+
+// Tracks the lifecycle of a printer's consumable (toner/drum/etc.) from
+// forecasted replacement date through to confirmation, so providers can see
+// predicted vs. actual replacements and catch premature (wasteful) swaps.
+model ConsumableReplacement {
+  id          String                       @id @default(uuid())
+  tenantId    String
+  tenant      Tenant                       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  printerId   String
+  printer     Printer                      @relation(fields: [printerId], references: [id], onDelete: Cascade)
+  type        String
+  color       String?
+
+  predictedAt DateTime?
+  replacedAt  DateTime?
+  levelPercentAtReplacement Int?
+  status      ConsumableReplacementStatus  @default(PREDICTED)
+
+  inventoryMovementId String?
+  inventoryMovement    InventoryMovement?  @relation(fields: [inventoryMovementId], references: [id])
+
+  notes       String?
+
+  createdAt   DateTime                     @default(now())
+  updatedAt   DateTime                     @updatedAt
+
+  @@index([tenantId, status])
+  @@index([printerId, type, color])
+  @@map("consumable_replacements")
+}
+
 // ---------------------------------------------------------------------------
 // ALERTS
 // ---------------------------------------------------------------------------
@@ -398,6 +441,8 @@ model Alert {
   tenant      Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   printerId   String?
   printer     Printer?    @relation(fields: [printerId], references: [id])
+  serviceOrderId String?
+  serviceOrder   ServiceOrder? @relation(fields: [serviceOrderId], references: [id])
   type        AlertType
   level       AlertLevel
   status      AlertStatus @default(OPEN)
@@ -462,6 +507,7 @@ model ServiceOrder {
 
   financialEntries FinancialEntry[]
   inventoryMovements InventoryMovement[]
+  alerts           Alert[]
 
   @@unique([tenantId, number])
   @@index([tenantId, status])
@@ -551,6 +597,8 @@ model InventoryMovement {
   serviceOrderId String?
   serviceOrder   ServiceOrder?          @relation(fields: [serviceOrderId], references: [id])
   createdAt      DateTime               @default(now())
+
+  consumableReplacements ConsumableReplacement[]
 
   @@index([tenantId])
   @@index([itemId])

@@ -17,6 +17,7 @@ import { ServiceOrdersModule } from './service-orders/service-orders.module';
 import { ContractsModule } from './contracts/contracts.module';
 import { FinancialModule } from './financial/financial.module';
 import { InventoryModule } from './inventory/inventory.module';
+import { ConsumablesModule } from './consumables/consumables.module';
 import { ReportsModule } from './reports/reports.module';
 import { PortalModule } from './portal/portal.module';
 import { PlatformModule } from './platform/platform.module';
@@ -46,6 +47,7 @@ import { HealthController } from './health/health.controller';
     ContractsModule,
     FinancialModule,
     InventoryModule,
+    ConsumablesModule,
     ReportsModule,
     PortalModule,
     PlatformModule,
