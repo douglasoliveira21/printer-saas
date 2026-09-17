@@ -43,3 +43,24 @@ export function useUpdateServiceOrderStatus() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["service-orders"] }),
   });
 }
+
+export function useUpdateServiceOrder() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      id,
+      ...input
+    }: {
+      id: string;
+      description?: string;
+      diagnosis?: string;
+      solution?: string;
+      technicianId?: string;
+      priority?: ServiceOrderPriority;
+    }) => {
+      const { data } = await apiClient.patch<ServiceOrder>(`/service-orders/${id}`, input);
+      return data;
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["service-orders"] }),
+  });
+}

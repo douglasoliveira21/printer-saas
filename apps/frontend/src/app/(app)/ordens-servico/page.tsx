@@ -9,6 +9,7 @@ import { useServiceOrders, useUpdateServiceOrderStatus } from "@/hooks/use-servi
 import { getApiErrorMessage } from "@/lib/api-client";
 import type { ServiceOrder, ServiceOrderPriority, ServiceOrderStatus } from "@/lib/types";
 import { CreateServiceOrderDialog } from "./create-service-order-dialog";
+import { EditServiceOrderDialog } from "./edit-service-order-dialog";
 
 const STATUS_OPTIONS: { value: ServiceOrderStatus; label: string }[] = [
   { value: "OPEN", label: "Aberta" },
@@ -58,22 +59,24 @@ export default function OrdensServicoPage() {
               <TableHead>Número</TableHead>
               <TableHead>Cliente</TableHead>
               <TableHead>Impressora</TableHead>
+              <TableHead>Técnico</TableHead>
               <TableHead>Prioridade</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Aberta em</TableHead>
+              <TableHead />
             </TableRow>
           </TableHeader>
           <TableBody>
             {isLoading && (
               <TableRow>
-                <TableCell colSpan={6} className="text-center text-neutral-400">
+                <TableCell colSpan={8} className="text-center text-neutral-400">
                   Carregando...
                 </TableCell>
               </TableRow>
             )}
             {!isLoading && !data?.data.length && (
               <TableRow>
-                <TableCell colSpan={6} className="text-center text-neutral-400">
+                <TableCell colSpan={8} className="text-center text-neutral-400">
                   Nenhuma ordem de serviço registrada ainda.
                 </TableCell>
               </TableRow>
@@ -83,6 +86,7 @@ export default function OrdensServicoPage() {
                 <TableCell className="font-medium">#{order.number}</TableCell>
                 <TableCell>{order.customer?.tradeName || order.customer?.legalName || "—"}</TableCell>
                 <TableCell>{order.printer ? `${order.printer.model || ""} (${order.printer.ip || "—"})` : "—"}</TableCell>
+                <TableCell>{order.technician?.name || "Não atribuído"}</TableCell>
                 <TableCell>
                   <Badge variant={PRIORITY_CONFIG[order.priority].variant}>{PRIORITY_CONFIG[order.priority].label}</Badge>
                 </TableCell>
@@ -106,6 +110,9 @@ export default function OrdensServicoPage() {
                   </div>
                 </TableCell>
                 <TableCell>{new Date(order.createdAt).toLocaleDateString("pt-BR")}</TableCell>
+                <TableCell className="text-right">
+                  <EditServiceOrderDialog order={order} />
+                </TableCell>
               </TableRow>
             ))}
           </TableBody>

@@ -33,11 +33,24 @@ export function useCreateContract() {
   });
 }
 
-export function useActivateContract() {
+export function useUpdateContractStatus() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (id: string) => {
-      const { data } = await apiClient.patch<Contract>(`/contracts/${id}`, { status: "ACTIVE" });
+    mutationFn: async ({ id, status }: { id: string; status: Contract["status"] }) => {
+      const { data } = await apiClient.patch<Contract>(`/contracts/${id}`, { status });
+      return data;
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["contracts"] }),
+  });
+}
+
+export type UpdateContractInput = Partial<CreateContractInput>;
+
+export function useUpdateContract() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, ...input }: UpdateContractInput & { id: string }) => {
+      const { data } = await apiClient.patch<Contract>(`/contracts/${id}`, input);
       return data;
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["contracts"] }),

@@ -1,15 +1,13 @@
 "use client";
 
-import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { useActivateContract, useContracts } from "@/hooks/use-contracts";
-import { getApiErrorMessage } from "@/lib/api-client";
+import { useContracts } from "@/hooks/use-contracts";
 import type { ContractStatus } from "@/lib/types";
 import { CreateContractDialog } from "./create-contract-dialog";
 import { FranchiseUsage } from "./franchise-usage";
+import { ContractActionsMenu } from "./contract-actions-menu";
 
 const STATUS_CONFIG: Record<ContractStatus, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
   DRAFT: { label: "Rascunho", variant: "outline" },
@@ -21,16 +19,6 @@ const STATUS_CONFIG: Record<ContractStatus, { label: string; variant: "default" 
 
 export default function ContratosPage() {
   const { data, isLoading } = useContracts();
-  const activateContract = useActivateContract();
-
-  async function handleActivate(id: string) {
-    try {
-      await activateContract.mutateAsync(id);
-      toast.success("Contrato ativado");
-    } catch (error) {
-      toast.error(getApiErrorMessage(error, "Erro ao ativar contrato"));
-    }
-  }
 
   return (
     <div className="space-y-6">
@@ -80,11 +68,7 @@ export default function ContratosPage() {
                   <Badge variant={STATUS_CONFIG[contract.status].variant}>{STATUS_CONFIG[contract.status].label}</Badge>
                 </TableCell>
                 <TableCell className="text-right">
-                  {contract.status === "DRAFT" && (
-                    <Button size="sm" variant="outline" onClick={() => handleActivate(contract.id)}>
-                      Ativar
-                    </Button>
-                  )}
+                  <ContractActionsMenu contract={contract} />
                 </TableCell>
               </TableRow>
             ))}
