@@ -77,7 +77,34 @@ public class WindowsServiceInstaller
         }
     }
 
-    public void InstallOrUpdate(string apiUrl, string enrollmentToken)
+    /// <summary>Comma-separated networks as currently configured, e.g. "192.168.1.0/24, 192.168.2.10-192.168.2.50" — for pre-filling the UI.</summary>
+    public string? GetConfiguredNetworks()
+    {
+        var path = Path.Combine(InstallPath, "appsettings.json");
+        if (!File.Exists(path))
+        {
+            return null;
+        }
+        try
+        {
+            using var doc = JsonDocument.Parse(File.ReadAllText(path));
+            var networks = doc.RootElement.GetProperty("Agent").GetProperty("Networks")
+                .EnumerateArray()
+                .Select(e => e.GetString())
+                .Where(s => !string.IsNullOrWhiteSpace(s));
+            return string.Join(", ", networks);
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    /// <param name="networksCsv">
+    /// Alvos de discovery separados por vírgula: "192.168.1.0/24", IP único
+    /// ou faixa "192.168.1.100-192.168.1.200" (spec §15) — ver NetworkRange.Expand.
+    /// </param>
+    public void InstallOrUpdate(string apiUrl, string enrollmentToken, string networksCsv)
     {
         if (!Directory.Exists(ServiceSourcePath))
         {
@@ -97,10 +124,15 @@ public class WindowsServiceInstaller
         using var doc = JsonDocument.Parse(json);
         var settings = JsonSerializer.Deserialize<Dictionary<string, object>>(json)!;
 
+        var networks = networksCsv
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .ToList();
+
         var agentSection = JsonSerializer.Deserialize<Dictionary<string, object>>(
             JsonSerializer.Serialize(settings["Agent"]))!;
         agentSection["ApiUrl"] = apiUrl;
         agentSection["EnrollmentToken"] = enrollmentToken;
+        agentSection["Networks"] = networks;
         settings["Agent"] = agentSection;
 
         File.WriteAllText(appsettingsPath, JsonSerializer.Serialize(settings, new JsonSerializerOptions { WriteIndented = true }));

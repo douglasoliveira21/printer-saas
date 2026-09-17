@@ -18,6 +18,12 @@ public partial class MainWindow : Window
 
         ApiUrlText.Text = _installer.GetConfiguredApiUrl() ?? WindowsServiceInstaller.DefaultApiUrl;
 
+        var existingNetworks = _installer.GetConfiguredNetworks();
+        if (!string.IsNullOrWhiteSpace(existingNetworks))
+        {
+            NetworksTextBox.Text = existingNetworks;
+        }
+
         RefreshStatus();
     }
 
@@ -59,7 +65,7 @@ public partial class MainWindow : Window
         try
         {
             InstallButton.IsEnabled = false;
-            _installer.InstallOrUpdate(WindowsServiceInstaller.DefaultApiUrl, token);
+            _installer.InstallOrUpdate(WindowsServiceInstaller.DefaultApiUrl, token, NetworksTextBox.Text.Trim());
             MessageBox.Show(this, "Agent instalado e iniciado com sucesso.", "Printer SaaS Agent", MessageBoxButton.OK, MessageBoxImage.Information);
         }
         catch (Exception ex)
