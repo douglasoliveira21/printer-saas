@@ -19,6 +19,9 @@ ENV NODE_ENV=production
 # See apps/api/Dockerfile for why this reuses node_modules from the build
 # stage wholesale instead of a second `npm ci --omit=dev` here.
 COPY --from=build /repo/node_modules node_modules
+# node_modules/@printer-saas/shared is a workspace SYMLINK to ../../packages/shared
+# (npm workspaces) — copy the real directory too or the symlink dangles.
+COPY --from=build /repo/packages/shared packages/shared
 COPY --from=build /repo/apps/worker/dist apps/worker/dist
 COPY --from=build /repo/apps/worker/package.json apps/worker/package.json
 

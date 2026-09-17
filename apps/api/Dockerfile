@@ -20,6 +20,10 @@ ENV NODE_ENV=production
 # root "postinstall" (which builds packages/shared) without `typescript`
 # installed, breaking the build. Simpler and correct beats a smaller image.
 COPY --from=build /repo/node_modules node_modules
+# node_modules/@printer-saas/shared is a workspace SYMLINK to ../../packages/shared
+# (npm workspaces), so the actual package directory must be copied too, or
+# the symlink dangles and `require('@printer-saas/shared')` fails at runtime.
+COPY --from=build /repo/packages/shared packages/shared
 COPY --from=build /repo/apps/api/dist apps/api/dist
 COPY --from=build /repo/apps/api/prisma apps/api/prisma
 COPY --from=build /repo/apps/api/prisma.config.ts apps/api/prisma.config.ts
