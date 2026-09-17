@@ -16,11 +16,7 @@ public partial class MainWindow : Window
         _refreshTimer.Tick += (_, _) => RefreshStatus();
         _refreshTimer.Start();
 
-        var existingApiUrl = _installer.GetConfiguredApiUrl();
-        if (!string.IsNullOrEmpty(existingApiUrl))
-        {
-            ApiUrlTextBox.Text = existingApiUrl;
-        }
+        ApiUrlText.Text = _installer.GetConfiguredApiUrl() ?? WindowsServiceInstaller.DefaultApiUrl;
 
         RefreshStatus();
     }
@@ -50,14 +46,7 @@ public partial class MainWindow : Window
 
     private void InstallButton_Click(object sender, RoutedEventArgs e)
     {
-        var apiUrl = ApiUrlTextBox.Text.Trim();
         var token = EnrollmentTokenTextBox.Text.Trim();
-
-        if (string.IsNullOrWhiteSpace(apiUrl))
-        {
-            MessageBox.Show(this, "Informe a URL da API.", "Printer SaaS Agent", MessageBoxButton.OK, MessageBoxImage.Warning);
-            return;
-        }
 
         var alreadyInstalled = _installer.GetState() != AgentServiceState.NotInstalled;
         if (!alreadyInstalled && string.IsNullOrWhiteSpace(token))
@@ -70,7 +59,7 @@ public partial class MainWindow : Window
         try
         {
             InstallButton.IsEnabled = false;
-            _installer.InstallOrUpdate(apiUrl, token);
+            _installer.InstallOrUpdate(WindowsServiceInstaller.DefaultApiUrl, token);
             MessageBox.Show(this, "Agent instalado e iniciado com sucesso.", "Printer SaaS Agent", MessageBoxButton.OK, MessageBoxImage.Information);
         }
         catch (Exception ex)

@@ -23,6 +23,14 @@ public class WindowsServiceInstaller
 {
     public const string ServiceName = "PrinterSaaSAgent";
 
+    /// <summary>
+    /// Fixed production API endpoint — not user-editable in the UI on
+    /// purpose, so whoever installs the Agent at a client site can't point
+    /// it at the wrong server by typo. Change this and rebuild
+    /// (installer/build-package.ps1) if the platform's API domain changes.
+    /// </summary>
+    public const string DefaultApiUrl = "https://api.print.vgon.com.br";
+
     public static readonly string InstallPath =
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "PrinterSaaS", "Agent");
 

@@ -32,9 +32,9 @@
             </StackPanel>
         </Border>
 
-        <StackPanel Grid.Row="2" Margin="0,0,0,10">
-            <TextBlock Text="URL da API" FontWeight="SemiBold" Margin="0,0,0,4"/>
-            <TextBox x:Name="ApiUrlTextBox" Padding="6" Text="https://api.seudominio.com.br"/>
+        <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,0,0,10">
+            <TextBlock Text="Servidor: " Foreground="Gray"/>
+            <TextBlock x:Name="ApiUrlText" FontFamily="Consolas" FontSize="11" Foreground="Gray"/>
         </StackPanel>
 
         <StackPanel Grid.Row="3" Margin="0,0,0,10">
