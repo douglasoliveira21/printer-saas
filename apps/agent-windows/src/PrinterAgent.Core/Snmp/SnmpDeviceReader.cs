@@ -144,7 +144,19 @@ public class SnmpDeviceReader
                 var variables = new List<Variable> { new(new ObjectIdentifier(oid)) };
                 var result = await Task.Run(
                     () => Messenger.Get(VersionCode.V2, endpoint, community, variables, timeoutMs), ct);
-                var value = result.FirstOrDefault()?.Data?.ToString()?.Trim();
+                var data = result.FirstOrDefault()?.Data;
+
+                // SNMP's own "this OID doesn't exist on this device" markers —
+                // e.g. a firewall/switch answering sysDescr but having no
+                // Printer-MIB serial number OID at all. Must be treated as
+                // "not available" (null), never stored as a literal string
+                // (spec §67 — never invent/misrepresent a value).
+                if (data is null or NoSuchObject or NoSuchInstance or EndOfMibView)
+                {
+                    return null;
+                }
+
+                var value = data.ToString()?.Trim();
                 return string.IsNullOrEmpty(value) ? null : value;
             }
             catch (Lextm.SharpSnmpLib.Messaging.TimeoutException)
