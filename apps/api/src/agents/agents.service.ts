@@ -38,6 +38,41 @@ export class AgentsService {
     return this.tenantPrisma.client.agent.findMany({ orderBy: { createdAt: 'desc' } });
   }
 
+  async rename(id: string, name: string) {
+    await this.assertExists(id);
+    return this.tenantPrisma.client.agent.update({ where: { id }, data: { name } });
+  }
+
+  async remove(id: string) {
+    await this.assertExists(id);
+    // Printers stay (they're independent equipment records — spec §70 never
+    // deletes discovery/counter history just because the Agent that found
+    // them is gone); only the Agent slot itself is removed.
+    await this.tenantPrisma.client.agent.delete({ where: { id } });
+  }
+
+  /** Re-issues a fresh one-time token for an Agent that never completed enrollment (e.g. the old one expired). */
+  async regenerateToken(id: string) {
+    const agent = await this.assertExists(id);
+    if (agent.status !== 'PENDING') {
+      throw new BadRequestException('Este Agent já foi enrollado — não é possível gerar um novo token de instalação para ele');
+    }
+    const token = randomBytes(16).toString('hex').toUpperCase();
+    const updated = await this.tenantPrisma.client.agent.update({
+      where: { id },
+      data: { enrollmentToken: token, enrollmentTokenExpiresAt: new Date(Date.now() + ENROLLMENT_TOKEN_TTL_MS) },
+    });
+    return { agentId: updated.id, enrollmentToken: token, expiresAt: updated.enrollmentTokenExpiresAt };
+  }
+
+  private async assertExists(id: string) {
+    const agent = await this.tenantPrisma.client.agent.findFirst({ where: { id } });
+    if (!agent) {
+      throw new NotFoundException('Agent não encontrado');
+    }
+    return agent;
+  }
+
   /** Public: the Windows Agent redeems its one-time token for a permanent API key. */
   async enroll(dto: EnrollAgentDto) {
     const agent = await this.prisma.agent.findUnique({ where: { enrollmentToken: dto.enrollmentToken } });

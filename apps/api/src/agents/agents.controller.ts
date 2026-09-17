@@ -1,7 +1,8 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Patch, Post, UseGuards } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { AgentsService } from './agents.service';
 import { CreateAgentDto } from './dto/create-agent.dto';
+import { UpdateAgentDto } from './dto/update-agent.dto';
 import { EnrollAgentDto, HeartbeatDto, SubmitDevicesDto } from './dto/agent-payloads.dto';
 import { RequirePermissions } from '../common/decorators/permissions.decorator';
 import { Public } from '../common/decorators/public.decorator';
@@ -24,6 +25,25 @@ export class AgentsController {
   @RequirePermissions('agents.view')
   findAll() {
     return this.agentsService.findAll();
+  }
+
+  @Patch(':id')
+  @RequirePermissions('agents.create')
+  rename(@Param('id') id: string, @Body() dto: UpdateAgentDto) {
+    return this.agentsService.rename(id, dto.name);
+  }
+
+  @Delete(':id')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @RequirePermissions('agents.create')
+  remove(@Param('id') id: string) {
+    return this.agentsService.remove(id);
+  }
+
+  @Post(':id/regenerate-token')
+  @RequirePermissions('agents.create')
+  regenerateToken(@Param('id') id: string) {
+    return this.agentsService.regenerateToken(id);
   }
 }
 

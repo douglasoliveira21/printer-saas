@@ -5,6 +5,7 @@ import { Card } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useAgents } from "@/hooks/use-agents";
 import { CreateAgentDialog } from "./create-agent-dialog";
+import { AgentActionsMenu } from "./agent-actions-menu";
 import type { Agent } from "@/lib/types";
 
 const STATUS_CONFIG: Record<Agent["status"], { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
@@ -34,19 +35,20 @@ export default function AgentsPage() {
               <TableHead>Versão</TableHead>
               <TableHead>Último heartbeat</TableHead>
               <TableHead>Status</TableHead>
+              <TableHead />
             </TableRow>
           </TableHeader>
           <TableBody>
             {isLoading && (
               <TableRow>
-                <TableCell colSpan={6} className="text-center text-neutral-400">
+                <TableCell colSpan={7} className="text-center text-neutral-400">
                   Carregando...
                 </TableCell>
               </TableRow>
             )}
             {!isLoading && !agents?.length && (
               <TableRow>
-                <TableCell colSpan={6} className="text-center text-neutral-400">
+                <TableCell colSpan={7} className="text-center text-neutral-400">
                   Nenhum Agent instalado ainda.
                 </TableCell>
               </TableRow>
@@ -60,6 +62,9 @@ export default function AgentsPage() {
                 <TableCell>{agent.lastHeartbeatAt ? new Date(agent.lastHeartbeatAt).toLocaleString("pt-BR") : "Nunca"}</TableCell>
                 <TableCell>
                   <Badge variant={STATUS_CONFIG[agent.status].variant}>{STATUS_CONFIG[agent.status].label}</Badge>
+                </TableCell>
+                <TableCell className="text-right">
+                  <AgentActionsMenu agent={agent} />
                 </TableCell>
               </TableRow>
             ))}

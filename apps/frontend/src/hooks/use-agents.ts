@@ -31,3 +31,35 @@ export function useCreateAgentEnrollment() {
     },
   });
 }
+
+export function useRenameAgent() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, name }: { id: string; name: string }) => {
+      const { data } = await apiClient.patch<Agent>(`/agents/${id}`, { name });
+      return data;
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["agents"] }),
+  });
+}
+
+export function useDeleteAgent() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      await apiClient.delete(`/agents/${id}`);
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["agents"] }),
+  });
+}
+
+export function useRegenerateAgentToken() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { data } = await apiClient.post<CreateAgentEnrollmentResult>(`/agents/${id}/regenerate-token`);
+      return data;
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["agents"] }),
+  });
+}

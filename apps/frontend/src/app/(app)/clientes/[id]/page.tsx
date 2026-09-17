@@ -1,15 +1,43 @@
 "use client";
 
-import { use } from "react";
-import { MapPin, Building2 } from "lucide-react";
+import { use, useState } from "react";
+import { useRouter } from "next/navigation";
+import { toast } from "sonner";
+import { Building2, Trash2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { useCustomer } from "@/hooks/use-customers";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { useCustomer, useDeleteCustomer } from "@/hooks/use-customers";
+import { getApiErrorMessage } from "@/lib/api-client";
 import { CreateLocationDialog } from "./create-location-dialog";
+import { EditCustomerDialog } from "./edit-customer-dialog";
+import { LocationCard } from "./location-card";
 
 export default function CustomerDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const { data: customer, isLoading } = useCustomer(id);
+  const [deleting, setDeleting] = useState(false);
+  const deleteCustomer = useDeleteCustomer();
+  const router = useRouter();
+
+  async function handleDelete() {
+    try {
+      await deleteCustomer.mutateAsync(id);
+      toast.success("Cliente excluído");
+      router.push("/clientes");
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, "Erro ao excluir cliente"));
+      setDeleting(false);
+    }
+  }
 
   if (isLoading) {
     return <p className="text-neutral-400">Carregando...</p>;
@@ -21,7 +49,7 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-3">
+      <div className="flex flex-wrap items-center gap-3">
         <Building2 className="h-6 w-6 text-blue-600" />
         <div>
           <h1 className="text-2xl font-semibold">{customer.tradeName || customer.legalName}</h1>
@@ -30,6 +58,13 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
         <Badge variant={customer.status === "ACTIVE" ? "default" : "secondary"} className="ml-2">
           {customer.status === "ACTIVE" ? "Ativo" : "Inativo"}
         </Badge>
+        <div className="ml-auto flex gap-2">
+          <EditCustomerDialog customer={customer} />
+          <Button variant="outline" size="sm" className="text-red-600 hover:text-red-600" onClick={() => setDeleting(true)}>
+            <Trash2 className="mr-2 h-4 w-4" />
+            Excluir
+          </Button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
@@ -64,20 +99,29 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
         ) : (
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {customer.locations.map((location) => (
-              <Card key={location.id}>
-                <CardHeader className="flex flex-row items-center gap-2 pb-2">
-                  <MapPin className="h-4 w-4 text-neutral-400" />
-                  <CardTitle className="text-base">{location.name}</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-1 text-sm text-neutral-500">
-                  <p>{location.address || "Endereço não informado"}</p>
-                  {location.contactName && <p>Responsável: {location.contactName}</p>}
-                </CardContent>
-              </Card>
+              <LocationCard key={location.id} location={location} customerId={customer.id} />
             ))}
           </div>
         )}
       </div>
+
+      <Dialog open={deleting} onOpenChange={setDeleting}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Excluir cliente</DialogTitle>
+            <DialogDescription>
+              Tem certeza que quer excluir &quot;{customer.tradeName || customer.legalName}&quot;? Locais são excluídos junto;
+              não é possível se houver contratos ou ordens de serviço vinculados a ele (impressoras vinculadas apenas
+              deixam de ter cliente).
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="destructive" onClick={handleDelete} disabled={deleteCustomer.isPending}>
+              Excluir
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

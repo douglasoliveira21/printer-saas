@@ -59,3 +59,65 @@ export function useCreateLocation() {
     },
   });
 }
+
+export type UpdateCustomerInput = Partial<CreateCustomerInput> & { status?: "ACTIVE" | "INACTIVE" };
+
+export function useUpdateCustomer() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, ...input }: UpdateCustomerInput & { id: string }) => {
+      const { data } = await apiClient.patch<Customer>(`/customers/${id}`, input);
+      return data;
+    },
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["customers"] });
+      queryClient.invalidateQueries({ queryKey: ["customers", variables.id] });
+    },
+  });
+}
+
+export function useDeleteCustomer() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      await apiClient.delete(`/customers/${id}`);
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["customers"] }),
+  });
+}
+
+export function useUpdateLocation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      id,
+      customerId,
+      ...input
+    }: {
+      id: string;
+      customerId: string;
+      name?: string;
+      address?: string;
+      contactName?: string;
+      contactPhone?: string;
+    }) => {
+      const { data } = await apiClient.patch<Location>(`/locations/${id}`, input);
+      return data;
+    },
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["customers", variables.customerId] });
+    },
+  });
+}
+
+export function useDeleteLocation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id }: { id: string; customerId: string }) => {
+      await apiClient.delete(`/locations/${id}`);
+    },
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["customers", variables.customerId] });
+    },
+  });
+}
