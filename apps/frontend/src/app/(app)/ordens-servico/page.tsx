@@ -2,11 +2,13 @@
 
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
+import { Wrench } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { PageHeader } from "@/components/shared/page-header";
+import { ResponsiveDataTable, type DataTableColumn } from "@/components/shared/responsive-data-table";
 import { useServiceOrders, useUpdateServiceOrderStatus } from "@/hooks/use-service-orders";
 import { useTenantUsers } from "@/hooks/use-users";
 import { getApiErrorMessage } from "@/lib/api-client";
@@ -75,39 +77,81 @@ export default function OrdensServicoPage() {
     return Array.from(byTechnician.values()).filter((b) => b.orders.length > 0 || b.name !== "Não atribuído");
   }, [data, users]);
 
+  const columns: DataTableColumn<ServiceOrder>[] = [
+    { key: "number", header: "Número", cell: (o) => `#${o.number}`, hideOnMobile: true },
+    { key: "customer", header: "Cliente", cell: (o) => o.customer?.tradeName || o.customer?.legalName || "—" },
+    {
+      key: "printer",
+      header: "Impressora",
+      cell: (o) => (o.printer ? `${o.printer.model || ""} (${o.printer.ip || "—"})` : "—"),
+    },
+    { key: "technician", header: "Técnico", cell: (o) => o.technician?.name || "Não atribuído" },
+    {
+      key: "priority",
+      header: "Prioridade",
+      cell: (o) => <Badge variant={PRIORITY_CONFIG[o.priority].variant}>{PRIORITY_CONFIG[o.priority].label}</Badge>,
+      hideOnMobile: true,
+    },
+    {
+      key: "status",
+      header: "Status",
+      cell: (o) => (
+        <div className="flex items-center gap-2">
+          <Select value={o.status} onValueChange={(v) => v && handleStatusChange(o.id, v as ServiceOrderStatus)}>
+            <SelectTrigger className="w-44">
+              <SelectValue>{(value: ServiceOrderStatus) => STATUS_OPTIONS.find((opt) => opt.value === value)?.label ?? value}</SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              {STATUS_OPTIONS.map((option) => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {isLate(o) && <Badge variant="destructive">Atrasada</Badge>}
+        </div>
+      ),
+    },
+    { key: "createdAt", header: "Aberta em", cell: (o) => new Date(o.createdAt).toLocaleDateString("pt-BR"), hideOnMobile: true },
+    { key: "actions", header: "", cell: (o) => <EditServiceOrderDialog order={o} />, className: "text-right" },
+  ];
+
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <h1 className="text-2xl font-semibold">Ordens de Serviço</h1>
-        <div className="flex items-center gap-2">
-          <Button variant={view === "table" ? "default" : "outline"} size="sm" onClick={() => setView("table")}>
-            Lista
-          </Button>
-          <Button variant={view === "queue" ? "default" : "outline"} size="sm" onClick={() => setView("queue")}>
-            Fila por técnico
-          </Button>
-          <CreateServiceOrderDialog />
-        </div>
-      </div>
+      <PageHeader
+        title="Ordens de Serviço"
+        actions={
+          <>
+            <Button variant={view === "table" ? "default" : "outline"} size="sm" onClick={() => setView("table")}>
+              Lista
+            </Button>
+            <Button variant={view === "queue" ? "default" : "outline"} size="sm" onClick={() => setView("queue")}>
+              Fila por técnico
+            </Button>
+            <CreateServiceOrderDialog />
+          </>
+        }
+      />
 
       {view === "queue" && (
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
           {queueColumns.map((column) => (
             <Card key={column.name}>
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-neutral-500">
+                <CardTitle className="text-sm font-medium text-muted-foreground">
                   {column.name} ({column.orders.length})
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-2">
-                {column.orders.length === 0 && <p className="text-sm text-neutral-400">Nenhuma OS aberta.</p>}
+                {column.orders.length === 0 && <p className="text-sm text-muted-foreground">Nenhuma OS aberta.</p>}
                 {column.orders.map((order) => (
-                  <div key={order.id} className="rounded-md border p-2 text-sm">
+                  <div key={order.id} className="rounded-md border border-border p-2 text-sm">
                     <div className="flex items-center justify-between gap-2">
                       <span className="font-medium">#{order.number}</span>
                       <Badge variant={PRIORITY_CONFIG[order.priority].variant}>{PRIORITY_CONFIG[order.priority].label}</Badge>
                     </div>
-                    <p className="text-neutral-500">{order.customer?.tradeName || order.customer?.legalName || "—"}</p>
+                    <p className="text-muted-foreground">{order.customer?.tradeName || order.customer?.legalName || "—"}</p>
                     <div className="mt-1 flex items-center justify-between gap-2">
                       {isLate(order) ? (
                         <Badge variant="destructive">SLA vencido</Badge>
@@ -127,72 +171,17 @@ export default function OrdensServicoPage() {
       )}
 
       {view === "table" && (
-      <Card className="overflow-hidden py-0">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Número</TableHead>
-              <TableHead>Cliente</TableHead>
-              <TableHead>Impressora</TableHead>
-              <TableHead>Técnico</TableHead>
-              <TableHead>Prioridade</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Aberta em</TableHead>
-              <TableHead />
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {isLoading && (
-              <TableRow>
-                <TableCell colSpan={8} className="text-center text-neutral-400">
-                  Carregando...
-                </TableCell>
-              </TableRow>
-            )}
-            {!isLoading && !data?.data.length && (
-              <TableRow>
-                <TableCell colSpan={8} className="text-center text-neutral-400">
-                  Nenhuma ordem de serviço registrada ainda.
-                </TableCell>
-              </TableRow>
-            )}
-            {data?.data.map((order) => (
-              <TableRow key={order.id}>
-                <TableCell className="font-medium">#{order.number}</TableCell>
-                <TableCell>{order.customer?.tradeName || order.customer?.legalName || "—"}</TableCell>
-                <TableCell>{order.printer ? `${order.printer.model || ""} (${order.printer.ip || "—"})` : "—"}</TableCell>
-                <TableCell>{order.technician?.name || "Não atribuído"}</TableCell>
-                <TableCell>
-                  <Badge variant={PRIORITY_CONFIG[order.priority].variant}>{PRIORITY_CONFIG[order.priority].label}</Badge>
-                </TableCell>
-                <TableCell>
-                  <div className="flex items-center gap-2">
-                    <Select value={order.status} onValueChange={(v) => v && handleStatusChange(order.id, v as ServiceOrderStatus)}>
-                      <SelectTrigger className="w-44">
-                        <SelectValue>
-                          {(value: ServiceOrderStatus) => STATUS_OPTIONS.find((o) => o.value === value)?.label ?? value}
-                        </SelectValue>
-                      </SelectTrigger>
-                      <SelectContent>
-                        {STATUS_OPTIONS.map((option) => (
-                          <SelectItem key={option.value} value={option.value}>
-                            {option.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    {isLate(order) && <Badge variant="destructive">Atrasada</Badge>}
-                  </div>
-                </TableCell>
-                <TableCell>{new Date(order.createdAt).toLocaleDateString("pt-BR")}</TableCell>
-                <TableCell className="text-right">
-                  <EditServiceOrderDialog order={order} />
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </Card>
+        <ResponsiveDataTable
+          columns={columns}
+          data={data?.data}
+          keyField={(o) => o.id}
+          isLoading={isLoading}
+          emptyIcon={Wrench}
+          emptyTitle="Nenhuma ordem de serviço registrada ainda"
+          cardTitle={(o) => `#${o.number} — ${o.customer?.tradeName || o.customer?.legalName || "—"}`}
+          cardMeta={(o) => <Badge variant={PRIORITY_CONFIG[o.priority].variant}>{PRIORITY_CONFIG[o.priority].label}</Badge>}
+          cardActions={(o) => <EditServiceOrderDialog order={o} />}
+        />
       )}
     </div>
   );

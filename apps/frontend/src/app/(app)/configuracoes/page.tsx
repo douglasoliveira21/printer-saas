@@ -1,10 +1,11 @@
 "use client";
 
+import { Users } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { Card } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useTenantUsers } from "@/hooks/use-users";
+import { PageHeader } from "@/components/shared/page-header";
+import { ResponsiveDataTable, type DataTableColumn } from "@/components/shared/responsive-data-table";
+import { useTenantUsers, type TenantUser } from "@/hooks/use-users";
 import { ComingSoon } from "@/components/layout/coming-soon";
 import { CreateUserDialog } from "./create-user-dialog";
 import { UserActionsMenu } from "./user-actions-menu";
@@ -12,9 +13,27 @@ import { UserActionsMenu } from "./user-actions-menu";
 export default function ConfiguracoesPage() {
   const { data: users, isLoading } = useTenantUsers();
 
+  const columns: DataTableColumn<TenantUser>[] = [
+    { key: "name", header: "Nome", cell: (u) => u.name, hideOnMobile: true },
+    { key: "email", header: "E-mail", cell: (u) => u.email },
+    { key: "role", header: "Perfil", cell: (u) => u.role?.name || "—" },
+    {
+      key: "status",
+      header: "Status",
+      cell: (u) => <Badge variant={u.status === "ACTIVE" ? "default" : "secondary"}>{u.status === "ACTIVE" ? "Ativo" : "Inativo"}</Badge>,
+      hideOnMobile: true,
+    },
+    {
+      key: "lastLoginAt",
+      header: "Último acesso",
+      cell: (u) => (u.lastLoginAt ? new Date(u.lastLoginAt).toLocaleString("pt-BR") : "Nunca"),
+    },
+    { key: "actions", header: "", cell: (u) => <UserActionsMenu user={u} />, className: "text-right" },
+  ];
+
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-semibold">Configurações</h1>
+      <PageHeader title="Configurações" />
 
       <Tabs defaultValue="usuarios">
         <TabsList>
@@ -26,45 +45,17 @@ export default function ConfiguracoesPage() {
           <div className="flex justify-end">
             <CreateUserDialog />
           </div>
-          <Card className="overflow-hidden py-0">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Nome</TableHead>
-                  <TableHead>E-mail</TableHead>
-                  <TableHead>Perfil</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Último acesso</TableHead>
-                  <TableHead />
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {isLoading && (
-                  <TableRow>
-                    <TableCell colSpan={6} className="text-center text-neutral-400">
-                      Carregando...
-                    </TableCell>
-                  </TableRow>
-                )}
-                {users?.map((user) => (
-                  <TableRow key={user.id}>
-                    <TableCell className="font-medium">{user.name}</TableCell>
-                    <TableCell>{user.email}</TableCell>
-                    <TableCell>{user.role?.name || "—"}</TableCell>
-                    <TableCell>
-                      <Badge variant={user.status === "ACTIVE" ? "default" : "secondary"}>
-                        {user.status === "ACTIVE" ? "Ativo" : "Inativo"}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>{user.lastLoginAt ? new Date(user.lastLoginAt).toLocaleString("pt-BR") : "Nunca"}</TableCell>
-                    <TableCell className="text-right">
-                      <UserActionsMenu user={user} />
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </Card>
+          <ResponsiveDataTable
+            columns={columns}
+            data={users}
+            keyField={(u) => u.id}
+            isLoading={isLoading}
+            emptyIcon={Users}
+            emptyTitle="Nenhum usuário cadastrado ainda"
+            cardTitle={(u) => u.name}
+            cardMeta={(u) => <Badge variant={u.status === "ACTIVE" ? "default" : "secondary"}>{u.status === "ACTIVE" ? "Ativo" : "Inativo"}</Badge>}
+            cardActions={(u) => <UserActionsMenu user={u} />}
+          />
         </TabsContent>
 
         <TabsContent value="empresa" className="mt-4">

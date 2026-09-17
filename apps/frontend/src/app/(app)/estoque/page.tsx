@@ -1,11 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, Boxes } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { PageHeader } from "@/components/shared/page-header";
+import { ResponsiveDataTable, type DataTableColumn } from "@/components/shared/responsive-data-table";
 import { useInventoryItems } from "@/hooks/use-inventory";
 import type { InventoryItem } from "@/lib/types";
 import { CreateItemDialog } from "./create-item-dialog";
@@ -16,71 +16,61 @@ export default function EstoquePage() {
   const { data: items, isLoading } = useInventoryItems();
   const [moving, setMoving] = useState<InventoryItem | null>(null);
 
+  function renderActions(item: InventoryItem) {
+    return (
+      <>
+        <Button size="sm" variant="outline" onClick={() => setMoving(item)}>
+          Movimentar
+        </Button>
+        <ItemActionsMenu item={item} />
+      </>
+    );
+  }
+
+  const columns: DataTableColumn<InventoryItem>[] = [
+    { key: "name", header: "Item", cell: (i) => i.name, hideOnMobile: true },
+    { key: "type", header: "Tipo", cell: (i) => i.type },
+    {
+      key: "quantity",
+      header: "Estoque atual",
+      cell: (i) => (
+        <div className="flex items-center gap-2">
+          {i.quantity}
+          {i.quantity <= i.minQuantity && (
+            <Badge variant="destructive" className="gap-1">
+              <AlertTriangle className="h-3 w-3" />
+              Baixo
+            </Badge>
+          )}
+        </div>
+      ),
+    },
+    { key: "minQuantity", header: "Estoque mínimo", cell: (i) => i.minQuantity, hideOnMobile: true },
+    { key: "actions", header: "", cell: (i) => <div className="flex justify-end gap-2">{renderActions(i)}</div>, className: "text-right" },
+  ];
+
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <h1 className="text-2xl font-semibold">Estoque</h1>
-        <CreateItemDialog />
-      </div>
+      <PageHeader title="Estoque" actions={<CreateItemDialog />} />
 
-      <Card className="overflow-hidden py-0">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Item</TableHead>
-              <TableHead>Tipo</TableHead>
-              <TableHead>Estoque atual</TableHead>
-              <TableHead>Estoque mínimo</TableHead>
-              <TableHead />
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {isLoading && (
-              <TableRow>
-                <TableCell colSpan={5} className="text-center text-neutral-400">
-                  Carregando...
-                </TableCell>
-              </TableRow>
-            )}
-            {!isLoading && !items?.length && (
-              <TableRow>
-                <TableCell colSpan={5} className="text-center text-neutral-400">
-                  Nenhum item cadastrado ainda.
-                </TableCell>
-              </TableRow>
-            )}
-            {items?.map((item) => {
-              const low = item.quantity <= item.minQuantity;
-              return (
-                <TableRow key={item.id}>
-                  <TableCell className="font-medium">{item.name}</TableCell>
-                  <TableCell>{item.type}</TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      {item.quantity}
-                      {low && (
-                        <Badge variant="destructive" className="gap-1">
-                          <AlertTriangle className="h-3 w-3" />
-                          Baixo
-                        </Badge>
-                      )}
-                    </div>
-                  </TableCell>
-                  <TableCell>{item.minQuantity}</TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex justify-end gap-2">
-                      <Button size="sm" variant="outline" onClick={() => setMoving(item)}>
-                        Movimentar
-                      </Button>
-                      <ItemActionsMenu item={item} />
-                    </div>
-                  </TableCell>
-                </TableRow>
-              );
-            })}
-          </TableBody>
-        </Table>
-      </Card>
+      <ResponsiveDataTable
+        columns={columns}
+        data={items}
+        keyField={(i) => i.id}
+        isLoading={isLoading}
+        emptyIcon={Boxes}
+        emptyTitle="Nenhum item cadastrado ainda"
+        cardTitle={(i) => i.name}
+        cardMeta={(i) =>
+          i.quantity <= i.minQuantity ? (
+            <Badge variant="destructive" className="gap-1">
+              <AlertTriangle className="h-3 w-3" />
+              Baixo
+            </Badge>
+          ) : null
+        }
+        cardActions={renderActions}
+      />
 
       {moving && <MovementDialog item={moving} onClose={() => setMoving(null)} />}
     </div>

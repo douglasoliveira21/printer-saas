@@ -1,12 +1,14 @@
 "use client";
 
 import { toast } from "sonner";
+import { Wallet } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
+import { PageHeader } from "@/components/shared/page-header";
+import { ResponsiveDataTable, type DataTableColumn } from "@/components/shared/responsive-data-table";
 import { useFinancialEntries, useFinancialSummary, useMarkEntryPaid } from "@/hooks/use-financial";
 import { getApiErrorMessage } from "@/lib/api-client";
 import type { FinancialEntry, FinancialEntryStatus } from "@/lib/types";
@@ -41,60 +43,57 @@ function EntriesTable({ type }: { type: "RECEIVABLE" | "PAYABLE" }) {
     }
   }
 
+  function renderActions(entry: FinancialEntry) {
+    return (
+      <>
+        {entry.status === "PENDING" && (
+          <Button size="sm" variant="outline" onClick={() => handleMarkPaid(entry.id)}>
+            Baixar
+          </Button>
+        )}
+        <EntryActionsMenu entry={entry} />
+      </>
+    );
+  }
+
+  const columns: DataTableColumn<FinancialEntry>[] = [
+    { key: "category", header: "Categoria", cell: (e) => e.category, hideOnMobile: true },
+    {
+      key: "who",
+      header: type === "RECEIVABLE" ? "Cliente" : "Descrição",
+      cell: (e) => e.customer?.tradeName || e.customer?.legalName || e.description || "—",
+    },
+    { key: "amount", header: "Valor", cell: (e) => currency(e.amount) },
+    { key: "dueDate", header: "Vencimento", cell: (e) => new Date(e.dueDate).toLocaleDateString("pt-BR") },
+    {
+      key: "status",
+      header: "Status",
+      cell: (e) => (
+        <Badge variant={isOverdue(e) ? "destructive" : STATUS_CONFIG[e.status].variant}>
+          {isOverdue(e) ? "Vencido" : STATUS_CONFIG[e.status].label}
+        </Badge>
+      ),
+      hideOnMobile: true,
+    },
+    { key: "actions", header: "", cell: (e) => <div className="flex justify-end gap-2">{renderActions(e)}</div>, className: "text-right" },
+  ];
+
   return (
-    <Card className="overflow-hidden py-0">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Categoria</TableHead>
-            <TableHead>{type === "RECEIVABLE" ? "Cliente" : "Descrição"}</TableHead>
-            <TableHead>Valor</TableHead>
-            <TableHead>Vencimento</TableHead>
-            <TableHead>Status</TableHead>
-            <TableHead />
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {isLoading && (
-            <TableRow>
-              <TableCell colSpan={6} className="text-center text-neutral-400">
-                Carregando...
-              </TableCell>
-            </TableRow>
-          )}
-          {!isLoading && !data?.data.length && (
-            <TableRow>
-              <TableCell colSpan={6} className="text-center text-neutral-400">
-                Nenhum lançamento cadastrado.
-              </TableCell>
-            </TableRow>
-          )}
-          {data?.data.map((entry) => (
-            <TableRow key={entry.id}>
-              <TableCell className="font-medium">{entry.category}</TableCell>
-              <TableCell>{entry.customer?.tradeName || entry.customer?.legalName || entry.description || "—"}</TableCell>
-              <TableCell>{currency(entry.amount)}</TableCell>
-              <TableCell>{new Date(entry.dueDate).toLocaleDateString("pt-BR")}</TableCell>
-              <TableCell>
-                <Badge variant={isOverdue(entry) ? "destructive" : STATUS_CONFIG[entry.status].variant}>
-                  {isOverdue(entry) ? "Vencido" : STATUS_CONFIG[entry.status].label}
-                </Badge>
-              </TableCell>
-              <TableCell className="text-right">
-                <div className="flex justify-end gap-2">
-                  {entry.status === "PENDING" && (
-                    <Button size="sm" variant="outline" onClick={() => handleMarkPaid(entry.id)}>
-                      Baixar
-                    </Button>
-                  )}
-                  <EntryActionsMenu entry={entry} />
-                </div>
-              </TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-    </Card>
+    <ResponsiveDataTable
+      columns={columns}
+      data={data?.data}
+      keyField={(e) => e.id}
+      isLoading={isLoading}
+      emptyIcon={Wallet}
+      emptyTitle="Nenhum lançamento cadastrado"
+      cardTitle={(e) => e.category}
+      cardMeta={(e) => (
+        <Badge variant={isOverdue(e) ? "destructive" : STATUS_CONFIG[e.status].variant}>
+          {isOverdue(e) ? "Vencido" : STATUS_CONFIG[e.status].label}
+        </Badge>
+      )}
+      cardActions={renderActions}
+    />
   );
 }
 
@@ -103,22 +102,19 @@ export default function FinanceiroPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <h1 className="text-2xl font-semibold">Financeiro</h1>
-        <CreateEntryDialog />
-      </div>
+      <PageHeader title="Financeiro" actions={<CreateEntryDialog />} />
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
         {[
           { label: "Receber hoje", key: "receivableToday" as const, tone: "text-emerald-600" },
-          { label: "Vencido", key: "receivableOverdue" as const, tone: "text-red-600" },
-          { label: "A vencer", key: "receivableUpcoming" as const, tone: "text-neutral-700" },
+          { label: "Vencido", key: "receivableOverdue" as const, tone: "text-destructive" },
+          { label: "A vencer", key: "receivableUpcoming" as const, tone: "text-foreground" },
           { label: "Pagar", key: "payablePending" as const, tone: "text-amber-600" },
-          { label: "Saldo previsto", key: "projectedBalance" as const, tone: "text-blue-600" },
+          { label: "Saldo previsto", key: "projectedBalance" as const, tone: "text-primary" },
         ].map((card) => (
           <Card key={card.key}>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-neutral-500">{card.label}</CardTitle>
+              <CardTitle className="text-sm font-medium text-muted-foreground">{card.label}</CardTitle>
             </CardHeader>
             <CardContent>
               {isLoading || !summary ? (

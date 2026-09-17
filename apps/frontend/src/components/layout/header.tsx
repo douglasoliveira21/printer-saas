@@ -18,7 +18,7 @@ export function Header({ title }: { title?: string }) {
   const { user, logout } = useAuth();
 
   return (
-    <header className="flex h-16 items-center justify-between border-b bg-white px-4 dark:bg-neutral-950 md:px-6">
+    <header className="flex h-16 items-center justify-between border-b border-border bg-card px-4 md:px-6">
       <div className="flex items-center gap-3">
         <Sheet>
           <SheetTrigger render={<Button variant="ghost" size="icon" className="md:hidden" />}>
@@ -40,7 +40,7 @@ export function Header({ title }: { title?: string }) {
         <DropdownMenuContent align="end">
           <DropdownMenuLabel>{user?.email}</DropdownMenuLabel>
           <DropdownMenuSeparator />
-          <DropdownMenuItem onClick={logout} className="text-red-600 focus:text-red-600">
+          <DropdownMenuItem onClick={logout} className="text-destructive focus:text-destructive">
             <LogOut className="mr-2 h-4 w-4" />
             Sair
           </DropdownMenuItem>

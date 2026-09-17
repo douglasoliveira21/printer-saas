@@ -1,8 +1,9 @@
 "use client";
 
+import { Cpu } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { Card } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { PageHeader } from "@/components/shared/page-header";
+import { ResponsiveDataTable, type DataTableColumn } from "@/components/shared/responsive-data-table";
 import { useAgents } from "@/hooks/use-agents";
 import { CreateAgentDialog } from "./create-agent-dialog";
 import { AgentActionsMenu } from "./agent-actions-menu";
@@ -18,59 +19,40 @@ const STATUS_CONFIG: Record<Agent["status"], { label: string; variant: "default"
 export default function AgentsPage() {
   const { data: agents, isLoading } = useAgents();
 
+  const columns: DataTableColumn<Agent>[] = [
+    { key: "name", header: "Nome", cell: (a) => a.name, hideOnMobile: true },
+    { key: "hostname", header: "Hostname", cell: (a) => a.hostname || "Não disponível" },
+    { key: "ip", header: "IP", cell: (a) => a.localIp || "Não disponível" },
+    { key: "version", header: "Versão", cell: (a) => a.agentVersion || "—" },
+    {
+      key: "heartbeat",
+      header: "Último heartbeat",
+      cell: (a) => (a.lastHeartbeatAt ? new Date(a.lastHeartbeatAt).toLocaleString("pt-BR") : "Nunca"),
+    },
+    {
+      key: "status",
+      header: "Status",
+      cell: (a) => <Badge variant={STATUS_CONFIG[a.status].variant}>{STATUS_CONFIG[a.status].label}</Badge>,
+      hideOnMobile: true,
+    },
+    { key: "actions", header: "", cell: (a) => <AgentActionsMenu agent={a} />, className: "text-right" },
+  ];
+
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <h1 className="text-2xl font-semibold">Agents</h1>
-        <CreateAgentDialog />
-      </div>
+      <PageHeader title="Agents" actions={<CreateAgentDialog />} />
 
-      <Card className="overflow-hidden py-0">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Nome</TableHead>
-              <TableHead>Hostname</TableHead>
-              <TableHead>IP</TableHead>
-              <TableHead>Versão</TableHead>
-              <TableHead>Último heartbeat</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead />
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {isLoading && (
-              <TableRow>
-                <TableCell colSpan={7} className="text-center text-neutral-400">
-                  Carregando...
-                </TableCell>
-              </TableRow>
-            )}
-            {!isLoading && !agents?.length && (
-              <TableRow>
-                <TableCell colSpan={7} className="text-center text-neutral-400">
-                  Nenhum Agent instalado ainda.
-                </TableCell>
-              </TableRow>
-            )}
-            {agents?.map((agent) => (
-              <TableRow key={agent.id}>
-                <TableCell className="font-medium">{agent.name}</TableCell>
-                <TableCell>{agent.hostname || "Não disponível"}</TableCell>
-                <TableCell>{agent.localIp || "Não disponível"}</TableCell>
-                <TableCell>{agent.agentVersion || "—"}</TableCell>
-                <TableCell>{agent.lastHeartbeatAt ? new Date(agent.lastHeartbeatAt).toLocaleString("pt-BR") : "Nunca"}</TableCell>
-                <TableCell>
-                  <Badge variant={STATUS_CONFIG[agent.status].variant}>{STATUS_CONFIG[agent.status].label}</Badge>
-                </TableCell>
-                <TableCell className="text-right">
-                  <AgentActionsMenu agent={agent} />
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </Card>
+      <ResponsiveDataTable
+        columns={columns}
+        data={agents}
+        keyField={(a) => a.id}
+        isLoading={isLoading}
+        emptyIcon={Cpu}
+        emptyTitle="Nenhum Agent instalado ainda"
+        cardTitle={(a) => a.name}
+        cardMeta={(a) => <Badge variant={STATUS_CONFIG[a.status].variant}>{STATUS_CONFIG[a.status].label}</Badge>}
+        cardActions={(a) => <AgentActionsMenu agent={a} />}
+      />
     </div>
   );
 }

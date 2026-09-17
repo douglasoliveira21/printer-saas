@@ -2,13 +2,14 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { Droplet, Wrench } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { Card } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { PageHeader } from "@/components/shared/page-header";
+import { ResponsiveDataTable, type DataTableColumn } from "@/components/shared/responsive-data-table";
 import { useReplacements, useSupplyForecast } from "@/hooks/use-consumables";
-import type { ConsumableReplacementStatus } from "@/lib/types";
+import type { ConsumableReplacement, ConsumableReplacementStatus, SupplyForecastEntry } from "@/lib/types";
 
 function urgencyVariant(daysRemaining: number): "destructive" | "secondary" | "outline" {
   if (daysRemaining <= 7) return "destructive";
@@ -35,9 +36,66 @@ export default function SuprimentosPage() {
   const [statusFilter, setStatusFilter] = useState<string>("");
   const { data: replacements, isLoading: loadingReplacements } = useReplacements(statusFilter || undefined);
 
+  const forecastColumns: DataTableColumn<SupplyForecastEntry>[] = [
+    {
+      key: "printer",
+      header: "Impressora",
+      cell: (e) => (
+        <Link href={`/impressoras/${e.printer.id}`} className="hover:underline">
+          {e.printer.model || e.printer.ip || e.printer.id}
+        </Link>
+      ),
+      hideOnMobile: true,
+    },
+    { key: "customer", header: "Cliente", cell: (e) => e.customer?.legalName ?? "—" },
+    { key: "supply", header: "Suprimento", cell: (e) => `${e.type}${e.color ? ` (${e.color})` : ""}` },
+    { key: "level", header: "Nível atual", cell: (e) => `${e.currentLevelPercent}%` },
+    {
+      key: "predicted",
+      header: "Previsão de troca",
+      cell: (e) => new Date(e.predictedReplacementAt).toLocaleDateString("pt-BR"),
+      hideOnMobile: true,
+    },
+    {
+      key: "days",
+      header: "Dias restantes",
+      cell: (e) => <Badge variant={urgencyVariant(e.daysRemaining)}>{Math.max(0, Math.round(e.daysRemaining))} dias</Badge>,
+    },
+  ];
+
+  const replacementColumns: DataTableColumn<ConsumableReplacement>[] = [
+    {
+      key: "printer",
+      header: "Impressora",
+      cell: (r) =>
+        r.printer ? (
+          <Link href={`/impressoras/${r.printer.id}`} className="hover:underline">
+            {r.printer.model || r.printer.ip || r.printer.id}
+          </Link>
+        ) : (
+          "—"
+        ),
+      hideOnMobile: true,
+    },
+    { key: "customer", header: "Cliente", cell: (r) => r.printer?.customer?.legalName ?? "—" },
+    { key: "supply", header: "Suprimento", cell: (r) => `${r.type}${r.color ? ` (${r.color})` : ""}` },
+    {
+      key: "predictedAt",
+      header: "Previsão",
+      cell: (r) => (r.predictedAt ? new Date(r.predictedAt).toLocaleDateString("pt-BR") : "—"),
+      hideOnMobile: true,
+    },
+    { key: "replacedAt", header: "Troca real", cell: (r) => (r.replacedAt ? new Date(r.replacedAt).toLocaleDateString("pt-BR") : "—") },
+    {
+      key: "status",
+      header: "Status",
+      cell: (r) => <Badge variant={REPLACEMENT_STATUS_VARIANT[r.status]}>{REPLACEMENT_STATUS_LABEL[r.status]}</Badge>,
+    },
+  ];
+
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-semibold">Suprimentos</h1>
+      <PageHeader title="Suprimentos" />
 
       <Tabs defaultValue="previsoes">
         <TabsList>
@@ -46,61 +104,23 @@ export default function SuprimentosPage() {
         </TabsList>
 
         <TabsContent value="previsoes" className="mt-4">
-          <Card className="overflow-hidden py-0">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Impressora</TableHead>
-                  <TableHead>Cliente</TableHead>
-                  <TableHead>Suprimento</TableHead>
-                  <TableHead>Nível atual</TableHead>
-                  <TableHead>Previsão de troca</TableHead>
-                  <TableHead>Dias restantes</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {loadingForecast && (
-                  <TableRow>
-                    <TableCell colSpan={6} className="text-center text-neutral-400">
-                      Carregando...
-                    </TableCell>
-                  </TableRow>
-                )}
-                {!loadingForecast && !forecast?.length && (
-                  <TableRow>
-                    <TableCell colSpan={6} className="text-center text-neutral-400">
-                      Sem dados suficientes ainda para prever trocas. Volte quando houver mais histórico de coleta.
-                    </TableCell>
-                  </TableRow>
-                )}
-                {forecast?.map((entry, i) => (
-                  <TableRow key={`${entry.printer.id}-${entry.type}-${entry.color ?? "default"}-${i}`}>
-                    <TableCell>
-                      <Link href={`/impressoras/${entry.printer.id}`} className="text-neutral-900 hover:underline dark:text-neutral-100">
-                        {entry.printer.model || entry.printer.ip || entry.printer.id}
-                      </Link>
-                    </TableCell>
-                    <TableCell>{entry.customer?.legalName ?? "—"}</TableCell>
-                    <TableCell>
-                      {entry.type}
-                      {entry.color ? ` (${entry.color})` : ""}
-                    </TableCell>
-                    <TableCell>{entry.currentLevelPercent}%</TableCell>
-                    <TableCell>{new Date(entry.predictedReplacementAt).toLocaleDateString("pt-BR")}</TableCell>
-                    <TableCell>
-                      <Badge variant={urgencyVariant(entry.daysRemaining)}>{Math.max(0, Math.round(entry.daysRemaining))} dias</Badge>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </Card>
+          <ResponsiveDataTable
+            columns={forecastColumns}
+            data={forecast}
+            keyField={(e) => `${e.printer.id}-${e.type}-${e.color ?? "default"}`}
+            isLoading={loadingForecast}
+            emptyIcon={Droplet}
+            emptyTitle="Sem dados suficientes ainda para prever trocas"
+            emptyDescription="Volte quando houver mais histórico de coleta."
+            cardTitle={(e) => e.printer.model || e.printer.ip || e.printer.id}
+            cardMeta={(e) => <Badge variant={urgencyVariant(e.daysRemaining)}>{Math.max(0, Math.round(e.daysRemaining))} dias</Badge>}
+          />
         </TabsContent>
 
         <TabsContent value="trocas" className="mt-4 space-y-4">
           <div className="flex justify-end">
             <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v ?? "")}>
-              <SelectTrigger className="w-48">
+              <SelectTrigger className="w-full sm:w-48">
                 <SelectValue placeholder="Todos os status" />
               </SelectTrigger>
               <SelectContent>
@@ -111,59 +131,16 @@ export default function SuprimentosPage() {
               </SelectContent>
             </Select>
           </div>
-          <Card className="overflow-hidden py-0">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Impressora</TableHead>
-                  <TableHead>Cliente</TableHead>
-                  <TableHead>Suprimento</TableHead>
-                  <TableHead>Previsão</TableHead>
-                  <TableHead>Troca real</TableHead>
-                  <TableHead>Status</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {loadingReplacements && (
-                  <TableRow>
-                    <TableCell colSpan={6} className="text-center text-neutral-400">
-                      Carregando...
-                    </TableCell>
-                  </TableRow>
-                )}
-                {!loadingReplacements && !replacements?.length && (
-                  <TableRow>
-                    <TableCell colSpan={6} className="text-center text-neutral-400">
-                      Nenhuma troca registrada ainda.
-                    </TableCell>
-                  </TableRow>
-                )}
-                {replacements?.map((r) => (
-                  <TableRow key={r.id}>
-                    <TableCell>
-                      {r.printer ? (
-                        <Link href={`/impressoras/${r.printer.id}`} className="text-neutral-900 hover:underline dark:text-neutral-100">
-                          {r.printer.model || r.printer.ip || r.printer.id}
-                        </Link>
-                      ) : (
-                        "—"
-                      )}
-                    </TableCell>
-                    <TableCell>{r.printer?.customer?.legalName ?? "—"}</TableCell>
-                    <TableCell>
-                      {r.type}
-                      {r.color ? ` (${r.color})` : ""}
-                    </TableCell>
-                    <TableCell>{r.predictedAt ? new Date(r.predictedAt).toLocaleDateString("pt-BR") : "—"}</TableCell>
-                    <TableCell>{r.replacedAt ? new Date(r.replacedAt).toLocaleDateString("pt-BR") : "—"}</TableCell>
-                    <TableCell>
-                      <Badge variant={REPLACEMENT_STATUS_VARIANT[r.status]}>{REPLACEMENT_STATUS_LABEL[r.status]}</Badge>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </Card>
+          <ResponsiveDataTable
+            columns={replacementColumns}
+            data={replacements}
+            keyField={(r) => r.id}
+            isLoading={loadingReplacements}
+            emptyIcon={Wrench}
+            emptyTitle="Nenhuma troca registrada ainda"
+            cardTitle={(r) => (r.printer ? r.printer.model || r.printer.ip || r.printer.id : "—")}
+            cardMeta={(r) => <Badge variant={REPLACEMENT_STATUS_VARIANT[r.status]}>{REPLACEMENT_STATUS_LABEL[r.status]}</Badge>}
+          />
         </TabsContent>
       </Tabs>
     </div>

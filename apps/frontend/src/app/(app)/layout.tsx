@@ -17,15 +17,21 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   }, [isLoading, user, router]);
 
   if (isLoading || !user) {
-    return <div className="flex min-h-screen items-center justify-center text-neutral-400">Carregando...</div>;
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+      </div>
+    );
   }
 
   return (
-    <div className="flex min-h-screen">
+    <div className="flex min-h-screen bg-background">
       <Sidebar className="hidden md:flex" />
       <div className="flex min-w-0 flex-1 flex-col">
         <Header />
-        <main className="flex-1 overflow-y-auto p-4 md:p-6">{children}</main>
+        <main className="flex-1 overflow-y-auto p-4 md:p-6">
+          <div className="mx-auto w-full max-w-7xl">{children}</div>
+        </main>
       </div>
     </div>
   );

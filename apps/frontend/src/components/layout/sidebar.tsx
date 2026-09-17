@@ -13,8 +13,8 @@ export function Sidebar({ className }: { className?: string }) {
   const { user } = useAuth();
 
   return (
-    <nav className={cn("flex h-full w-64 flex-col border-r bg-white dark:bg-neutral-950", className)}>
-      <div className="flex h-16 items-center gap-2 border-b px-6">
+    <nav className={cn("flex h-full w-64 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground", className)}>
+      <div className="flex h-16 items-center gap-2 border-b border-sidebar-border px-6">
         <Image src="/logo.png" alt="Printer SaaS" width={28} height={28} className="rounded" />
         <span className="font-semibold text-lg tracking-tight">Printer SaaS</span>
       </div>
@@ -25,8 +25,8 @@ export function Sidebar({ className }: { className?: string }) {
             className={cn(
               "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
               pathname.startsWith("/plataforma")
-                ? "bg-purple-600 text-white"
-                : "text-purple-700 hover:bg-purple-50 dark:text-purple-300 dark:hover:bg-purple-950/40",
+                ? "bg-sidebar-primary text-sidebar-primary-foreground"
+                : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
             )}
           >
             <ShieldCheck className="h-4 w-4 shrink-0" />
@@ -43,8 +43,8 @@ export function Sidebar({ className }: { className?: string }) {
               className={cn(
                 "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
                 active
-                  ? "bg-blue-600 text-white"
-                  : "text-neutral-600 hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-900",
+                  ? "bg-sidebar-primary text-sidebar-primary-foreground"
+                  : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
               )}
             >
               <Icon className="h-4 w-4 shrink-0" />

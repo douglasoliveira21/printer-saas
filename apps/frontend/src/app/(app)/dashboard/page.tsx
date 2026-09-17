@@ -3,6 +3,7 @@
 import { Printer, AlertTriangle, FileText, Wrench } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { PageHeader } from "@/components/shared/page-header";
 import { useDashboardSummary } from "@/hooks/use-dashboard";
 
 function StatCard({
@@ -17,8 +18,10 @@ function StatCard({
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-sm font-medium text-neutral-500">{title}</CardTitle>
-        <Icon className="h-4 w-4 text-neutral-400" />
+        <CardTitle className="text-sm font-medium text-muted-foreground">{title}</CardTitle>
+        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10">
+          <Icon className="h-4 w-4 text-primary" />
+        </div>
       </CardHeader>
       <CardContent>{children}</CardContent>
     </Card>
@@ -30,7 +33,7 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-semibold">Dashboard</h1>
+      <PageHeader title="Dashboard" description="Visão geral do seu parque de impressoras." />
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard title="Impressoras monitoradas" icon={Printer}>
@@ -39,9 +42,9 @@ export default function DashboardPage() {
           ) : (
             <>
               <div className="text-2xl font-bold">{data?.printers.monitored ?? 0}</div>
-              <p className="text-xs text-neutral-500">
-                <span className="text-emerald-600 font-medium">{data?.printers.online ?? 0} online</span> ·{" "}
-                <span className="text-red-600 font-medium">{data?.printers.offline ?? 0} offline</span> ·{" "}
+              <p className="text-xs text-muted-foreground">
+                <span className="font-medium text-emerald-600">{data?.printers.online ?? 0} online</span> ·{" "}
+                <span className="font-medium text-destructive">{data?.printers.offline ?? 0} offline</span> ·{" "}
                 {data?.printers.onlinePercent ?? 0}%
               </p>
             </>
@@ -54,9 +57,9 @@ export default function DashboardPage() {
           ) : (
             <>
               <div className="text-2xl font-bold">{(data?.alerts.critical ?? 0) + (data?.alerts.warning ?? 0)}</div>
-              <p className="text-xs text-neutral-500">
-                <span className="text-red-600 font-medium">{data?.alerts.critical ?? 0} críticos</span> ·{" "}
-                <span className="text-amber-600 font-medium">{data?.alerts.warning ?? 0} avisos</span>
+              <p className="text-xs text-muted-foreground">
+                <span className="font-medium text-destructive">{data?.alerts.critical ?? 0} críticos</span> ·{" "}
+                <span className="font-medium text-amber-600">{data?.alerts.warning ?? 0} avisos</span>
               </p>
             </>
           )}
@@ -72,8 +75,8 @@ export default function DashboardPage() {
           ) : (
             <>
               <div className="text-2xl font-bold">{data?.serviceOrders.open ?? 0}</div>
-              <p className="text-xs text-neutral-500">
-                <span className={data?.serviceOrders.late ? "text-red-600 font-medium" : ""}>
+              <p className="text-xs text-muted-foreground">
+                <span className={data?.serviceOrders.late ? "font-medium text-destructive" : ""}>
                   {data?.serviceOrders.late ?? 0} atrasadas
                 </span>
               </p>
