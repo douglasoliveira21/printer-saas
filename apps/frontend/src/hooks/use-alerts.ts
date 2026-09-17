@@ -11,11 +11,11 @@ export interface Alert {
   printer?: { id: string; model: string | null; ip: string | null; customer?: { legalName: string } | null } | null;
 }
 
-export function useAlerts(status?: string) {
+export function useAlerts(status?: string, printerId?: string) {
   return useQuery({
-    queryKey: ["alerts", status ?? "all"],
+    queryKey: ["alerts", status ?? "all", printerId ?? "all"],
     queryFn: async () => {
-      const { data } = await apiClient.get<Alert[]>("/alerts", { params: { status } });
+      const { data } = await apiClient.get<Alert[]>("/alerts", { params: { status, printerId } });
       return data;
     },
     refetchInterval: 30_000,

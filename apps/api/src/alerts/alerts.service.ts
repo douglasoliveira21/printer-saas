@@ -5,9 +5,12 @@ import { TenantPrismaService } from '../prisma/tenant-prisma.service';
 export class AlertsService {
   constructor(private readonly tenantPrisma: TenantPrismaService) {}
 
-  findAll(status?: string) {
+  findAll(status?: string, printerId?: string) {
     return this.tenantPrisma.client.alert.findMany({
-      where: status ? { status: status as any } : {},
+      where: {
+        ...(status ? { status: status as any } : {}),
+        ...(printerId ? { printerId } : {}),
+      },
       include: { printer: { select: { id: true, model: true, ip: true, customer: { select: { legalName: true } } } } },
       orderBy: { createdAt: 'desc' },
       take: 200,

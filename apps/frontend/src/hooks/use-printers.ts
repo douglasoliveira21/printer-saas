@@ -14,6 +14,18 @@ export function usePrinters(params: { status?: string; search?: string; customer
   });
 }
 
+export function usePrinter(id: string | undefined) {
+  return useQuery({
+    queryKey: ["printers", id],
+    queryFn: async () => {
+      const { data } = await apiClient.get<Printer>(`/printers/${id}`);
+      return data;
+    },
+    enabled: !!id,
+    refetchInterval: 30_000,
+  });
+}
+
 export function useClaimPrinter() {
   const queryClient = useQueryClient();
   return useMutation({

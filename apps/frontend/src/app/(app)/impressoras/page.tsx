@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { Search, Wifi, WifiOff, HelpCircle } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -119,7 +120,9 @@ export default function ImpressorasPage() {
                   <Badge variant={printer.status === "MONITORED" ? "default" : "outline"}>{STATUS_LABEL[printer.status]}</Badge>
                 </TableCell>
                 <TableCell className="font-medium">
-                  {printer.manufacturer || "Fabricante não disponível"} {printer.model || ""}
+                  <Link href={`/impressoras/${printer.id}`} className="hover:underline">
+                    {printer.manufacturer || "Fabricante não disponível"} {printer.model || ""}
+                  </Link>
                   <div className="text-xs text-neutral-400">{printer.serial || "Serial não disponível"}</div>
                 </TableCell>
                 <TableCell>{printer.customer?.legalName || "—"}</TableCell>
