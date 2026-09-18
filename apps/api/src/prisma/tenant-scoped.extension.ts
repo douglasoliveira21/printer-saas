@@ -25,6 +25,8 @@ const TENANT_SCOPED_MODELS = new Set([
   'PrinterComment',
   'Alert',
   'ServiceOrder',
+  'ServiceOrderPart',
+  'ServiceOrderPhoto',
   'Contract',
   'ContractPrinter',
   'ContractFixedCost',

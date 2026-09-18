@@ -216,6 +216,33 @@ export interface TopCustomerUsage {
 
 export type ServiceOrderStatus = "OPEN" | "SCHEDULED" | "IN_PROGRESS" | "WAITING_PART" | "WAITING_CUSTOMER" | "DONE" | "CANCELLED";
 export type ServiceOrderPriority = "LOW" | "MEDIUM" | "HIGH" | "URGENT";
+export type ServiceOrderType =
+  | "CORRECTIVE_MAINTENANCE"
+  | "PREVENTIVE_MAINTENANCE"
+  | "INSTALLATION"
+  | "EQUIPMENT_REPLACEMENT"
+  | "DELIVERY_PICKUP"
+  | "PRINT_ISSUE"
+  | "CONFIGURATION"
+  | "TECHNICAL_SUPPORT"
+  | "OTHER";
+export type ServiceOrderBillingType = "CONTRACT" | "CHARGE_CUSTOMER" | "WARRANTY" | "COURTESY";
+export type ServiceOrderPhotoPhase = "BEFORE" | "AFTER";
+
+export interface ServiceOrderPart {
+  id: string;
+  name: string;
+  quantity: number;
+  unitValue: string;
+  inventoryItemId: string | null;
+}
+
+export interface ServiceOrderPhoto {
+  id: string;
+  phase: ServiceOrderPhotoPhase;
+  path: string;
+  createdAt: string;
+}
 
 export interface ServiceOrder {
   id: string;
@@ -223,9 +250,36 @@ export interface ServiceOrder {
   status: ServiceOrderStatus;
   priority: ServiceOrderPriority;
   type: string | null;
+  serviceType: ServiceOrderType | null;
   description: string | null;
+  symptoms: string[];
+  counterAtOpening: number | null;
+
   diagnosis: string | null;
+  causeIdentified: string | null;
+  testsPerformed: string | null;
+  defectiveParts: string | null;
+  suppliesUsed: string | null;
+  technicalNotes: string | null;
   solution: string | null;
+
+  billingType: ServiceOrderBillingType | null;
+  laborCost: string | null;
+  travelCost: string | null;
+
+  arrivedAt: string | null;
+  departedAt: string | null;
+  mileageKm: number | null;
+  activityPerformed: string | null;
+  attendanceNotes: string | null;
+
+  equipmentWorking: boolean | null;
+
+  approvalName: string | null;
+  approvalAt: string | null;
+  approvalSignature: string | null;
+  approvalNotes: string | null;
+
   scheduledAt: string | null;
   startedAt: string | null;
   completedAt: string | null;
@@ -233,8 +287,11 @@ export interface ServiceOrder {
   createdAt: string;
   customer?: { id: string; legalName: string; tradeName: string | null } | null;
   location?: { id: string; name: string } | null;
-  printer?: { id: string; model: string | null; ip: string | null } | null;
+  printer?: { id: string; manufacturer: string | null; model: string | null; ip: string | null } | null;
   technician?: { id: string; name: string } | null;
+  createdBy?: { id: string; name: string } | null;
+  parts?: ServiceOrderPart[];
+  photos?: ServiceOrderPhoto[];
 }
 
 export type ContractStatus = "DRAFT" | "ACTIVE" | "SUSPENDED" | "ENDED" | "EXPIRED";

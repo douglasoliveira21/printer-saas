@@ -46,6 +46,12 @@ services:
       API_PORT: 3001
     ports:
       - "3001:3001"
+    volumes:
+      # Only stateful thing on this service — service order photos (spec
+      # §"Ordens de Serviço", fotos antes/depois). Everything else stays
+      # stateless in Postgres/Redis; see docs/easypanel.md for the EasyPanel
+      # equivalent of this mount.
+      - api_uploads:/repo/apps/api/uploads
     depends_on:
       postgres:
         condition: service_healthy
@@ -83,3 +89,4 @@ services:
 volumes:
   postgres_data:
   redis_data:
+  api_uploads:

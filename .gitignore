@@ -26,3 +26,6 @@ apps/agent-windows/**/bin/
 apps/agent-windows/**/obj/
 apps/agent-windows/**/*.user
 apps/agent-windows/publish/
+
+# Local service-order photo uploads (production uses a persistent volume, see docs/easypanel.md)
+apps/api/uploads/

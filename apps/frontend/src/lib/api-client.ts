@@ -1,9 +1,16 @@
 import axios, { type AxiosError, type InternalAxiosRequestConfig } from "axios";
 import { authStorage } from "./auth-storage";
 
+const API_ORIGIN = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+
 export const apiClient = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL ? `${process.env.NEXT_PUBLIC_API_URL}/api/v1` : "http://localhost:3001/api/v1",
+  baseURL: `${API_ORIGIN}/api/v1`,
 });
+
+/** Static assets (e.g. service order photos) are served outside the /api/v1 prefix. */
+export function uploadedFileUrl(relativePath: string) {
+  return `${API_ORIGIN}/uploads/${relativePath}`;
+}
 
 apiClient.interceptors.request.use((config) => {
   const token = authStorage.getAccessToken();

@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
+import Link from "next/link";
 import { Wrench } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -18,11 +19,11 @@ import { EditServiceOrderDialog } from "./edit-service-order-dialog";
 
 const STATUS_OPTIONS: { value: ServiceOrderStatus; label: string }[] = [
   { value: "OPEN", label: "Aberta" },
-  { value: "SCHEDULED", label: "Agendada" },
+  { value: "SCHEDULED", label: "Aguardando atendimento" },
   { value: "IN_PROGRESS", label: "Em atendimento" },
   { value: "WAITING_PART", label: "Aguardando peça" },
   { value: "WAITING_CUSTOMER", label: "Aguardando cliente" },
-  { value: "DONE", label: "Concluída" },
+  { value: "DONE", label: "Resolvida" },
   { value: "CANCELLED", label: "Cancelada" },
 ];
 
@@ -117,6 +118,10 @@ export default function OrdensServicoPage() {
     { key: "actions", header: "", cell: (o) => <EditServiceOrderDialog order={o} />, className: "text-right" },
   ];
 
+  function orderHref(o: ServiceOrder) {
+    return `/ordens-servico/${o.id}`;
+  }
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -160,7 +165,12 @@ export default function OrdensServicoPage() {
                       ) : (
                         <span />
                       )}
-                      <EditServiceOrderDialog order={order} />
+                      <div className="flex items-center gap-2">
+                        <Link href={orderHref(order)} className="text-xs text-muted-foreground hover:text-foreground hover:underline">
+                          Ver OS
+                        </Link>
+                        <EditServiceOrderDialog order={order} />
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -178,6 +188,7 @@ export default function OrdensServicoPage() {
           isLoading={isLoading}
           emptyIcon={Wrench}
           emptyTitle="Nenhuma ordem de serviço registrada ainda"
+          rowHref={orderHref}
           cardTitle={(o) => `#${o.number} — ${o.customer?.tradeName || o.customer?.legalName || "—"}`}
           cardMeta={(o) => <Badge variant={PRIORITY_CONFIG[o.priority].variant}>{PRIORITY_CONFIG[o.priority].label}</Badge>}
           cardActions={(o) => <EditServiceOrderDialog order={o} />}

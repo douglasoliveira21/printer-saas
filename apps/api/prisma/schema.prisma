@@ -54,6 +54,8 @@ model Tenant {
   contractFixedCosts ContractFixedCost[]
   contractEmailRecipients ContractEmailRecipient[]
   contractReadjustments ContractReadjustment[]
+  serviceOrderParts ServiceOrderPart[]
+  serviceOrderPhotos ServiceOrderPhoto[]
 
   @@map("tenants")
 }
@@ -109,6 +111,7 @@ model User {
   refreshTokens RefreshToken[]
   auditLogs     AuditLog[]
   technicianServiceOrders ServiceOrder[] @relation("technician")
+  createdServiceOrders ServiceOrder[] @relation("createdServiceOrders")
   printerComments PrinterComment[]
 
   @@unique([tenantId, email])
@@ -529,6 +532,30 @@ enum ServiceOrderPriority {
   URGENT
 }
 
+enum ServiceOrderType {
+  CORRECTIVE_MAINTENANCE
+  PREVENTIVE_MAINTENANCE
+  INSTALLATION
+  EQUIPMENT_REPLACEMENT
+  DELIVERY_PICKUP
+  PRINT_ISSUE
+  CONFIGURATION
+  TECHNICAL_SUPPORT
+  OTHER
+}
+
+enum ServiceOrderBillingType {
+  CONTRACT
+  CHARGE_CUSTOMER
+  WARRANTY
+  COURTESY
+}
+
+enum ServiceOrderPhotoPhase {
+  BEFORE
+  AFTER
+}
+
 model ServiceOrder {
   id           String               @id @default(uuid())
   tenantId     String
@@ -542,13 +569,41 @@ model ServiceOrder {
   printer      Printer?             @relation(fields: [printerId], references: [id])
   technicianId String?
   technician   User?                @relation("technician", fields: [technicianId], references: [id])
+  createdByUserId String?
+  createdBy    User?                @relation("createdServiceOrders", fields: [createdByUserId], references: [id])
 
-  type         String?
+  type         String? // legado, sem uso na UI nova — ver serviceType
+  serviceType  ServiceOrderType?
   priority     ServiceOrderPriority @default(MEDIUM)
   status       ServiceOrderStatus   @default(OPEN)
   description  String?
-  diagnosis    String?
-  solution     String?
+  symptoms     String[]             @default([])
+  counterAtOpening Int? // snapshot do contador total do printer no momento da abertura
+
+  diagnosis       String?
+  causeIdentified String?
+  testsPerformed  String?
+  defectiveParts  String?
+  suppliesUsed    String?
+  technicalNotes  String?
+  solution        String?
+
+  billingType  ServiceOrderBillingType?
+  laborCost    Decimal? @db.Decimal(12, 2)
+  travelCost   Decimal? @db.Decimal(12, 2)
+
+  arrivedAt         DateTime?
+  departedAt        DateTime?
+  mileageKm         Int?
+  activityPerformed String?
+  attendanceNotes   String?
+
+  equipmentWorking Boolean?
+
+  approvalName      String?
+  approvalAt        DateTime?
+  approvalSignature String? // PNG base64 data URL captured on a signature canvas
+  approvalNotes     String?
 
   scheduledAt  DateTime?
   startedAt    DateTime?
@@ -561,10 +616,43 @@ model ServiceOrder {
   financialEntries FinancialEntry[]
   inventoryMovements InventoryMovement[]
   alerts           Alert[]
+  parts            ServiceOrderPart[]
+  photos           ServiceOrderPhoto[]
 
   @@unique([tenantId, number])
   @@index([tenantId, status])
   @@map("service_orders")
+}
+
+model ServiceOrderPart {
+  id             String   @id @default(uuid())
+  tenantId       String
+  tenant         Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  serviceOrderId String
+  serviceOrder   ServiceOrder @relation(fields: [serviceOrderId], references: [id], onDelete: Cascade)
+  name           String
+  quantity       Int
+  unitValue      Decimal  @db.Decimal(12, 2)
+  inventoryItemId    String?
+  inventoryMovementId String?
+  createdAt      DateTime @default(now())
+
+  @@index([tenantId])
+  @@map("service_order_parts")
+}
+
+model ServiceOrderPhoto {
+  id             String                 @id @default(uuid())
+  tenantId       String
+  tenant         Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  serviceOrderId String
+  serviceOrder   ServiceOrder           @relation(fields: [serviceOrderId], references: [id], onDelete: Cascade)
+  phase          ServiceOrderPhotoPhase
+  path           String
+  createdAt      DateTime               @default(now())
+
+  @@index([tenantId])
+  @@map("service_order_photos")
 }
 
 // ---------------------------------------------------------------------------
