@@ -9,6 +9,7 @@ import { PageHeader } from "@/components/shared/page-header";
 import { EmptyState } from "@/components/shared/empty-state";
 import { useAlerts, useResolveAlert, type Alert } from "@/hooks/use-alerts";
 import { getApiErrorMessage } from "@/lib/api-client";
+import { CreateServiceOrderFromAlertDialog } from "./create-service-order-from-alert-dialog";
 
 const LEVEL_CONFIG: Record<Alert["level"], { label: string; variant: "default" | "destructive" | "secondary"; icon: typeof Info; tone: string }> = {
   CRITICAL: { label: "Crítico", variant: "destructive", icon: ShieldAlert, tone: "text-destructive" },
@@ -64,9 +65,12 @@ export default function AlertasPage() {
                     <p className="mt-1 text-xs text-muted-foreground">{new Date(alert.createdAt).toLocaleString("pt-BR")}</p>
                   </div>
                 </div>
-                <Button size="sm" variant="outline" onClick={() => handleResolve(alert.id)} disabled={resolveAlert.isPending}>
-                  Resolver
-                </Button>
+                <div className="flex shrink-0 items-center gap-2">
+                  <CreateServiceOrderFromAlertDialog alert={alert} />
+                  <Button size="sm" variant="outline" onClick={() => handleResolve(alert.id)} disabled={resolveAlert.isPending}>
+                    Resolver
+                  </Button>
+                </div>
               </CardContent>
             </Card>
           );

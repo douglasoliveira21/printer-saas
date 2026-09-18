@@ -1,0 +1,176 @@
+"use client";
+
+import { useState } from "react";
+import { toast } from "sonner";
+import { Download, FileStack, Printer, RefreshCw } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { EmptyState } from "@/components/shared/empty-state";
+import { useCustomers } from "@/hooks/use-customers";
+import { downloadClosingPdf, useClosings, useGenerateClosing } from "@/hooks/use-closings";
+import { getApiErrorMessage } from "@/lib/api-client";
+
+const MONTH_NAMES = [
+  "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
+  "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro",
+];
+
+function currency(value: number | string) {
+  return Number(value).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+}
+
+export function ClosingMonthTab() {
+  const now = new Date();
+  const [customerId, setCustomerId] = useState("");
+  const [year, setYear] = useState(now.getFullYear());
+  const [month, setMonth] = useState(now.getMonth() + 1);
+
+  const { data: customers } = useCustomers();
+  const { data: closings, isLoading } = useClosings(customerId || undefined, year);
+  const generateClosing = useGenerateClosing();
+
+  const closing = closings?.find((c) => c.referenceMonth === month && c.referenceYear === year);
+  const customerName = closing?.customer?.tradeName || closing?.customer?.legalName;
+
+  async function handleGenerate() {
+    if (!customerId) return;
+    try {
+      await generateClosing.mutateAsync({ customerId, year, month });
+      toast.success("Fechamento gerado");
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, "Erro ao gerar fechamento"));
+    }
+  }
+
+  async function handleExportPdf() {
+    if (!closing) return;
+    try {
+      await downloadClosingPdf(closing.id, `fechamento-${customerName}-${month}-${year}.pdf`);
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, "Erro ao exportar PDF"));
+    }
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center gap-3 print:hidden">
+        <Select value={customerId} onValueChange={(v) => setCustomerId(v ?? "")}>
+          <SelectTrigger className="w-full sm:w-64">
+            <SelectValue placeholder="Selecione o cliente" />
+          </SelectTrigger>
+          <SelectContent>
+            {customers?.data.map((c) => (
+              <SelectItem key={c.id} value={c.id}>
+                {c.tradeName || c.legalName}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select value={String(month)} onValueChange={(v) => setMonth(Number(v ?? month))}>
+          <SelectTrigger className="w-40">
+            <SelectValue>{() => MONTH_NAMES[month - 1]}</SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            {MONTH_NAMES.map((name, i) => (
+              <SelectItem key={name} value={String(i + 1)}>
+                {name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select value={String(year)} onValueChange={(v) => setYear(Number(v ?? year))}>
+          <SelectTrigger className="w-28">
+            <SelectValue>{() => String(year)}</SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            {[now.getFullYear(), now.getFullYear() - 1, now.getFullYear() - 2].map((y) => (
+              <SelectItem key={y} value={String(y)}>
+                {y}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Button onClick={handleGenerate} disabled={!customerId || generateClosing.isPending}>
+          <RefreshCw className="mr-2 h-4 w-4" />
+          {generateClosing.isPending ? "Gerando..." : closing ? "Atualizar fechamento" : "Gerar fechamento"}
+        </Button>
+      </div>
+
+      {!customerId && (
+        <Card>
+          <EmptyState icon={FileStack} title="Selecione um cliente" description="Escolha um cliente e o período para gerar o fechamento mensal." />
+        </Card>
+      )}
+
+      {customerId && !isLoading && !closing && (
+        <Card>
+          <EmptyState icon={FileStack} title="Nenhum fechamento gerado para este período" description="Clique em “Gerar fechamento” para calcular." />
+        </Card>
+      )}
+
+      {closing && (
+        <div className="space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-2 print:hidden">
+            <p className="text-sm text-muted-foreground">
+              Gerado em {new Date(closing.generatedAt).toLocaleString("pt-BR")}
+            </p>
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" onClick={() => window.print()}>
+                <Printer className="mr-2 h-4 w-4" />
+                Imprimir
+              </Button>
+              <Button variant="outline" size="sm" onClick={handleExportPdf}>
+                <Download className="mr-2 h-4 w-4" />
+                Exportar PDF
+              </Button>
+            </div>
+          </div>
+
+          <div className="hidden print:block">
+            <h2 className="text-lg font-semibold">
+              Fechamento — {customerName} — {MONTH_NAMES[month - 1]}/{year}
+            </h2>
+          </div>
+
+          <Card className="overflow-hidden py-0">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Contrato</TableHead>
+                  <TableHead>Impressora</TableHead>
+                  <TableHead>Páginas usadas</TableHead>
+                  <TableHead>Franquia</TableHead>
+                  <TableHead>Excedente</TableHead>
+                  <TableHead>Mensalidade</TableHead>
+                  <TableHead>Total</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {closing.details.map((line) => (
+                  <TableRow key={line.contractId}>
+                    <TableCell className="font-medium">#{line.contractNumber}</TableCell>
+                    <TableCell>{line.printerModel ?? "Sem impressora"}</TableCell>
+                    <TableCell>{line.dataAvailable ? (line.pagesUsed ?? "—") : "Dados insuficientes"}</TableCell>
+                    <TableCell>{line.franchisePages}</TableCell>
+                    <TableCell>{line.overturnedPages ?? "—"}</TableCell>
+                    <TableCell>{currency(line.monthlyFee)}</TableCell>
+                    <TableCell className="font-medium">{currency(line.totalAmount)}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </Card>
+
+          <Card>
+            <CardContent className="flex items-center justify-between py-4">
+              <span className="text-sm font-medium text-muted-foreground">Total do fechamento</span>
+              <span className="text-2xl font-bold">{currency(closing.totalAmount)}</span>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+    </div>
+  );
+}

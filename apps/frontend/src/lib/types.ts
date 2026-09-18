@@ -169,7 +169,7 @@ export interface Alert {
   message: string;
   createdAt: string;
   resolvedAt: string | null;
-  printer?: { id: string; model: string | null; ip: string | null; customer?: { legalName: string } | null } | null;
+  printer?: { id: string; model: string | null; ip: string | null; customer?: { id: string; legalName: string } | null } | null;
 }
 
 export interface DashboardSummary {
@@ -261,6 +261,31 @@ export interface FinancialSummary {
   receivableUpcoming: number;
   payablePending: number;
   projectedBalance: number;
+}
+
+export interface MonthlyClosingLine {
+  contractId: string;
+  contractNumber: number;
+  printerId: string | null;
+  printerModel: string | null;
+  pagesUsed: number | null;
+  franchisePages: number;
+  overturnedPages: number | null;
+  overageAmount: number | null;
+  monthlyFee: number;
+  totalAmount: number;
+  dataAvailable: boolean;
+}
+
+export interface MonthlyClosing {
+  id: string;
+  customerId: string;
+  referenceYear: number;
+  referenceMonth: number;
+  totalAmount: string;
+  details: MonthlyClosingLine[];
+  generatedAt: string;
+  customer?: { id: string; legalName: string; tradeName: string | null };
 }
 
 export type InventoryMovementType = "IN" | "OUT" | "ADJUSTMENT";

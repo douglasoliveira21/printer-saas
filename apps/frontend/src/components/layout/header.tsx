@@ -2,6 +2,7 @@
 
 import { Menu, LogOut, User as UserIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -14,11 +15,11 @@ import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/s
 import { useAuth } from "@/lib/auth-context";
 import { Sidebar } from "./sidebar";
 
-export function Header({ title }: { title?: string }) {
+export function Header({ title, className }: { title?: string; className?: string }) {
   const { user, logout } = useAuth();
 
   return (
-    <header className="flex h-16 items-center justify-between border-b border-border bg-card px-4 md:px-6">
+    <header className={cn("flex h-16 items-center justify-between border-b border-border bg-card px-4 md:px-6", className)}>
       <div className="flex items-center gap-3">
         <Sheet>
           <SheetTrigger render={<Button variant="ghost" size="icon" className="md:hidden" />}>

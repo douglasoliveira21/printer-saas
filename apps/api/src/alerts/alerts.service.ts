@@ -12,7 +12,7 @@ export class AlertsService {
         ...(printerId ? { printerId } : {}),
         ...(serviceOrderId ? { serviceOrderId } : {}),
       },
-      include: { printer: { select: { id: true, model: true, ip: true, customer: { select: { legalName: true } } } } },
+      include: { printer: { select: { id: true, model: true, ip: true, customer: { select: { id: true, legalName: true } } } } },
       orderBy: { createdAt: 'desc' },
       take: 200,
     });
