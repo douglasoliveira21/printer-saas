@@ -3,16 +3,34 @@ export interface PaginatedResponse<T> {
   meta: { page: number; limit: number; total: number; totalPages: number };
 }
 
-export type CustomerStatus = "ACTIVE" | "INACTIVE";
+export type CustomerStatus = "ACTIVE" | "INACTIVE" | "BLOCKED";
+export type CustomerPersonType = "INDIVIDUAL" | "COMPANY";
 
 export interface Customer {
   id: string;
+  personType: CustomerPersonType;
   legalName: string;
   tradeName: string | null;
   document: string | null;
+  stateRegistration: string | null;
+  municipalRegistration: string | null;
   email: string | null;
   phone: string | null;
+  whatsapp: string | null;
+  financialEmail: string | null;
+  supportEmail: string | null;
+  contactName: string | null;
+  contactRole: string | null;
   address: string | null;
+  zipCode: string | null;
+  street: string | null;
+  number: string | null;
+  complement: string | null;
+  neighborhood: string | null;
+  city: string | null;
+  state: string | null;
+  country: string | null;
+  notes: string | null;
   status: CustomerStatus;
   slaHours: number | null;
   createdAt: string;

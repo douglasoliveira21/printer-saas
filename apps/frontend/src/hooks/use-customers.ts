@@ -26,12 +26,29 @@ export function useCustomer(id: string | undefined) {
 }
 
 export interface CreateCustomerInput {
+  personType?: "INDIVIDUAL" | "COMPANY";
   legalName: string;
   tradeName?: string;
   document?: string;
+  stateRegistration?: string;
+  municipalRegistration?: string;
   email?: string;
   phone?: string;
+  whatsapp?: string;
+  financialEmail?: string;
+  supportEmail?: string;
+  contactName?: string;
+  contactRole?: string;
   address?: string;
+  zipCode?: string;
+  street?: string;
+  number?: string;
+  complement?: string;
+  neighborhood?: string;
+  city?: string;
+  state?: string;
+  country?: string;
+  notes?: string;
   slaHours?: number;
 }
 
@@ -61,7 +78,7 @@ export function useCreateLocation() {
   });
 }
 
-export type UpdateCustomerInput = Partial<CreateCustomerInput> & { status?: "ACTIVE" | "INACTIVE" };
+export type UpdateCustomerInput = Partial<CreateCustomerInput> & { status?: "ACTIVE" | "INACTIVE" | "BLOCKED" };
 
 export function useUpdateCustomer() {
   const queryClient = useQueryClient();

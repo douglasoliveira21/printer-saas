@@ -15,33 +15,55 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useUpdateCustomer } from "@/hooks/use-customers";
 import { getApiErrorMessage } from "@/lib/api-client";
 import type { Customer } from "@/lib/types";
+import { CustomerFormFields, customerFormToInput, type CustomerFormValue } from "../customer-form-fields";
+
+function customerToFormValue(customer: Customer): CustomerFormValue {
+  return {
+    personType: customer.personType,
+    legalName: customer.legalName,
+    tradeName: customer.tradeName ?? "",
+    document: customer.document ?? "",
+    stateRegistration: customer.stateRegistration ?? "",
+    municipalRegistration: customer.municipalRegistration ?? "",
+    status: customer.status,
+    email: customer.email ?? "",
+    phone: customer.phone ?? "",
+    whatsapp: customer.whatsapp ?? "",
+    financialEmail: customer.financialEmail ?? "",
+    supportEmail: customer.supportEmail ?? "",
+    contactName: customer.contactName ?? "",
+    contactRole: customer.contactRole ?? "",
+    zipCode: customer.zipCode ?? "",
+    street: customer.street ?? "",
+    number: customer.number ?? "",
+    complement: customer.complement ?? "",
+    neighborhood: customer.neighborhood ?? "",
+    city: customer.city ?? "",
+    state: customer.state ?? "",
+    country: customer.country ?? "Brasil",
+  };
+}
 
 export function EditCustomerDialog({ customer }: { customer: Customer }) {
   const [open, setOpen] = useState(false);
-  const [legalName, setLegalName] = useState(customer.legalName);
-  const [tradeName, setTradeName] = useState(customer.tradeName ?? "");
-  const [document, setDocument] = useState(customer.document ?? "");
-  const [email, setEmail] = useState(customer.email ?? "");
-  const [phone, setPhone] = useState(customer.phone ?? "");
-  const [status, setStatus] = useState<Customer["status"]>(customer.status);
+  const [form, setForm] = useState<CustomerFormValue>(() => customerToFormValue(customer));
   const [slaHours, setSlaHours] = useState(customer.slaHours?.toString() ?? "");
   const updateCustomer = useUpdateCustomer();
+
+  function patch(update: Partial<CustomerFormValue>) {
+    setForm((prev) => ({ ...prev, ...update }));
+  }
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
     try {
       await updateCustomer.mutateAsync({
         id: customer.id,
-        legalName,
-        tradeName: tradeName || undefined,
-        document: document || undefined,
-        email: email || undefined,
-        phone: phone || undefined,
-        status,
+        ...customerFormToInput(form),
+        status: form.status,
         slaHours: slaHours ? Number(slaHours) : undefined,
       });
       toast.success("Cliente atualizado");
@@ -52,52 +74,25 @@ export function EditCustomerDialog({ customer }: { customer: Customer }) {
   }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        setOpen(next);
+        if (next) setForm(customerToFormValue(customer));
+      }}
+    >
       <DialogTrigger render={<Button variant="outline" size="sm" />}>
         <Pencil className="mr-2 h-4 w-4" />
         Editar
       </DialogTrigger>
-      <DialogContent>
+      <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-2xl">
         <form onSubmit={handleSubmit}>
           <DialogHeader>
             <DialogTitle>Editar cliente</DialogTitle>
-            <DialogDescription>Atualize os dados cadastrais.</DialogDescription>
+            <DialogDescription>Atualize os dados cadastrais, de contato e endereço.</DialogDescription>
           </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="legalName">Razão social *</Label>
-              <Input id="legalName" required value={legalName} onChange={(e) => setLegalName(e.target.value)} />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="tradeName">Nome fantasia</Label>
-              <Input id="tradeName" value={tradeName} onChange={(e) => setTradeName(e.target.value)} />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="document">CNPJ</Label>
-              <Input id="document" value={document} onChange={(e) => setDocument(e.target.value)} />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="email">E-mail</Label>
-                <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="phone">Telefone</Label>
-                <Input id="phone" value={phone} onChange={(e) => setPhone(e.target.value)} />
-              </div>
-            </div>
-            <div className="space-y-2">
-              <Label>Status</Label>
-              <Select value={status} onValueChange={(v) => setStatus((v ?? "ACTIVE") as Customer["status"])}>
-                <SelectTrigger className="w-full">
-                  <SelectValue>{(value: Customer["status"]) => (value === "ACTIVE" ? "Ativo" : "Inativo")}</SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="ACTIVE">Ativo</SelectItem>
-                  <SelectItem value="INACTIVE">Inativo</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+          <div className="space-y-4 py-4">
+            <CustomerFormFields value={form} onChange={patch} showStatus />
             <div className="space-y-2">
               <Label htmlFor="slaHours">SLA padrão (horas) — sobrescreve o do contrato</Label>
               <Input

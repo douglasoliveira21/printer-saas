@@ -191,19 +191,40 @@ model AuditLog {
 enum CustomerStatus {
   ACTIVE
   INACTIVE
+  BLOCKED
+}
+
+enum CustomerPersonType {
+  INDIVIDUAL // Pessoa Física
+  COMPANY    // Pessoa Jurídica
 }
 
 model Customer {
   id             String         @id @default(uuid())
   tenantId       String
   tenant         Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  personType     CustomerPersonType @default(COMPANY)
   legalName      String
   tradeName      String?
-  document       String? // CNPJ
+  document       String? // CPF ou CNPJ, conforme personType
   stateRegistration String?
+  municipalRegistration String?
   email          String?
   phone          String?
-  address        String?
+  whatsapp       String?
+  financialEmail String?
+  supportEmail   String?
+  contactName    String?
+  contactRole    String?
+  address        String? // legado — mantido para não perder dado já preenchido, o formulário novo usa os campos estruturados abaixo
+  zipCode        String?
+  street         String?
+  number         String?
+  complement     String?
+  neighborhood   String?
+  city           String?
+  state          String?
+  country        String?        @default("Brasil")
   notes          String?
   status         CustomerStatus @default(ACTIVE)
   slaHours       Int? // overrides the applicable contract's SLA for this customer's service orders

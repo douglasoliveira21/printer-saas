@@ -8,8 +8,14 @@ import { Badge } from "@/components/ui/badge";
 import { PageHeader } from "@/components/shared/page-header";
 import { ResponsiveDataTable, type DataTableColumn } from "@/components/shared/responsive-data-table";
 import { useCustomers } from "@/hooks/use-customers";
-import type { Customer } from "@/lib/types";
+import type { Customer, CustomerStatus } from "@/lib/types";
 import { CreateCustomerDialog } from "./create-customer-dialog";
+
+const STATUS_CONFIG: Record<CustomerStatus, { label: string; variant: "default" | "secondary" | "destructive" }> = {
+  ACTIVE: { label: "Ativo", variant: "default" },
+  INACTIVE: { label: "Inativo", variant: "secondary" },
+  BLOCKED: { label: "Bloqueado", variant: "destructive" },
+};
 
 export default function ClientesPage() {
   const [search, setSearch] = useState("");
@@ -26,12 +32,12 @@ export default function ClientesPage() {
       ),
       hideOnMobile: true,
     },
-    { key: "document", header: "CNPJ", cell: (c) => c.document || "—" },
+    { key: "document", header: "CPF/CNPJ", cell: (c) => c.document || "—" },
     { key: "contact", header: "Contato", cell: (c) => c.email || c.phone || "—" },
     {
       key: "status",
       header: "Status",
-      cell: (c) => <Badge variant={c.status === "ACTIVE" ? "default" : "secondary"}>{c.status === "ACTIVE" ? "Ativo" : "Inativo"}</Badge>,
+      cell: (c) => <Badge variant={STATUS_CONFIG[c.status].variant}>{STATUS_CONFIG[c.status].label}</Badge>,
       hideOnMobile: true,
     },
   ];
@@ -57,7 +63,7 @@ export default function ClientesPage() {
             {c.tradeName || c.legalName}
           </Link>
         )}
-        cardMeta={(c) => <Badge variant={c.status === "ACTIVE" ? "default" : "secondary"}>{c.status === "ACTIVE" ? "Ativo" : "Inativo"}</Badge>}
+        cardMeta={(c) => <Badge variant={STATUS_CONFIG[c.status].variant}>{STATUS_CONFIG[c.status].label}</Badge>}
       />
     </div>
   );

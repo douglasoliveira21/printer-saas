@@ -5,6 +5,7 @@ import { CreateCustomerDto } from './create-customer.dto';
 enum CustomerStatusDto {
   ACTIVE = 'ACTIVE',
   INACTIVE = 'INACTIVE',
+  BLOCKED = 'BLOCKED',
 }
 
 export class UpdateCustomerDto extends PartialType(CreateCustomerDto) {
