@@ -50,6 +50,10 @@ model Tenant {
   consumableReplacements ConsumableReplacement[]
   printerComments   PrinterComment[]
   monthlyClosings   MonthlyClosing[]
+  contractPrinters  ContractPrinter[]
+  contractFixedCosts ContractFixedCost[]
+  contractEmailRecipients ContractEmailRecipient[]
+  contractReadjustments ContractReadjustment[]
 
   @@map("tenants")
 }
@@ -342,6 +346,7 @@ model Printer {
   contracts     Contract[]
   replacements  ConsumableReplacement[]
   comments      PrinterComment[]
+  contractPrinters ContractPrinter[]
 
   @@unique([tenantId, fingerprint])
   @@index([tenantId])
@@ -575,14 +580,104 @@ model Contract {
   status            ContractStatus @default(DRAFT)
   notes             String?
 
+  // Default per-page cost, used as a fallback for any linked ContractPrinter
+  // that doesn't have its own override (spec: "custo padrão"). Supersedes
+  // franchisePages/overagePriceBw/Color for billing purposes going forward —
+  // those columns stay populated for historical contracts but are no longer
+  // read by ClosingsService.
+  defaultPriceBw    Decimal?       @db.Decimal(12, 4)
+  defaultPriceColor Decimal?       @db.Decimal(12, 4)
+  defaultPriceScan  Decimal?       @db.Decimal(12, 4)
+
   createdAt         DateTime       @default(now())
   updatedAt         DateTime       @updatedAt
 
   financialEntries FinancialEntry[]
+  contractPrinters ContractPrinter[]
+  fixedCosts       ContractFixedCost[]
+  emailRecipients  ContractEmailRecipient[]
+  readjustments    ContractReadjustment[]
 
   @@unique([tenantId, number])
   @@index([tenantId])
   @@map("contracts")
+}
+
+// One row per printer billed under a contract (a contract can now cover many
+// printers, each with its own per-page pricing — Contract.printerId above is
+// the legacy single-printer link, kept for old contracts/reports).
+model ContractPrinter {
+  id         String   @id @default(uuid())
+  tenantId   String
+  tenant     Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  contractId String
+  contract   Contract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  printerId  String
+  printer    Printer  @relation(fields: [printerId], references: [id])
+
+  priceBw    Decimal? @db.Decimal(12, 4) // null = falls back to Contract.defaultPriceBw
+  priceColor Decimal? @db.Decimal(12, 4)
+  priceScan  Decimal? @db.Decimal(12, 4)
+  fixedCost  Decimal  @db.Decimal(12, 2) @default(0)
+
+  createdAt  DateTime @default(now())
+
+  @@unique([contractId, printerId])
+  @@index([tenantId])
+  @@map("contract_printers")
+}
+
+model ContractFixedCost {
+  id         String   @id @default(uuid())
+  tenantId   String
+  tenant     Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  contractId String
+  contract   Contract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  label      String
+  amount     Decimal  @db.Decimal(12, 2)
+  createdAt  DateTime @default(now())
+
+  @@index([tenantId])
+  @@map("contract_fixed_costs")
+}
+
+model ContractEmailRecipient {
+  id         String   @id @default(uuid())
+  tenantId   String
+  tenant     Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  contractId String
+  contract   Contract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  email      String
+  createdAt  DateTime @default(now())
+
+  @@unique([contractId, email])
+  @@index([tenantId])
+  @@map("contract_email_recipients")
+}
+
+enum ContractReadjustmentStatus {
+  SCHEDULED
+  APPLIED
+  CANCELLED
+}
+
+model ContractReadjustment {
+  id                 String                      @id @default(uuid())
+  tenantId           String
+  tenant             Tenant                      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  contractId         String
+  contract           Contract                    @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  percentage         Decimal                     @db.Decimal(6, 2)
+  effectiveMonth     Int // 1-12
+  effectiveYear      Int
+  status             ContractReadjustmentStatus  @default(SCHEDULED)
+  previousMonthlyFee Decimal?                    @db.Decimal(12, 2)
+  newMonthlyFee      Decimal?                    @db.Decimal(12, 2)
+  appliedAt          DateTime?
+  createdAt          DateTime                    @default(now())
+
+  @@index([tenantId, contractId])
+  @@map("contract_readjustments")
 }
 
 // Immutable snapshot of a customer's monthly billing closing — generated on

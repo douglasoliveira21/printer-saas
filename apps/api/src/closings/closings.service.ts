@@ -1,27 +1,42 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import PDFDocument from 'pdfkit';
-import { calculateFranchiseBilling, calculatePeriodUsage } from '@printer-saas/shared';
+import { calculatePeriodUsage } from '@printer-saas/shared';
 import { TenantPrismaService } from '../prisma/tenant-prisma.service';
 
-interface ClosingLine {
+interface PrinterLine {
+  printerId: string;
+  printerModel: string | null;
+  pagesBw: number | null;
+  pagesColor: number | null;
+  pagesScan: number | null;
+  priceBw: number;
+  priceColor: number;
+  priceScan: number;
+  fixedCost: number;
+  lineTotal: number;
+  dataAvailable: boolean;
+}
+
+interface ContractLine {
   contractId: string;
   contractNumber: number;
-  printerId: string | null;
-  printerModel: string | null;
-  pagesUsed: number | null;
-  franchisePages: number;
-  overturnedPages: number | null;
-  overageAmount: number | null;
   monthlyFee: number;
-  totalAmount: number;
-  dataAvailable: boolean;
+  fixedCosts: { label: string; amount: number }[];
+  printers: PrinterLine[];
+  contractTotal: number;
 }
 
 @Injectable()
 export class ClosingsService {
   constructor(private readonly tenantPrisma: TenantPrismaService) {}
 
-  /** Generates (or regenerates) a customer's monthly closing from their active contracts — reuses the exact same franchise/overage math as Contract.billingPreview. */
+  /**
+   * Generates (or regenerates) a customer's monthly closing from their
+   * active contracts, using each contract's per-printer cost-per-page
+   * pricing (ContractPrinter, falling back to the contract's default*
+   * price when a printer has no override) — the franchise/overage model
+   * (Contract.franchisePages/overagePrice*) is no longer used for billing.
+   */
   async generate(customerId: string, year: number, month: number) {
     const customer = await this.tenantPrisma.client.customer.findFirst({ where: { id: customerId } });
     if (!customer) {
@@ -33,64 +48,71 @@ export class ClosingsService {
 
     const contracts = await this.tenantPrisma.client.contract.findMany({
       where: { customerId, status: 'ACTIVE' },
-      include: { printer: { select: { id: true, model: true, ip: true } } },
+      include: {
+        fixedCosts: true,
+        contractPrinters: { include: { printer: { select: { id: true, model: true, ip: true } } } },
+      },
     });
 
-    const lines: ClosingLine[] = [];
+    const contractLines: ContractLine[] = [];
     for (const contract of contracts) {
       const monthlyFee = Number(contract.monthlyFee);
+      const fixedCosts = contract.fixedCosts.map((c) => ({ label: c.label, amount: Number(c.amount) }));
 
-      if (!contract.printerId) {
-        // No printer to measure usage against — bills the flat fee only.
-        lines.push({
-          contractId: contract.id,
-          contractNumber: contract.number,
-          printerId: null,
-          printerModel: null,
-          pagesUsed: null,
-          franchisePages: contract.franchisePages,
-          overturnedPages: null,
-          overageAmount: null,
-          monthlyFee,
-          totalAmount: monthlyFee,
-          dataAvailable: true,
+      const printerLines: PrinterLine[] = [];
+      for (const cp of contract.contractPrinters) {
+        const readings = await this.tenantPrisma.client.counterReading.findMany({
+          where: { printerId: cp.printerId, collectedAt: { gte: from, lte: to } },
+          orderBy: { collectedAt: 'asc' },
         });
-        continue;
+
+        const bw = calculatePeriodUsage(readings, 'blackWhite', from, to);
+        const color = calculatePeriodUsage(readings, 'color', from, to);
+        const scan = calculatePeriodUsage(readings, 'copies', from, to);
+
+        const priceBw = Number(cp.priceBw ?? contract.defaultPriceBw ?? 0);
+        const priceColor = Number(cp.priceColor ?? contract.defaultPriceColor ?? 0);
+        const priceScan = Number(cp.priceScan ?? contract.defaultPriceScan ?? 0);
+        const fixedCost = Number(cp.fixedCost);
+
+        const dataAvailable = bw.pagesUsed !== null || color.pagesUsed !== null || scan.pagesUsed !== null;
+        const lineTotal =
+          (bw.pagesUsed ?? 0) * priceBw + (color.pagesUsed ?? 0) * priceColor + (scan.pagesUsed ?? 0) * priceScan + fixedCost;
+
+        printerLines.push({
+          printerId: cp.printerId,
+          printerModel: cp.printer.model ?? cp.printer.ip ?? null,
+          pagesBw: bw.pagesUsed,
+          pagesColor: color.pagesUsed,
+          pagesScan: scan.pagesUsed,
+          priceBw,
+          priceColor,
+          priceScan,
+          fixedCost,
+          lineTotal: Math.round(lineTotal * 100) / 100,
+          dataAvailable,
+        });
       }
 
-      const readings = await this.tenantPrisma.client.counterReading.findMany({
-        where: { printerId: contract.printerId, collectedAt: { gte: from, lte: to } },
-        orderBy: { collectedAt: 'asc' },
-      });
-      const usage = calculatePeriodUsage(readings, 'total', from, to);
-      const billing = calculateFranchiseBilling({
-        franchisePages: contract.franchisePages,
-        monthlyFee,
-        overagePricePerPage: Number(contract.overagePriceBw),
-        usage,
-      });
+      const contractTotal =
+        monthlyFee + fixedCosts.reduce((s, c) => s + c.amount, 0) + printerLines.reduce((s, p) => s + p.lineTotal, 0);
 
-      lines.push({
+      contractLines.push({
         contractId: contract.id,
         contractNumber: contract.number,
-        printerId: contract.printerId,
-        printerModel: contract.printer?.model ?? contract.printer?.ip ?? null,
-        pagesUsed: billing.pagesUsed,
-        franchisePages: contract.franchisePages,
-        overturnedPages: billing.overturnedPages,
-        overageAmount: billing.overageAmount,
         monthlyFee,
-        totalAmount: billing.dataAvailable ? billing.totalAmount! : monthlyFee,
-        dataAvailable: billing.dataAvailable,
+        fixedCosts,
+        printers: printerLines,
+        contractTotal: Math.round(contractTotal * 100) / 100,
       });
     }
 
-    const totalAmount = lines.reduce((sum, l) => sum + l.totalAmount, 0);
+    const totalAmount = contractLines.reduce((sum, c) => sum + c.contractTotal, 0);
 
     return this.tenantPrisma.client.monthlyClosing.upsert({
       where: { tenantId_customerId_referenceYear_referenceMonth: { tenantId: this.tenantPrisma.tenantId, customerId, referenceYear: year, referenceMonth: month } },
-      update: { totalAmount, details: lines as any, generatedAt: new Date() },
-      create: { customerId, referenceYear: year, referenceMonth: month, totalAmount, details: lines as any } as any,
+      update: { totalAmount, details: contractLines as any, generatedAt: new Date() },
+      create: { customerId, referenceYear: year, referenceMonth: month, totalAmount, details: contractLines as any } as any,
     });
   }
 
@@ -114,7 +136,7 @@ export class ClosingsService {
 
   async generatePdf(id: string): Promise<Buffer> {
     const closing = await this.findOne(id);
-    const lines = closing.details as unknown as ClosingLine[];
+    const contractLines = closing.details as unknown as ContractLine[];
 
     const doc = new PDFDocument({ margin: 50 });
     const chunks: Buffer[] = [];
@@ -129,15 +151,22 @@ export class ClosingsService {
     doc.text(`Gerado em: ${closing.generatedAt.toLocaleString('pt-BR')}`);
     doc.moveDown();
 
-    doc.fontSize(12).text('Detalhamento por impressora', { underline: true });
-    doc.moveDown(0.5);
-    for (const line of lines) {
-      doc.fontSize(10).text(
-        `Contrato #${line.contractNumber} — ${line.printerModel ?? 'Sem impressora vinculada'}\n` +
-          `  Páginas usadas: ${line.pagesUsed ?? 'Não disponível'} | Franquia: ${line.franchisePages} | Excedente: ${line.overturnedPages ?? '-'}\n` +
-          `  Mensalidade: R$ ${line.monthlyFee.toFixed(2)} | Excedente: R$ ${(line.overageAmount ?? 0).toFixed(2)} | Total: R$ ${line.totalAmount.toFixed(2)}`,
-      );
-      doc.moveDown(0.5);
+    for (const contract of contractLines) {
+      doc.fontSize(12).text(`Contrato #${contract.contractNumber} — Mensalidade: R$ ${contract.monthlyFee.toFixed(2)}`, { underline: true });
+      doc.moveDown(0.3);
+      for (const p of contract.printers) {
+        doc.fontSize(10).text(
+          `${p.printerModel ?? p.printerId}\n` +
+            `  P&B: ${p.pagesBw ?? 'Não disponível'} × R$ ${p.priceBw.toFixed(4)} | Colorida: ${p.pagesColor ?? 'Não disponível'} × R$ ${p.priceColor.toFixed(4)} | Digitalização: ${p.pagesScan ?? 'Não disponível'} × R$ ${p.priceScan.toFixed(4)}\n` +
+            `  Custo fixo: R$ ${p.fixedCost.toFixed(2)} | Total da impressora: R$ ${p.lineTotal.toFixed(2)}`,
+        );
+        doc.moveDown(0.3);
+      }
+      for (const fc of contract.fixedCosts) {
+        doc.fontSize(10).text(`Custo adicional — ${fc.label}: R$ ${fc.amount.toFixed(2)}`);
+      }
+      doc.fontSize(11).text(`Total do contrato: R$ ${contract.contractTotal.toFixed(2)}`, { align: 'right' });
+      doc.moveDown();
     }
 
     doc.moveDown();

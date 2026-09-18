@@ -1,4 +1,7 @@
-import type { ReactNode } from "react";
+"use client";
+
+import type { MouseEvent, ReactNode } from "react";
+import { useRouter } from "next/navigation";
 import { Card } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { TableSkeleton } from "./table-skeleton";
@@ -28,6 +31,8 @@ export interface ResponsiveDataTableProps<T> {
   cardMeta?: (row: T) => ReactNode;
   /** Mobile-only: action buttons shown at the bottom of each card. */
   cardActions?: (row: T) => ReactNode;
+  /** When set, the whole row/card navigates here on click (clicks on buttons/links/selects inside are excluded). */
+  rowHref?: (row: T) => string;
 }
 
 /**
@@ -46,8 +51,19 @@ export function ResponsiveDataTable<T>({
   cardTitle,
   cardMeta,
   cardActions,
+  rowHref,
 }: ResponsiveDataTableProps<T>) {
   const isEmpty = !isLoading && (!data || data.length === 0);
+  const router = useRouter();
+
+  function handleRowClick(row: T) {
+    return (event: MouseEvent<HTMLElement>) => {
+      if (!rowHref) return;
+      const target = event.target as HTMLElement;
+      if (target.closest('button, a, [role="button"], input, select, textarea')) return;
+      router.push(rowHref(row));
+    };
+  }
 
   return (
     <>
@@ -73,7 +89,7 @@ export function ResponsiveDataTable<T>({
               </TableRow>
             )}
             {data?.map((row) => (
-              <TableRow key={keyField(row)}>
+              <TableRow key={keyField(row)} onClick={handleRowClick(row)} className={rowHref ? "cursor-pointer" : undefined}>
                 {columns.map((col) => (
                   <TableCell key={col.key} className={col.className}>
                     {col.cell(row)}
@@ -95,7 +111,7 @@ export function ResponsiveDataTable<T>({
           </Card>
         )}
         {data?.map((row) => (
-          <Card key={keyField(row)} className="p-4">
+          <Card key={keyField(row)} className={rowHref ? "cursor-pointer p-4" : "p-4"} onClick={handleRowClick(row)}>
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0 flex-1 font-medium">{cardTitle(row)}</div>
               {cardMeta?.(row)}

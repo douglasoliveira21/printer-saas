@@ -134,34 +134,55 @@ export function ClosingMonthTab() {
             </h2>
           </div>
 
-          <Card className="overflow-hidden py-0">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Contrato</TableHead>
-                  <TableHead>Impressora</TableHead>
-                  <TableHead>Páginas usadas</TableHead>
-                  <TableHead>Franquia</TableHead>
-                  <TableHead>Excedente</TableHead>
-                  <TableHead>Mensalidade</TableHead>
-                  <TableHead>Total</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {closing.details.map((line) => (
-                  <TableRow key={line.contractId}>
-                    <TableCell className="font-medium">#{line.contractNumber}</TableCell>
-                    <TableCell>{line.printerModel ?? "Sem impressora"}</TableCell>
-                    <TableCell>{line.dataAvailable ? (line.pagesUsed ?? "—") : "Dados insuficientes"}</TableCell>
-                    <TableCell>{line.franchisePages}</TableCell>
-                    <TableCell>{line.overturnedPages ?? "—"}</TableCell>
-                    <TableCell>{currency(line.monthlyFee)}</TableCell>
-                    <TableCell className="font-medium">{currency(line.totalAmount)}</TableCell>
+          {closing.details.map((contractLine) => (
+            <Card key={contractLine.contractId} className="overflow-hidden py-0">
+              <div className="flex items-center justify-between border-b border-border px-4 py-3">
+                <span className="font-medium">
+                  Contrato #{contractLine.contractNumber} — Mensalidade {currency(contractLine.monthlyFee)}
+                </span>
+                <span className="font-semibold">{currency(contractLine.contractTotal)}</span>
+              </div>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Impressora</TableHead>
+                    <TableHead>P&B</TableHead>
+                    <TableHead>Colorida</TableHead>
+                    <TableHead>Digitalização</TableHead>
+                    <TableHead>Custo fixo</TableHead>
+                    <TableHead>Total</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </Card>
+                </TableHeader>
+                <TableBody>
+                  {contractLine.printers.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={6} className="text-center text-muted-foreground">
+                        Nenhuma impressora vinculada
+                      </TableCell>
+                    </TableRow>
+                  )}
+                  {contractLine.printers.map((p) => (
+                    <TableRow key={p.printerId}>
+                      <TableCell>{p.printerModel ?? p.printerId}</TableCell>
+                      <TableCell>{p.pagesBw ?? "—"} × {currency(p.priceBw)}</TableCell>
+                      <TableCell>{p.pagesColor ?? "—"} × {currency(p.priceColor)}</TableCell>
+                      <TableCell>{p.pagesScan ?? "—"} × {currency(p.priceScan)}</TableCell>
+                      <TableCell>{currency(p.fixedCost)}</TableCell>
+                      <TableCell className="font-medium">{currency(p.lineTotal)}</TableCell>
+                    </TableRow>
+                  ))}
+                  {contractLine.fixedCosts.map((fc, i) => (
+                    <TableRow key={i}>
+                      <TableCell colSpan={5} className="text-muted-foreground">
+                        Custo adicional — {fc.label}
+                      </TableCell>
+                      <TableCell className="font-medium">{currency(fc.amount)}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </Card>
+          ))}
 
           <Card>
             <CardContent className="flex items-center justify-between py-4">

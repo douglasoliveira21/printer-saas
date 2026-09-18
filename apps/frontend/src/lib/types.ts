@@ -221,6 +221,41 @@ export interface ServiceOrder {
 
 export type ContractStatus = "DRAFT" | "ACTIVE" | "SUSPENDED" | "ENDED" | "EXPIRED";
 
+export interface ContractPrinter {
+  id: string;
+  printerId: string;
+  priceBw: string | null;
+  priceColor: string | null;
+  priceScan: string | null;
+  fixedCost: string;
+  printer: { id: string; manufacturer: string | null; model: string | null; serial: string | null };
+}
+
+export interface ContractFixedCost {
+  id: string;
+  label: string;
+  amount: string;
+}
+
+export interface ContractEmailRecipient {
+  id: string;
+  email: string;
+}
+
+export type ContractReadjustmentStatus = "SCHEDULED" | "APPLIED" | "CANCELLED";
+
+export interface ContractReadjustment {
+  id: string;
+  percentage: string;
+  effectiveMonth: number;
+  effectiveYear: number;
+  status: ContractReadjustmentStatus;
+  previousMonthlyFee: string | null;
+  newMonthlyFee: string | null;
+  appliedAt: string | null;
+  createdAt: string;
+}
+
 export interface Contract {
   id: string;
   number: number;
@@ -233,8 +268,16 @@ export interface Contract {
   overagePriceColor: string;
   billingDay: number;
   slaHours: number | null;
+  defaultPriceBw: string | null;
+  defaultPriceColor: string | null;
+  defaultPriceScan: string | null;
   customer?: { id: string; legalName: string; tradeName: string | null } | null;
   printer?: { id: string; model: string | null; ip: string | null } | null;
+  contractPrinters?: ContractPrinter[];
+  fixedCosts?: ContractFixedCost[];
+  emailRecipients?: ContractEmailRecipient[];
+  readjustments?: ContractReadjustment[];
+  _count?: { contractPrinters: number };
 }
 
 export type FinancialEntryType = "RECEIVABLE" | "PAYABLE";
@@ -263,18 +306,27 @@ export interface FinancialSummary {
   projectedBalance: number;
 }
 
-export interface MonthlyClosingLine {
+export interface ClosingPrinterLine {
+  printerId: string;
+  printerModel: string | null;
+  pagesBw: number | null;
+  pagesColor: number | null;
+  pagesScan: number | null;
+  priceBw: number;
+  priceColor: number;
+  priceScan: number;
+  fixedCost: number;
+  lineTotal: number;
+  dataAvailable: boolean;
+}
+
+export interface ClosingContractLine {
   contractId: string;
   contractNumber: number;
-  printerId: string | null;
-  printerModel: string | null;
-  pagesUsed: number | null;
-  franchisePages: number;
-  overturnedPages: number | null;
-  overageAmount: number | null;
   monthlyFee: number;
-  totalAmount: number;
-  dataAvailable: boolean;
+  fixedCosts: { label: string; amount: number }[];
+  printers: ClosingPrinterLine[];
+  contractTotal: number;
 }
 
 export interface MonthlyClosing {
@@ -283,7 +335,7 @@ export interface MonthlyClosing {
   referenceYear: number;
   referenceMonth: number;
   totalAmount: string;
-  details: MonthlyClosingLine[];
+  details: ClosingContractLine[];
   generatedAt: string;
   customer?: { id: string; legalName: string; tradeName: string | null };
 }
