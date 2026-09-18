@@ -22,6 +22,7 @@ const TENANT_SCOPED_MODELS = new Set([
   'CounterReading',
   'ConsumableReading',
   'ConsumableReplacement',
+  'PrinterComment',
   'Alert',
   'ServiceOrder',
   'Contract',

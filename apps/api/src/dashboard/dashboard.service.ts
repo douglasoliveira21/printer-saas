@@ -66,13 +66,13 @@ export class DashboardService {
     };
   }
 
-  /** Sums P&B/color/copies usage per period across every printer (optionally scoped to one customer). */
-  async pageUsage(granularity: 'month' | 'day', customerId?: string) {
+  /** Sums P&B/color/copies usage per period across matching printers (scoped to a customer and/or a single printer). */
+  async pageUsage(granularity: 'month' | 'day', scope: { customerId?: string; printerId?: string } = {}) {
     const now = new Date();
     const periods = granularity === 'month' ? buildMonthPeriods(now, 6) : buildDayPeriods(now, 30);
 
     const printers = await this.tenantPrisma.client.printer.findMany({
-      where: customerId ? { customerId } : {},
+      where: { ...(scope.customerId ? { customerId: scope.customerId } : {}), ...(scope.printerId ? { id: scope.printerId } : {}) },
       select: {
         id: true,
         counters: {

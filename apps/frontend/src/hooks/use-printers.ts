@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiClient } from "@/lib/api-client";
-import type { PaginatedResponse, Printer } from "@/lib/types";
+import type { PageUsagePeriod, PaginatedResponse, Printer, PrinterComment, PrinterTimelineItem } from "@/lib/types";
 
 export function usePrinters(params: { status?: string; search?: string; customerId?: string }) {
   return useQuery({
@@ -94,6 +94,52 @@ export function useUpdatePrinter() {
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ["printers"] });
       queryClient.invalidateQueries({ queryKey: ["printers", variables.id] });
+    },
+  });
+}
+
+export function usePrinterTimeline(id: string | undefined) {
+  return useQuery({
+    queryKey: ["printers", id, "timeline"],
+    queryFn: async () => {
+      const { data } = await apiClient.get<PrinterTimelineItem[]>(`/printers/${id}/timeline`);
+      return data;
+    },
+    enabled: !!id,
+  });
+}
+
+export function usePrinterPageUsage(id: string | undefined, granularity: "month" | "day") {
+  return useQuery({
+    queryKey: ["printers", id, "page-usage", granularity],
+    queryFn: async () => {
+      const { data } = await apiClient.get<PageUsagePeriod[]>(`/printers/${id}/page-usage`, { params: { granularity } });
+      return data;
+    },
+    enabled: !!id,
+  });
+}
+
+export function usePrinterComments(id: string | undefined) {
+  return useQuery({
+    queryKey: ["printers", id, "comments"],
+    queryFn: async () => {
+      const { data } = await apiClient.get<PrinterComment[]>(`/printers/${id}/comments`);
+      return data;
+    },
+    enabled: !!id,
+  });
+}
+
+export function useCreatePrinterComment() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, body }: { id: string; body: string }) => {
+      const { data } = await apiClient.post<PrinterComment>(`/printers/${id}/comments`, { body });
+      return data;
+    },
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["printers", variables.id, "comments"] });
     },
   });
 }

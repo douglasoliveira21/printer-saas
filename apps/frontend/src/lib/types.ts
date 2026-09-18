@@ -50,6 +50,7 @@ export interface Printer {
   status: PrinterStatus;
   onlineStatus: PrinterOnlineStatus;
   ip: string | null;
+  mac: string | null;
   serial: string | null;
   manufacturer: string | null;
   model: string | null;
@@ -58,11 +59,13 @@ export interface Printer {
   locationId: string | null;
   lastSeenAt: string | null;
   lastCollectedAt: string | null;
+  monitoredAt: string | null;
   slaHours: number | null;
   collectionMethod: "SNMP" | "MANUAL";
+  createdAt: string;
   customer?: { id: string; legalName: string } | null;
   location?: { id: string; name: string } | null;
-  agent?: { id: string; name: string } | null;
+  agent?: { id: string; name: string; hostname: string | null } | null;
   counters?: CounterReading[];
   consumables?: ConsumableReading[];
 }
@@ -84,6 +87,13 @@ export interface CounterReading {
   collectedAt: string;
 }
 
+export interface SupplyStats {
+  pagesPrintedSinceInstall: number | null;
+  averagePagesPerReplacement: number | null;
+  averageDaysBetweenReplacements: number | null;
+  estimatedCoveragePercent: number | null;
+}
+
 export interface ConsumableReading {
   id: string;
   type: string;
@@ -92,6 +102,24 @@ export interface ConsumableReading {
   name: string | null;
   collectedAt: string;
   forecast?: SupplyForecast | null;
+  stats?: SupplyStats;
+}
+
+export type PrinterTimelineItemType = "replacement" | "service_order";
+
+export interface PrinterTimelineItem {
+  type: PrinterTimelineItemType;
+  date: string;
+  status: string;
+  label: string;
+  notes: string | null;
+}
+
+export interface PrinterComment {
+  id: string;
+  body: string;
+  createdAt: string;
+  user: { id: string; name: string } | null;
 }
 
 export type ConsumableReplacementStatus = "PREDICTED" | "CONFIRMED" | "PREMATURE" | "DISMISSED";

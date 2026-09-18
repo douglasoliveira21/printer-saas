@@ -48,6 +48,7 @@ model Tenant {
   inventoryMovements InventoryMovement[]
   financialEntries  FinancialEntry[]
   consumableReplacements ConsumableReplacement[]
+  printerComments   PrinterComment[]
 
   @@map("tenants")
 }
@@ -103,6 +104,7 @@ model User {
   refreshTokens RefreshToken[]
   auditLogs     AuditLog[]
   technicianServiceOrders ServiceOrder[] @relation("technician")
+  printerComments PrinterComment[]
 
   @@unique([tenantId, email])
   @@index([tenantId])
@@ -324,6 +326,7 @@ model Printer {
 
   lastSeenAt     DateTime?
   lastCollectedAt DateTime?
+  monitoredAt    DateTime? // when this printer's status first became MONITORED (spec: never backfilled/guessed for pre-existing rows)
 
   slaHours       Int? // overrides location/customer/contract SLA for service orders on this printer
 
@@ -336,6 +339,7 @@ model Printer {
   serviceOrders ServiceOrder[]
   contracts     Contract[]
   replacements  ConsumableReplacement[]
+  comments      PrinterComment[]
 
   @@unique([tenantId, fingerprint])
   @@index([tenantId])
@@ -410,6 +414,21 @@ model ConsumableReplacement {
   @@index([tenantId, status])
   @@index([printerId, type, color])
   @@map("consumable_replacements")
+}
+
+model PrinterComment {
+  id        String   @id @default(uuid())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  printerId String
+  printer   Printer  @relation(fields: [printerId], references: [id], onDelete: Cascade)
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id])
+  body      String
+  createdAt DateTime @default(now())
+
+  @@index([printerId, createdAt])
+  @@map("printer_comments")
 }
 
 // ---------------------------------------------------------------------------

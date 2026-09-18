@@ -17,7 +17,7 @@ export class DashboardController {
   @Get('page-usage')
   @RequirePermissions('dashboard.view')
   pageUsage(@Query('granularity') granularity: 'month' | 'day' = 'month', @Query('customerId') customerId?: string) {
-    return this.dashboardService.pageUsage(granularity, customerId);
+    return this.dashboardService.pageUsage(granularity, { customerId });
   }
 
   @Get('top-customers')
