@@ -15,6 +15,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useUpdatePrinter } from "@/hooks/use-printers";
 import { getApiErrorMessage } from "@/lib/api-client";
 import type { Printer } from "@/lib/types";
@@ -24,6 +25,7 @@ export function EditPrinterDialog({ printer }: { printer: Printer }) {
   const [manufacturer, setManufacturer] = useState(printer.manufacturer ?? "");
   const [model, setModel] = useState(printer.model ?? "");
   const [slaHours, setSlaHours] = useState(printer.slaHours?.toString() ?? "");
+  const [collectionMethod, setCollectionMethod] = useState<"SNMP" | "MANUAL">(printer.collectionMethod);
   const updatePrinter = useUpdatePrinter();
 
   async function handleSave(event: FormEvent) {
@@ -34,6 +36,7 @@ export function EditPrinterDialog({ printer }: { printer: Printer }) {
         manufacturer: manufacturer || undefined,
         model: model || undefined,
         slaHours: slaHours ? Number(slaHours) : undefined,
+        collectionMethod,
       });
       toast.success("Impressora atualizada");
       setOpen(false);
@@ -73,6 +76,18 @@ export function EditPrinterDialog({ printer }: { printer: Printer }) {
                 onChange={(e) => setSlaHours(e.target.value)}
                 placeholder="Herdado do cliente/contrato"
               />
+            </div>
+            <div className="space-y-2">
+              <Label>Origem da coleta</Label>
+              <Select value={collectionMethod} onValueChange={(v) => setCollectionMethod((v ?? "SNMP") as "SNMP" | "MANUAL")}>
+                <SelectTrigger className="w-full">
+                  <SelectValue>{(value: "SNMP" | "MANUAL") => (value === "SNMP" ? "SNMP (automática)" : "Manual")}</SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="SNMP">SNMP (automática)</SelectItem>
+                  <SelectItem value="MANUAL">Manual</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </div>
           <DialogFooter>

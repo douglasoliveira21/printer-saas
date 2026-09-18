@@ -285,6 +285,11 @@ enum PrinterStatus {
   DECOMMISSIONED
 }
 
+enum PrinterCollectionMethod {
+  SNMP
+  MANUAL
+}
+
 enum PrinterOnlineStatus {
   UNKNOWN
   ONLINE
@@ -304,6 +309,7 @@ model Printer {
 
   status         PrinterStatus       @default(DISCOVERED)
   onlineStatus   PrinterOnlineStatus @default(UNKNOWN)
+  collectionMethod PrinterCollectionMethod @default(SNMP)
 
   ip             String?
   mac            String?

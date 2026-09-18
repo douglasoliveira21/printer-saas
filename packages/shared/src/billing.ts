@@ -3,6 +3,7 @@ export interface CounterPoint {
   total: number | null;
   blackWhite: number | null;
   color: number | null;
+  copies: number | null;
 }
 
 export interface UsageResult {
@@ -23,7 +24,7 @@ export interface UsageResult {
  * (spec §22/§70): we report the end reading's own value as the usage since
  * the reset, flagged via `counterWasReset`, instead of a negative number.
  */
-export function calculatePeriodUsage(readings: CounterPoint[], field: 'total' | 'blackWhite' | 'color', from: Date, to: Date): UsageResult {
+export function calculatePeriodUsage(readings: CounterPoint[], field: 'total' | 'blackWhite' | 'color' | 'copies', from: Date, to: Date): UsageResult {
   const inPeriod = readings
     .filter((r) => r.collectedAt >= from && r.collectedAt <= to && r[field] !== null)
     .sort((a, b) => a.collectedAt.getTime() - b.collectedAt.getTime());

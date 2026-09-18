@@ -59,6 +59,7 @@ export interface Printer {
   lastSeenAt: string | null;
   lastCollectedAt: string | null;
   slaHours: number | null;
+  collectionMethod: "SNMP" | "MANUAL";
   customer?: { id: string; legalName: string } | null;
   location?: { id: string; name: string } | null;
   agent?: { id: string; name: string } | null;
@@ -144,10 +145,27 @@ export interface Alert {
 }
 
 export interface DashboardSummary {
-  printers: { monitored: number; online: number; offline: number; onlinePercent: number };
-  alerts: { critical: number; warning: number };
-  contracts: { active: number };
-  serviceOrders: { open: number; late: number };
+  customers: { total: number };
+  printers: {
+    total: number;
+    origin: { clientes: number; empresa: number; novas: number };
+    communication: { ok: number; falha: number; manual: number };
+  };
+  alerts: { total: number; alto: number; medio: number };
+  serviceOrders: { total: number; pendente: number; andamento: number; finalizado: number };
+  replacementsPending: number;
+}
+
+export interface PageUsagePeriod {
+  period: string;
+  blackWhite: number;
+  color: number;
+  copies: number;
+}
+
+export interface TopCustomerUsage {
+  name: string;
+  pages: number;
 }
 
 export type ServiceOrderStatus = "OPEN" | "SCHEDULED" | "IN_PROGRESS" | "WAITING_PART" | "WAITING_CUSTOMER" | "DONE" | "CANCELLED";

@@ -21,7 +21,7 @@ export interface NavItem {
 }
 
 export const NAV_ITEMS: NavItem[] = [
-  { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+  { label: "Painel", href: "/painel", icon: LayoutDashboard },
   { label: "Impressoras", href: "/impressoras", icon: Printer },
   { label: "Clientes", href: "/clientes", icon: Users },
   { label: "Contratos", href: "/contratos", icon: FileText },

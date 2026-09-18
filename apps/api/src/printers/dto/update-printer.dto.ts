@@ -1,4 +1,4 @@
-import { IsInt, IsOptional, IsString, Min } from 'class-validator';
+import { IsIn, IsInt, IsOptional, IsString, Min } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class UpdatePrinterDto {
@@ -19,4 +19,8 @@ export class UpdatePrinterDto {
   @IsInt()
   @Min(0)
   slaHours?: number;
+
+  @IsOptional()
+  @IsIn(['SNMP', 'MANUAL'])
+  collectionMethod?: 'SNMP' | 'MANUAL';
 }

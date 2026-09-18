@@ -29,7 +29,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const { data } = await apiClient.post("/auth/login", { email, password });
       authStorage.setSession(data.accessToken, data.refreshToken, data.user);
       setUser(data.user);
-      router.push("/dashboard");
+      router.push("/painel");
     } catch (error) {
       throw new Error(getApiErrorMessage(error, "Credenciais inválidas"));
     }

@@ -12,7 +12,7 @@ export default function NotFound() {
         <h1 className="text-xl font-semibold">Página não encontrada</h1>
         <p className="mt-1 text-sm text-muted-foreground">O endereço que você acessou não existe ou foi movido.</p>
       </div>
-      <Button render={<Link href="/dashboard" />}>Voltar ao início</Button>
+      <Button render={<Link href="/painel" />}>Voltar ao início</Button>
     </div>
   );
 }
