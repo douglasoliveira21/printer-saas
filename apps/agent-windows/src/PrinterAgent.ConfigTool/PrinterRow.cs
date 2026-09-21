@@ -16,12 +16,14 @@ public class PrinterRow(AgentPrinterSummary printer) : INotifyPropertyChanged
     }
 
     public string Id => Printer.Id;
+    public bool IsMonitored => Printer.Status == "MONITORED";
+    public string MonitoredLabel => IsMonitored ? "✔" : "—";
     public string StatusLabel => Printer.Status switch
     {
-        "MONITORED" => "Homologada / monitorada",
+        "MONITORED" => "Monitorada",
         "IGNORED" => "Desativada",
         "DECOMMISSIONED" => "Decomissionada",
-        _ => "Pendente (não monitorada)",
+        _ => "Pendente",
     };
     public string OnlineLabel => Printer.OnlineStatus switch
     {
@@ -29,12 +31,17 @@ public class PrinterRow(AgentPrinterSummary printer) : INotifyPropertyChanged
         "OFFLINE" => "Offline",
         _ => "Desconhecida",
     };
-    public string ConnectionLabel => Printer.CollectionMethod == "MANUAL" ? "Manual" : "Rede (SNMP)";
+    public string ConnectionLabel => Printer.CollectionMethod == "MANUAL" ? "Manual" : "Rede";
+    public string HomologadoLabel => IsMonitored ? "Sim" : "Não";
     public string Ip => Printer.Ip ?? "—";
     public string Mac => Printer.Mac ?? "—";
     public string Manufacturer => Printer.Manufacturer ?? "—";
     public string Model => Printer.Model ?? "—";
     public string Serial => Printer.Serial ?? "—";
+
+    public bool Matches(string filter) =>
+        string.IsNullOrWhiteSpace(filter) ||
+        $"{Ip} {Manufacturer} {Model} {Serial} {Mac}".Contains(filter, StringComparison.OrdinalIgnoreCase);
 
     public event PropertyChangedEventHandler? PropertyChanged;
     private void OnPropertyChanged([CallerMemberName] string? name = null) =>

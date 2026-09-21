@@ -21,23 +21,7 @@ public partial class ToolsTabView : UserControl
     public void Initialize(AgentContext context)
     {
         _context = context;
-        RefreshStatus();
     }
-
-    private void RefreshStatus()
-    {
-        if (_context is null) return;
-        var state = _context.Installer.GetState();
-        LinkServiceStatusText.Text = state switch
-        {
-            AgentServiceState.Running => "Em execução",
-            AgentServiceState.Stopped => "Parado",
-            AgentServiceState.NotInstalled => "Não instalado",
-            _ => "Desconhecido",
-        };
-    }
-
-    private void RefreshStatusButton_Click(object sender, RoutedEventArgs e) => RefreshStatus();
 
     private async void NetworkScanButton_Click(object sender, RoutedEventArgs e)
     {

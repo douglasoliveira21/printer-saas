@@ -1,6 +1,8 @@
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Data;
 using PrinterAgent.Core.Models;
 
 namespace PrinterAgent.ConfigTool;
@@ -9,11 +11,14 @@ public partial class PrintersTabView : UserControl
 {
     private AgentContext? _context;
     private readonly ObservableCollection<PrinterRow> _rows = [];
+    private ICollectionView? _view;
 
     public PrintersTabView()
     {
         InitializeComponent();
-        PrintersGrid.ItemsSource = _rows;
+        _view = CollectionViewSource.GetDefaultView(_rows);
+        _view.Filter = o => o is PrinterRow row && row.Matches(FilterTextBox.Text);
+        PrintersGrid.ItemsSource = _view;
     }
 
     public void Initialize(AgentContext context)
@@ -32,8 +37,12 @@ public partial class PrintersTabView : UserControl
         {
             _rows.Add(new PrinterRow(p));
         }
-        StatusText.Text = $"{_rows.Count} impressora(s) encontrada(s) para este Agent.";
+        StatusText.Text = "";
+        RegisteredCountText.Text = $"Impressoras cadastradas: {_rows.Count}";
+        MonitoredCountText.Text = $"Impressoras monitoradas: {_rows.Count(r => r.IsMonitored)}";
     }
+
+    private void FilterTextBox_TextChanged(object sender, TextChangedEventArgs e) => _view?.Refresh();
 
     private async void RefreshButton_Click(object sender, RoutedEventArgs e) => await RefreshAsync();
 

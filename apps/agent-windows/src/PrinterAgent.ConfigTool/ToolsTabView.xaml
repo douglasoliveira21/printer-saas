@@ -47,28 +47,6 @@
                 </StackPanel>
             </Border>
 
-            <Border Background="{StaticResource SurfaceBrush}" CornerRadius="8" Padding="14">
-                <StackPanel>
-                    <TextBlock Text="Status do cliente" Style="{StaticResource SectionLabel}"/>
-                    <Grid Margin="0,6,0,0">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="180"/>
-                            <ColumnDefinition Width="*"/>
-                        </Grid.ColumnDefinitions>
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="Auto"/>
-                        </Grid.RowDefinitions>
-                        <TextBlock Grid.Row="0" Grid.Column="0" Text="Serviço do Agent (link):"/>
-                        <TextBlock x:Name="LinkServiceStatusText" Grid.Row="0" Grid.Column="1" FontWeight="SemiBold"/>
-                        <TextBlock Grid.Row="1" Grid.Column="0" Text="Atualização automática:" Margin="0,4,0,0"/>
-                        <TextBlock Grid.Row="1" Grid.Column="1" Text="Não implementada nesta versão" Margin="0,4,0,0" Foreground="{StaticResource MutedBrush}"/>
-                    </Grid>
-                    <Button x:Name="RefreshStatusButton" Content="Atualizar status" Style="{StaticResource SecondaryButton}"
-                            HorizontalAlignment="Left" Margin="0,10,0,0" Click="RefreshStatusButton_Click"/>
-                </StackPanel>
-            </Border>
-
         </StackPanel>
     </ScrollViewer>
 </UserControl>

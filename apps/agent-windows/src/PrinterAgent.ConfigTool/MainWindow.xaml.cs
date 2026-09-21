@@ -1,4 +1,5 @@
 using System.Windows;
+using System.Windows.Controls.Primitives;
 using System.Windows.Media;
 using System.Windows.Threading;
 using PrinterAgent.Core.Discovery;
@@ -78,30 +79,45 @@ public partial class MainWindow : Window
         UninstallButton.IsEnabled = state != AgentServiceState.NotInstalled;
 
         var installed = state != AgentServiceState.NotInstalled;
-        MainTabControl.IsEnabled = installed;
+        // Once installed, the setup fields (token/networks) get out of the
+        // way — same information stays reachable via Configurações.
+        SetupPanel.Visibility = installed ? Visibility.Collapsed : Visibility.Visible;
+        ShellGrid.IsEnabled = installed;
+
         if (installed && !_tabsInitialized)
         {
             _tabsInitialized = true;
             PrintersTab.Initialize(_context);
             ToolsTab.Initialize(_context);
+            StatusTab.Initialize(_context);
             SettingsTab.Initialize(_context);
             _ = PrintersTab.RefreshAsync();
         }
-
-        var logTail = _installer.ReadRecentLogTail();
-        if (logTail is not null)
+        else if (installed)
         {
-            LogTextBox.Text = logTail;
-            LogTextBox.ScrollToEnd();
+            StatusTab.RefreshStatus();
         }
     }
 
-    private void MainTabControl_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
+    private void NavButton_Click(object sender, RoutedEventArgs e)
     {
-        if (!_tabsInitialized) return;
-        if (MainTabControl.SelectedItem is System.Windows.Controls.TabItem { Header: "Impressoras" })
+        foreach (var toggle in new[] { NavPrinters, NavTools, NavStatus, NavSettings })
+        {
+            toggle.IsChecked = ReferenceEquals(toggle, sender);
+        }
+
+        PrintersTab.Visibility = ReferenceEquals(sender, NavPrinters) ? Visibility.Visible : Visibility.Collapsed;
+        ToolsTab.Visibility = ReferenceEquals(sender, NavTools) ? Visibility.Visible : Visibility.Collapsed;
+        StatusTab.Visibility = ReferenceEquals(sender, NavStatus) ? Visibility.Visible : Visibility.Collapsed;
+        SettingsTab.Visibility = ReferenceEquals(sender, NavSettings) ? Visibility.Visible : Visibility.Collapsed;
+
+        if (ReferenceEquals(sender, NavPrinters) && _tabsInitialized)
         {
             _ = PrintersTab.RefreshAsync();
+        }
+        else if (ReferenceEquals(sender, NavStatus) && _tabsInitialized)
+        {
+            StatusTab.RefreshStatus();
         }
     }
 

@@ -11,33 +11,51 @@
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
 
-        <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,10">
-            <Button x:Name="RefreshButton" Content="Atualizar" Style="{StaticResource SecondaryButton}" Margin="0,0,8,0" Click="RefreshButton_Click"/>
-            <Button x:Name="MonitorButton" Content="Monitorar" Style="{StaticResource PrimaryButton}" Margin="0,0,8,0" Click="MonitorButton_Click"/>
-            <Button x:Name="DeactivateButton" Content="Desativar" Style="{StaticResource SecondaryButton}" Margin="0,0,8,0" Click="DeactivateButton_Click"/>
-            <Button x:Name="AddButton" Content="Adicionar" Style="{StaticResource SecondaryButton}" Margin="0,0,8,0" Click="AddButton_Click"/>
-            <Button x:Name="RemoveButton" Content="Remover" Style="{StaticResource SecondaryButton}" Click="RemoveButton_Click"/>
-        </StackPanel>
+        <Grid Grid.Row="0" Margin="0,0,0,10">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="220"/>
+            </Grid.ColumnDefinitions>
+
+            <StackPanel Grid.Column="0" Orientation="Horizontal">
+                <Button x:Name="MonitorButton" Content="👁  Monitorar" Style="{StaticResource ToolbarButton}" Click="MonitorButton_Click"/>
+                <Button x:Name="DeactivateButton" Content="🚫  Desativar" Style="{StaticResource ToolbarButton}" Click="DeactivateButton_Click"/>
+                <Button x:Name="AddButton" Content="➕  Adicionar" Style="{StaticResource ToolbarButton}" Click="AddButton_Click"/>
+                <Button x:Name="RemoveButton" Content="➖  Remover" Style="{StaticResource ToolbarButton}" Click="RemoveButton_Click"/>
+                <Button x:Name="RefreshButton" Content="↻  Atualizar" Style="{StaticResource ToolbarButton}" Click="RefreshButton_Click"/>
+            </StackPanel>
+
+            <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="16,0,0,0">
+                <TextBlock x:Name="RegisteredCountText" FontSize="11" Foreground="{StaticResource MutedBrush}"/>
+                <TextBlock x:Name="MonitoredCountText" FontSize="11" Foreground="{StaticResource MutedBrush}"/>
+            </StackPanel>
+
+            <TextBox x:Name="FilterTextBox" Grid.Column="2" VerticalAlignment="Center"
+                     Tag="Filtrar impressoras..." TextChanged="FilterTextBox_TextChanged"/>
+        </Grid>
 
         <TextBlock x:Name="StatusText" Grid.Row="1" Margin="0,0,0,8" FontSize="12" Foreground="{StaticResource MutedBrush}"/>
 
         <DataGrid x:Name="PrintersGrid" Grid.Row="2" AutoGenerateColumns="False" CanUserAddRows="False"
                   CanUserDeleteRows="False" IsReadOnly="True" GridLinesVisibility="Horizontal"
-                  BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" RowHeight="32">
+                  BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" RowHeight="32"
+                  HeadersVisibility="Column" AlternatingRowBackground="{StaticResource SurfaceBrush}">
             <DataGrid.Columns>
                 <DataGridCheckBoxColumn Header="" Binding="{Binding IsSelected, Mode=TwoWay}" IsReadOnly="False" Width="32"/>
-                <DataGridTextColumn Header="Monitoramento" Binding="{Binding StatusLabel}" Width="150"/>
+                <DataGridTextColumn Header="Monitorada" Binding="{Binding MonitoredLabel}" Width="80"/>
                 <DataGridTextColumn Header="Situação" Binding="{Binding OnlineLabel}" Width="80"/>
-                <DataGridTextColumn Header="Conexão" Binding="{Binding ConnectionLabel}" Width="90"/>
-                <DataGridTextColumn Header="IP" Binding="{Binding Ip}" Width="110"/>
+                <DataGridTextColumn Header="Tipo" Binding="{Binding ConnectionLabel}" Width="70"/>
+                <DataGridTextColumn Header="Homologado" Binding="{Binding HomologadoLabel}" Width="90"/>
+                <DataGridTextColumn Header="Endereço IP" Binding="{Binding Ip}" Width="110"/>
                 <DataGridTextColumn Header="Fabricante" Binding="{Binding Manufacturer}" Width="100"/>
-                <DataGridTextColumn Header="Modelo" Binding="{Binding Model}" Width="130"/>
-                <DataGridTextColumn Header="Nº de série" Binding="{Binding Serial}" Width="110"/>
-                <DataGridTextColumn Header="MAC" Binding="{Binding Mac}" Width="120"/>
+                <DataGridTextColumn Header="Modelo" Binding="{Binding Model}" Width="140"/>
+                <DataGridTextColumn Header="Número de série" Binding="{Binding Serial}" Width="140"/>
+                <DataGridTextColumn Header="Endereço MAC" Binding="{Binding Mac}" Width="120"/>
                 <DataGridTemplateColumn Header="" Width="90">
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
-                            <Button Content="Detalhes" Padding="6,2" Click="DetailsButton_Click" Tag="{Binding Id}"/>
+                            <Button Content="Ver detalhes" Style="{StaticResource LinkButton}" Click="DetailsButton_Click" Tag="{Binding Id}"/>
                         </DataTemplate>
                     </DataGridTemplateColumn.CellTemplate>
                 </DataGridTemplateColumn>
