@@ -14,7 +14,16 @@ public static class PrinterMibOids
 
     // Printer-MIB
     public const string PrtGeneralSerialNumber = "1.3.6.1.2.1.43.5.1.1.17.1";
+    // Human-readable product name (e.g. "HP LaserJet P1102w") — a much more
+    // reliable source for "model" than parsing sysDescr's free-text dump,
+    // when the device implements it.
+    public const string PrtGeneralPrinterName = "1.3.6.1.2.1.43.5.1.1.16.1";
     public const string PrtMarkerLifeCountTotal = "1.3.6.1.2.1.43.10.2.1.4.1.1";
+
+    // IF-MIB (network interface table, walked) — ifPhysAddress gives the
+    // MAC address of each interface. Printer-MIB has no MAC OID of its own;
+    // this is the standard, vendor-agnostic place to find it.
+    public const string IfPhysAddressTable = "1.3.6.1.2.1.2.2.1.6";
 
     // Printer-MIB marker table (walked — one row per marking engine). Most
     // devices expose a single marker (index 1, same value as
