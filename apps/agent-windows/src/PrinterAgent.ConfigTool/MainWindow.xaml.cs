@@ -9,15 +9,39 @@ public partial class MainWindow : Window
 {
     private readonly WindowsServiceInstaller _installer = new();
     private readonly DispatcherTimer _refreshTimer;
+    private readonly AgentContext _context;
+    private readonly InstallSeed? _seed;
+    private bool _tabsInitialized;
 
     public MainWindow()
     {
         InitializeComponent();
+        _context = new AgentContext(_installer);
         _refreshTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(5) };
         _refreshTimer.Tick += (_, _) => RefreshStatus();
         _refreshTimer.Start();
 
         ApiUrlText.Text = _installer.GetConfiguredApiUrl() ?? WindowsServiceInstaller.DefaultApiUrl;
+
+        // Seed file dropped next to the exe (from the site's "Adicionar Agent"
+        // download) means the token doesn't need to be typed in by hand.
+        _seed = _installer.TryReadInstallSeed();
+        if (_seed is not null)
+        {
+            EnrollmentTokenTextBox.Text = _seed.EnrollmentToken ?? "";
+            EnrollmentTokenTextBox.IsReadOnly = true;
+            EnrollmentTokenTextBox.Visibility = Visibility.Collapsed;
+            TokenSectionLabel.Visibility = Visibility.Collapsed;
+            TokenSectionCaption.Visibility = Visibility.Collapsed;
+            SeedCustomerText.Visibility = Visibility.Visible;
+            SeedCustomerText.Text = string.IsNullOrWhiteSpace(_seed.CustomerName)
+                ? "Token de instalação carregado automaticamente."
+                : $"Cliente: {_seed.CustomerName} — token de instalação carregado automaticamente.";
+            if (!string.IsNullOrWhiteSpace(_seed.ApiUrl))
+            {
+                ApiUrlText.Text = _seed.ApiUrl;
+            }
+        }
 
         var existingNetworks = _installer.GetConfiguredNetworks();
         if (!string.IsNullOrWhiteSpace(existingNetworks))
@@ -53,11 +77,31 @@ public partial class MainWindow : Window
         StopButton.IsEnabled = state == AgentServiceState.Running;
         UninstallButton.IsEnabled = state != AgentServiceState.NotInstalled;
 
+        var installed = state != AgentServiceState.NotInstalled;
+        MainTabControl.IsEnabled = installed;
+        if (installed && !_tabsInitialized)
+        {
+            _tabsInitialized = true;
+            PrintersTab.Initialize(_context);
+            ToolsTab.Initialize(_context);
+            SettingsTab.Initialize(_context);
+            _ = PrintersTab.RefreshAsync();
+        }
+
         var logTail = _installer.ReadRecentLogTail();
         if (logTail is not null)
         {
             LogTextBox.Text = logTail;
             LogTextBox.ScrollToEnd();
+        }
+    }
+
+    private void MainTabControl_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
+    {
+        if (!_tabsInitialized) return;
+        if (MainTabControl.SelectedItem is System.Windows.Controls.TabItem { Header: "Impressoras" })
+        {
+            _ = PrintersTab.RefreshAsync();
         }
     }
 
@@ -76,7 +120,12 @@ public partial class MainWindow : Window
         try
         {
             InstallButton.IsEnabled = false;
-            _installer.InstallOrUpdate(WindowsServiceInstaller.DefaultApiUrl, token, NetworksTextBox.Text.Trim());
+            var apiUrl = _seed?.ApiUrl ?? WindowsServiceInstaller.DefaultApiUrl;
+            _installer.InstallOrUpdate(apiUrl, token, NetworksTextBox.Text.Trim());
+            if (_seed is not null)
+            {
+                _installer.MarkInstallSeedUsed();
+            }
             MessageBox.Show(this, "Agent instalado e iniciado com sucesso.", "Printer SaaS Agent", MessageBoxButton.OK, MessageBoxImage.Information);
         }
         catch (Exception ex)

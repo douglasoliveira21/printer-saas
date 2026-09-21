@@ -55,7 +55,7 @@ public class AgentWorker : BackgroundService
                 await FlushOfflineQueueAsync(stoppingToken);
 
                 var now = DateTime.UtcNow;
-                if (now - _lastDiscovery >= TimeSpan.FromSeconds(options.DiscoveryIntervalSeconds))
+                if (options.DiscoveryEnabled && now - _lastDiscovery >= TimeSpan.FromSeconds(options.DiscoveryIntervalSeconds))
                 {
                     _lastDiscovery = now;
                     await RunDiscoveryAndCollectionAsync(options, stoppingToken);

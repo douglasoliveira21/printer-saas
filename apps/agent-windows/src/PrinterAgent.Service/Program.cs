@@ -34,17 +34,37 @@ try
     builder.Services.Configure<AgentOptions>(builder.Configuration.GetSection(AgentOptions.SectionName));
 
     builder.Services.AddSingleton<AgentCredentialStore>();
+    builder.Services.AddSingleton<AgentProxyStore>();
     builder.Services.AddSingleton<AgentEnrollmentService>();
     builder.Services.AddSingleton<OfflineQueue>();
     builder.Services.AddSingleton<SnmpDeviceReader>();
     builder.Services.AddSingleton<PrinterDiscoveryService>();
 
     builder.Services.AddHttpClient<PrinterSaasApiClient>((sp, http) =>
-    {
-        var apiUrl = builder.Configuration.GetSection(AgentOptions.SectionName)["ApiUrl"] ?? "http://localhost:3001";
-        http.BaseAddress = new Uri(apiUrl.TrimEnd('/') + "/");
-        http.Timeout = TimeSpan.FromSeconds(30);
-    });
+        {
+            var apiUrl = builder.Configuration.GetSection(AgentOptions.SectionName)["ApiUrl"] ?? "http://localhost:3001";
+            http.BaseAddress = new Uri(apiUrl.TrimEnd('/') + "/");
+            http.Timeout = TimeSpan.FromSeconds(30);
+        })
+        // Proxy settings (if any) are read once at service start — same rule as
+        // changing ApiUrl: applying a new proxy configuration requires a service
+        // restart (see AgentProxyStore / ConfigTool Configurações tab).
+        .ConfigurePrimaryHttpMessageHandler(sp =>
+        {
+            var proxy = sp.GetRequiredService<AgentProxyStore>().Load();
+            var handler = new HttpClientHandler();
+            if (proxy is { IsConfigured: true })
+            {
+                handler.Proxy = new System.Net.WebProxy(proxy.Server!, proxy.Port!.Value)
+                {
+                    Credentials = string.IsNullOrWhiteSpace(proxy.Username)
+                        ? null
+                        : new System.Net.NetworkCredential(proxy.Username, proxy.Password, proxy.Domain),
+                };
+                handler.UseProxy = true;
+            }
+            return handler;
+        });
 
     builder.Services.AddHostedService<AgentWorker>();
 

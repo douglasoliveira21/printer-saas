@@ -153,6 +153,7 @@ export class AgentsService {
           sysDescr: device.sysDescr,
           status: 'DISCOVERED',
           onlineStatus: 'ONLINE',
+          collectionMethod: device.collectionMethod ?? 'SNMP',
           lastSeenAt: new Date(),
           lastCollectedAt: new Date(),
         },
@@ -166,6 +167,7 @@ export class AgentsService {
           firmware: device.firmware ?? undefined,
           sysDescr: device.sysDescr ?? undefined,
           onlineStatus: 'ONLINE',
+          collectionMethod: device.collectionMethod ?? undefined,
           lastSeenAt: new Date(),
           lastCollectedAt: new Date(),
         },
@@ -242,6 +244,70 @@ export class AgentsService {
     if (device.mac) return `mac:${device.mac}`;
     if (device.ip) return `agent-ip:${agentId}:${device.ip}`;
     return null;
+  }
+
+  // ---------------------------------------------------------------------
+  // Printer management from the Agent's own ConfigTool (agent-api/v1/printers/*).
+  // Scoped to this Agent's own printers only — the Agent has no user JWT/
+  // permissions, just its own agentId, so every query below filters on it
+  // explicitly rather than going through TenantPrismaService.
+  // ---------------------------------------------------------------------
+
+  listPrintersForAgent(agent: Agent) {
+    return this.prisma.printer.findMany({
+      where: { agentId: agent.id },
+      orderBy: { lastSeenAt: 'desc' },
+    });
+  }
+
+  async getPrinterForAgent(agent: Agent, id: string) {
+    const printer = await this.prisma.printer.findFirst({
+      where: { id, agentId: agent.id },
+      include: {
+        counters: { orderBy: { collectedAt: 'desc' }, take: 20 },
+        consumables: { orderBy: { collectedAt: 'desc' }, take: 20 },
+      },
+    });
+    if (!printer) {
+      throw new NotFoundException('Impressora não encontrada');
+    }
+    return printer;
+  }
+
+  async monitorPrinters(agent: Agent, ids: string[]) {
+    const result = await this.prisma.printer.updateMany({
+      where: { id: { in: ids }, agentId: agent.id },
+      data: { status: 'MONITORED', monitoredAt: new Date() },
+    });
+    return { updated: result.count };
+  }
+
+  async deactivatePrinters(agent: Agent, ids: string[]) {
+    const result = await this.prisma.printer.updateMany({
+      where: { id: { in: ids }, agentId: agent.id },
+      data: { status: 'IGNORED' },
+    });
+    return { updated: result.count };
+  }
+
+  /**
+   * Hard delete — only for a DISCOVERED printer (never claimed/monitored),
+   * since a monitored printer may already have ServiceOrder/Contract/Alert
+   * rows pointing at it without cascade delete; those must go through the
+   * web app's "Decomissionar" (soft, history-preserving) instead.
+   */
+  async removePrinterForAgent(agent: Agent, id: string) {
+    const printer = await this.prisma.printer.findFirst({ where: { id, agentId: agent.id } });
+    if (!printer) {
+      throw new NotFoundException('Impressora não encontrada');
+    }
+    if (printer.status !== 'DISCOVERED') {
+      throw new BadRequestException(
+        'Só é possível remover impressoras ainda não monitoradas. Para retirar uma impressora monitorada, use "Decomissionar" no site.',
+      );
+    }
+    await this.prisma.printer.delete({ where: { id } });
+    return { removed: true };
   }
 
   async markOfflineStale(thresholdSeconds: number) {

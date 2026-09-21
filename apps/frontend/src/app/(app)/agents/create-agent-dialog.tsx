@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { toast } from "sonner";
-import { Copy, Plus } from "lucide-react";
+import { Copy, Download, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -19,6 +19,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useCustomer, useCustomers } from "@/hooks/use-customers";
 import { useCreateAgentEnrollment, type CreateAgentEnrollmentResult } from "@/hooks/use-agents";
 import { getApiErrorMessage } from "@/lib/api-client";
+
+// Precisa ficar em sincronia com WindowsServiceInstaller.DefaultApiUrl
+// (apps/agent-windows/src/PrinterAgent.ConfigTool/WindowsServiceInstaller.cs) —
+// é o mesmo endpoint fixo que o instalador do Agent já usa por padrão.
+const AGENT_DEFAULT_API_URL = "https://api.print.vgon.com.br";
 
 export function CreateAgentDialog() {
   const [open, setOpen] = useState(false);
@@ -52,6 +57,23 @@ export function CreateAgentDialog() {
     if (!result) return;
     navigator.clipboard.writeText(result.enrollmentToken);
     toast.success("Token copiado");
+  }
+
+  function downloadInstallSeed() {
+    if (!result) return;
+    const seed = {
+      apiUrl: AGENT_DEFAULT_API_URL,
+      enrollmentToken: result.enrollmentToken,
+      agentName: name,
+      customerName: customer?.tradeName || customer?.legalName || undefined,
+    };
+    const blob = new Blob([JSON.stringify(seed, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "install-config.json";
+    a.click();
+    URL.revokeObjectURL(url);
   }
 
   return (
@@ -133,6 +155,15 @@ export function CreateAgentDialog() {
               <p className="text-xs text-neutral-500">
                 Expira em {new Date(result.expiresAt).toLocaleString("pt-BR")}. O Agent aparecerá como &quot;Online&quot; assim que
                 enviar o primeiro heartbeat.
+              </p>
+              <Button variant="outline" className="w-full" onClick={downloadInstallSeed}>
+                <Download className="mr-2 h-4 w-4" />
+                Baixar arquivo de instalação
+              </Button>
+              <p className="text-xs text-neutral-500">
+                Coloque o <code className="font-mono">install-config.json</code> baixado ao lado do{" "}
+                <code className="font-mono">PrinterAgentSetup.exe</code> antes de rodar — o instalador identifica o cliente e
+                preenche o token sozinho, sem precisar digitar nada.
               </p>
             </div>
             <DialogFooter>

@@ -1,0 +1,19 @@
+<Window x:Class="PrinterAgent.ConfigTool.PrinterDetailsWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Detalhes da impressora" Height="560" Width="520"
+        WindowStartupLocation="CenterOwner"
+        Background="White">
+    <Grid Margin="20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <TextBlock x:Name="TitleText" Grid.Row="0" Style="{StaticResource TitleText}" Margin="0,0,0,12"/>
+
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+            <StackPanel x:Name="ContentPanel"/>
+        </ScrollViewer>
+    </Grid>
+</Window>

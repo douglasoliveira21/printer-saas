@@ -20,6 +20,9 @@ public class AgentOptions
 
     public int DiscoveryIntervalSeconds { get; set; } = 3600;
 
+    /// <summary>When false, the scheduled discovery sweep never runs — manual "Buscar agora" from the ConfigTool's Ferramentas tab still does, since that's an explicit user action.</summary>
+    public bool DiscoveryEnabled { get; set; } = true;
+
     public int CollectionIntervalSeconds { get; set; } = 900;
 
     /// <summary>CIDR ranges to scan, e.g. "192.168.1.0/24". Empty = discovery disabled until configured via GET /config.</summary>

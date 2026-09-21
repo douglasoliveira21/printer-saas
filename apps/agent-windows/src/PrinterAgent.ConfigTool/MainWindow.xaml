@@ -5,8 +5,8 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:PrinterAgent.ConfigTool"
         mc:Ignorable="d"
-        Title="Printer SaaS Agent" Height="660" Width="640"
-        MinHeight="560" MinWidth="520"
+        Title="Printer SaaS Agent" Height="760" Width="820"
+        MinHeight="600" MinWidth="680"
         WindowStartupLocation="CenterScreen"
         Background="White"
         Icon="agent.ico">
@@ -42,10 +42,11 @@
         </StackPanel>
 
         <StackPanel Grid.Row="3" Margin="0,0,0,14">
-            <TextBlock Text="Token de instalação" Style="{StaticResource SectionLabel}"/>
-            <TextBlock Text="Gerado em: Configurações → Agents → Adicionar Agent, no SaaS. Só é necessário na primeira instalação."
+            <TextBlock x:Name="TokenSectionLabel" Text="Token de instalação" Style="{StaticResource SectionLabel}"/>
+            <TextBlock x:Name="TokenSectionCaption" Text="Gerado em: Configurações → Agents → Adicionar Agent, no SaaS. Só é necessário na primeira instalação."
                        Style="{StaticResource CaptionText}" TextWrapping="Wrap"/>
             <TextBox x:Name="EnrollmentTokenTextBox"/>
+            <TextBlock x:Name="SeedCustomerText" Visibility="Collapsed" FontWeight="SemiBold" Margin="0,4,0,0"/>
         </StackPanel>
 
         <StackPanel Grid.Row="4" Margin="0,0,0,14">
@@ -62,13 +63,26 @@
             <Button x:Name="UninstallButton" Content="Desinstalar" Style="{StaticResource SecondaryButton}" Click="UninstallButton_Click"/>
         </StackPanel>
 
-        <DockPanel Grid.Row="6">
-            <TextBlock DockPanel.Dock="Top" Text="Logs recentes" Style="{StaticResource SectionLabel}" Margin="0,0,0,8"/>
-            <Border DockPanel.Dock="Top" Background="{StaticResource LogBackgroundBrush}" CornerRadius="6" Padding="1">
-                <TextBox x:Name="LogTextBox" IsReadOnly="True" BorderThickness="0" VerticalScrollBarVisibility="Auto"
-                         HorizontalScrollBarVisibility="Auto" FontFamily="Consolas" FontSize="11" Padding="10"
-                         Background="{StaticResource LogBackgroundBrush}" Foreground="{StaticResource LogForegroundBrush}" TextWrapping="NoWrap"/>
-            </Border>
-        </DockPanel>
+        <TabControl x:Name="MainTabControl" Grid.Row="6" BorderThickness="0" Background="Transparent" SelectionChanged="MainTabControl_SelectionChanged">
+            <TabItem Header="Impressoras">
+                <local:PrintersTabView x:Name="PrintersTab"/>
+            </TabItem>
+            <TabItem Header="Ferramentas">
+                <local:ToolsTabView x:Name="ToolsTab"/>
+            </TabItem>
+            <TabItem Header="Configurações">
+                <local:SettingsTabView x:Name="SettingsTab"/>
+            </TabItem>
+            <TabItem Header="Logs">
+                <DockPanel Margin="0,12,0,0">
+                    <TextBlock DockPanel.Dock="Top" Text="Logs recentes" Style="{StaticResource SectionLabel}" Margin="0,0,0,8"/>
+                    <Border DockPanel.Dock="Top" Background="{StaticResource LogBackgroundBrush}" CornerRadius="6" Padding="1">
+                        <TextBox x:Name="LogTextBox" IsReadOnly="True" BorderThickness="0" VerticalScrollBarVisibility="Auto"
+                                 HorizontalScrollBarVisibility="Auto" FontFamily="Consolas" FontSize="11" Padding="10"
+                                 Background="{StaticResource LogBackgroundBrush}" Foreground="{StaticResource LogForegroundBrush}" TextWrapping="NoWrap"/>
+                    </Border>
+                </DockPanel>
+            </TabItem>
+        </TabControl>
     </Grid>
 </Window>

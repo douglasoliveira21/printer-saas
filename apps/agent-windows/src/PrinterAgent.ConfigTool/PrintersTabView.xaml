@@ -1,0 +1,47 @@
+<UserControl x:Class="PrinterAgent.ConfigTool.PrintersTabView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             mc:Ignorable="d" d:DesignHeight="450" d:DesignWidth="700">
+    <Grid Margin="0,12,0,0">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,10">
+            <Button x:Name="RefreshButton" Content="Atualizar" Style="{StaticResource SecondaryButton}" Margin="0,0,8,0" Click="RefreshButton_Click"/>
+            <Button x:Name="MonitorButton" Content="Monitorar" Style="{StaticResource PrimaryButton}" Margin="0,0,8,0" Click="MonitorButton_Click"/>
+            <Button x:Name="DeactivateButton" Content="Desativar" Style="{StaticResource SecondaryButton}" Margin="0,0,8,0" Click="DeactivateButton_Click"/>
+            <Button x:Name="AddButton" Content="Adicionar" Style="{StaticResource SecondaryButton}" Margin="0,0,8,0" Click="AddButton_Click"/>
+            <Button x:Name="RemoveButton" Content="Remover" Style="{StaticResource SecondaryButton}" Click="RemoveButton_Click"/>
+        </StackPanel>
+
+        <TextBlock x:Name="StatusText" Grid.Row="1" Margin="0,0,0,8" FontSize="12" Foreground="{StaticResource MutedBrush}"/>
+
+        <DataGrid x:Name="PrintersGrid" Grid.Row="2" AutoGenerateColumns="False" CanUserAddRows="False"
+                  CanUserDeleteRows="False" IsReadOnly="True" GridLinesVisibility="Horizontal"
+                  BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" RowHeight="32">
+            <DataGrid.Columns>
+                <DataGridCheckBoxColumn Header="" Binding="{Binding IsSelected, Mode=TwoWay}" IsReadOnly="False" Width="32"/>
+                <DataGridTextColumn Header="Monitoramento" Binding="{Binding StatusLabel}" Width="150"/>
+                <DataGridTextColumn Header="Situação" Binding="{Binding OnlineLabel}" Width="80"/>
+                <DataGridTextColumn Header="Conexão" Binding="{Binding ConnectionLabel}" Width="90"/>
+                <DataGridTextColumn Header="IP" Binding="{Binding Ip}" Width="110"/>
+                <DataGridTextColumn Header="Fabricante" Binding="{Binding Manufacturer}" Width="100"/>
+                <DataGridTextColumn Header="Modelo" Binding="{Binding Model}" Width="130"/>
+                <DataGridTextColumn Header="Nº de série" Binding="{Binding Serial}" Width="110"/>
+                <DataGridTextColumn Header="MAC" Binding="{Binding Mac}" Width="120"/>
+                <DataGridTemplateColumn Header="" Width="90">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <Button Content="Detalhes" Padding="6,2" Click="DetailsButton_Click" Tag="{Binding Id}"/>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+            </DataGrid.Columns>
+        </DataGrid>
+    </Grid>
+</UserControl>

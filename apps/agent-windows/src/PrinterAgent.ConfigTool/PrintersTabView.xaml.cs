@@ -1,0 +1,115 @@
+using System.Collections.ObjectModel;
+using System.Windows;
+using System.Windows.Controls;
+using PrinterAgent.Core.Models;
+
+namespace PrinterAgent.ConfigTool;
+
+public partial class PrintersTabView : UserControl
+{
+    private AgentContext? _context;
+    private readonly ObservableCollection<PrinterRow> _rows = [];
+
+    public PrintersTabView()
+    {
+        InitializeComponent();
+        PrintersGrid.ItemsSource = _rows;
+    }
+
+    public void Initialize(AgentContext context)
+    {
+        _context = context;
+    }
+
+    public async Task RefreshAsync()
+    {
+        if (_context is null) return;
+
+        StatusText.Text = "Carregando impressoras...";
+        var printers = await _context.ApiClient.ListPrintersAsync(CancellationToken.None);
+        _rows.Clear();
+        foreach (var p in printers)
+        {
+            _rows.Add(new PrinterRow(p));
+        }
+        StatusText.Text = $"{_rows.Count} impressora(s) encontrada(s) para este Agent.";
+    }
+
+    private async void RefreshButton_Click(object sender, RoutedEventArgs e) => await RefreshAsync();
+
+    private async void MonitorButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (_context is null) return;
+        var ids = SelectedIds();
+        if (ids.Count == 0)
+        {
+            StatusText.Text = "Selecione ao menos uma impressora.";
+            return;
+        }
+        await _context.ApiClient.MonitorPrintersAsync(ids, CancellationToken.None);
+        await RefreshAsync();
+    }
+
+    private async void DeactivateButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (_context is null) return;
+        var ids = SelectedIds();
+        if (ids.Count == 0)
+        {
+            StatusText.Text = "Selecione ao menos uma impressora.";
+            return;
+        }
+        await _context.ApiClient.DeactivatePrintersAsync(ids, CancellationToken.None);
+        await RefreshAsync();
+    }
+
+    private async void RemoveButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (_context is null) return;
+        var ids = SelectedIds();
+        if (ids.Count == 0)
+        {
+            StatusText.Text = "Selecione ao menos uma impressora.";
+            return;
+        }
+        var confirm = MessageBox.Show(
+            Window.GetWindow(this), $"Remover {ids.Count} impressora(s)? Só funciona para as ainda não monitoradas.",
+            "Printer SaaS Agent", MessageBoxButton.YesNo, MessageBoxImage.Question);
+        if (confirm != MessageBoxResult.Yes) return;
+
+        var errors = new List<string>();
+        foreach (var id in ids)
+        {
+            var error = await _context.ApiClient.DeletePrinterAsync(id, CancellationToken.None);
+            if (error is not null) errors.Add(error);
+        }
+        if (errors.Count > 0)
+        {
+            MessageBox.Show(Window.GetWindow(this), string.Join("\n", errors.Distinct()), "Printer SaaS Agent", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+        await RefreshAsync();
+    }
+
+    private async void AddButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (_context is null) return;
+        var dialog = new AddPrinterDialog(_context) { Owner = Window.GetWindow(this) };
+        if (dialog.ShowDialog() == true && dialog.Result is not null)
+        {
+            await _context.ApiClient.SubmitDevicesAsync(new SubmitDevicesRequest { Devices = [dialog.Result] }, CancellationToken.None);
+            await RefreshAsync();
+        }
+    }
+
+    private void DetailsButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (_context is null) return;
+        if (sender is Button { Tag: string id })
+        {
+            var window = new PrinterDetailsWindow(_context, id) { Owner = Window.GetWindow(this) };
+            window.ShowDialog();
+        }
+    }
+
+    private List<string> SelectedIds() => _rows.Where(r => r.IsSelected).Select(r => r.Id).ToList();
+}

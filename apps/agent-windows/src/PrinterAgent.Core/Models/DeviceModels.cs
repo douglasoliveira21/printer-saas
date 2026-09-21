@@ -19,6 +19,9 @@ public class DiscoveredDevice
     public string? SysDescr { get; set; }
     public DeviceCounters? Counters { get; set; }
     public List<DeviceConsumable>? Consumables { get; set; }
+
+    /// <summary>"SNMP" (default, network discovery) or "MANUAL" (added by IP or found via USB, without a network probe).</summary>
+    public string? CollectionMethod { get; set; }
 }
 
 public class DeviceCounters
@@ -78,4 +81,53 @@ public class AgentDiscoveryConfig
 {
     public List<string>? Networks { get; set; }
     public string? SnmpCommunity { get; set; }
+}
+
+/// <summary>Mirrors the Printer row shape returned by GET /agent-api/v1/printers — only the fields the ConfigTool's Impressoras tab needs.</summary>
+public class AgentPrinterSummary
+{
+    public required string Id { get; set; }
+    public string? Status { get; set; }
+    public string? OnlineStatus { get; set; }
+    public string? CollectionMethod { get; set; }
+    public string? Ip { get; set; }
+    public string? Mac { get; set; }
+    public string? Hostname { get; set; }
+    public string? Serial { get; set; }
+    public string? Manufacturer { get; set; }
+    public string? Model { get; set; }
+    public DateTime? LastSeenAt { get; set; }
+    public DateTime? MonitoredAt { get; set; }
+}
+
+/// <summary>GET /agent-api/v1/printers/:id — summary fields plus every counter/consumable reading the SaaS actually has (never invented — spec §67).</summary>
+public class AgentPrinterDetail : AgentPrinterSummary
+{
+    public string? Firmware { get; set; }
+    public string? SysDescr { get; set; }
+    public List<AgentCounterReading>? Counters { get; set; }
+    public List<AgentConsumableReading>? Consumables { get; set; }
+}
+
+public class AgentCounterReading
+{
+    public int? Total { get; set; }
+    public int? BlackWhite { get; set; }
+    public int? Color { get; set; }
+    public int? Copies { get; set; }
+    public DateTime CollectedAt { get; set; }
+}
+
+public class AgentConsumableReading
+{
+    public required string Type { get; set; }
+    public string? Color { get; set; }
+    public double? LevelPercent { get; set; }
+    public string? Name { get; set; }
+    public DateTime CollectedAt { get; set; }
+}
+
+public class AgentPrinterIdsRequest
+{
+    public required List<string> Ids { get; set; }
 }

@@ -4,6 +4,7 @@ import { AgentsService } from './agents.service';
 import { CreateAgentDto } from './dto/create-agent.dto';
 import { UpdateAgentDto } from './dto/update-agent.dto';
 import { EnrollAgentDto, HeartbeatDto, SubmitDevicesDto } from './dto/agent-payloads.dto';
+import { AgentPrinterIdsDto } from './dto/agent-printer-ids.dto';
 import { RequirePermissions } from '../common/decorators/permissions.decorator';
 import { Public } from '../common/decorators/public.decorator';
 import { AgentAuthGuard } from './agent-auth.guard';
@@ -86,5 +87,43 @@ export class AgentApiController {
   @Post('devices')
   submitDevices(@CurrentAgent() agent: Agent, @Body() dto: SubmitDevicesDto) {
     return this.agentsService.submitDevices(agent, dto);
+  }
+
+  @Public()
+  @UseGuards(AgentAuthGuard)
+  @Get('printers')
+  listPrinters(@CurrentAgent() agent: Agent) {
+    return this.agentsService.listPrintersForAgent(agent);
+  }
+
+  @Public()
+  @UseGuards(AgentAuthGuard)
+  @Get('printers/:id')
+  getPrinter(@CurrentAgent() agent: Agent, @Param('id') id: string) {
+    return this.agentsService.getPrinterForAgent(agent, id);
+  }
+
+  @Public()
+  @UseGuards(AgentAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  @Post('printers/monitor')
+  monitorPrinters(@CurrentAgent() agent: Agent, @Body() dto: AgentPrinterIdsDto) {
+    return this.agentsService.monitorPrinters(agent, dto.ids);
+  }
+
+  @Public()
+  @UseGuards(AgentAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  @Post('printers/deactivate')
+  deactivatePrinters(@CurrentAgent() agent: Agent, @Body() dto: AgentPrinterIdsDto) {
+    return this.agentsService.deactivatePrinters(agent, dto.ids);
+  }
+
+  @Public()
+  @UseGuards(AgentAuthGuard)
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @Delete('printers/:id')
+  removePrinter(@CurrentAgent() agent: Agent, @Param('id') id: string) {
+    return this.agentsService.removePrinterForAgent(agent, id);
   }
 }

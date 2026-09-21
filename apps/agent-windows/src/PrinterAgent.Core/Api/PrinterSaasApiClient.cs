@@ -112,4 +112,84 @@ public class PrinterSaasApiClient
             return false;
         }
     }
+
+    public async Task<List<AgentPrinterSummary>> ListPrintersAsync(CancellationToken ct)
+    {
+        try
+        {
+            ApplyStoredCredentials();
+            var response = await _http.GetAsync("api/v1/agent-api/v1/printers", ct);
+            if (!response.IsSuccessStatusCode)
+            {
+                return [];
+            }
+            return await response.Content.ReadFromJsonAsync<List<AgentPrinterSummary>>(JsonOptions, ct) ?? [];
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to list printers");
+            return [];
+        }
+    }
+
+    public async Task<AgentPrinterDetail?> GetPrinterAsync(string id, CancellationToken ct)
+    {
+        try
+        {
+            ApplyStoredCredentials();
+            var response = await _http.GetAsync($"api/v1/agent-api/v1/printers/{id}", ct);
+            if (!response.IsSuccessStatusCode)
+            {
+                return null;
+            }
+            return await response.Content.ReadFromJsonAsync<AgentPrinterDetail>(JsonOptions, ct);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to fetch printer {Id}", id);
+            return null;
+        }
+    }
+
+    public Task<bool> MonitorPrintersAsync(List<string> ids, CancellationToken ct) =>
+        PostPrinterIdsAsync("api/v1/agent-api/v1/printers/monitor", ids, ct);
+
+    public Task<bool> DeactivatePrintersAsync(List<string> ids, CancellationToken ct) =>
+        PostPrinterIdsAsync("api/v1/agent-api/v1/printers/deactivate", ids, ct);
+
+    private async Task<bool> PostPrinterIdsAsync(string path, List<string> ids, CancellationToken ct)
+    {
+        try
+        {
+            ApplyStoredCredentials();
+            var response = await _http.PostAsJsonAsync(path, new AgentPrinterIdsRequest { Ids = ids }, JsonOptions, ct);
+            return response.IsSuccessStatusCode;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to POST {Path}", path);
+            return false;
+        }
+    }
+
+    /// <returns>Null on success; otherwise an error message from the API worth showing the user (e.g. "printer already monitored").</returns>
+    public async Task<string?> DeletePrinterAsync(string id, CancellationToken ct)
+    {
+        try
+        {
+            ApplyStoredCredentials();
+            var response = await _http.DeleteAsync($"api/v1/agent-api/v1/printers/{id}", ct);
+            if (response.IsSuccessStatusCode)
+            {
+                return null;
+            }
+            var body = await response.Content.ReadAsStringAsync(ct);
+            return string.IsNullOrWhiteSpace(body) ? $"Falha ({response.StatusCode})" : body;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to delete printer {Id}", id);
+            return ex.Message;
+        }
+    }
 }

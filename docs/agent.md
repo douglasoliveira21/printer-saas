@@ -29,6 +29,11 @@
 | POST | `/heartbeat` | a cada N segundos: hostname, IP local, versão, SO |
 | GET | `/config` | configuração de discovery (subnets, SNMP) atribuída pelo SaaS |
 | POST | `/devices` | payload normalizado de dispositivos descobertos/coletados |
+| GET | `/printers` | lista as impressoras deste Agent (aba Impressoras do ConfigTool) |
+| GET | `/printers/:id` | detalhe de uma impressora + últimos counters/consumíveis |
+| POST | `/printers/monitor` | `{ ids: string[] }` — marca como monitorada (bulk) |
+| POST | `/printers/deactivate` | `{ ids: string[] }` — desativa (bulk) |
+| DELETE | `/printers/:id` | remove, só se ainda `DISCOVERED` (nunca uma já monitorada) |
 
 Payload de `/devices` (`SubmitDevicesDto`):
 
@@ -75,4 +80,33 @@ etc.) vive no backend.
   tamanho máximo de fila — implementado (`OfflineQueue`).
 - Logs rotativos em `C:\ProgramData\PrinterSaaS\Agent\Logs`, nunca logando segredos —
   implementado (Serilog, 14 dias de retenção).
-- Auto-update assinado (spec §42): **não implementado** — atualização é manual por ora.
+- Auto-update assinado (spec §42): **não implementado** — atualização é manual por ora
+  (a aba "Ferramentas → Status do cliente" do ConfigTool mostra isso honestamente em vez
+  de fabricar um status de serviço que não existe).
+
+## ConfigTool (`PrinterAgentSetup.exe`) — telas de gestão
+
+Além de instalar/iniciar/parar o serviço, o ConfigTool tem 3 abas que falam direto com
+`agent-api/v1/*` usando a credencial permanente do próprio Agent (sem precisar de login
+de usuário):
+
+- **Impressoras**: lista as impressoras deste Agent, com monitorar/desativar em lote,
+  adicionar por IP (faz um probe SNMP local e envia via `/devices`), remover (só
+  `DISCOVERED`) e "Ver detalhes" (todos os campos + counters já coletados).
+- **Ferramentas**: busca manual por rede/sub-rede (reusa `PrinterDiscoveryService`), busca
+  de impressoras USB instaladas localmente (`System.Printing`, sem contadores — USB não
+  fala SNMP) e status do serviço do Agent.
+- **Configurações**: intervalo de busca de novas impressoras (ou "nunca buscar"),
+  intervalo de heartbeat, e proxy (servidor/porta/usuário/senha/domínio — guardado
+  criptografado via DPAPI em `proxy.dat`, nunca em `appsettings.json`; aplicar exige
+  reiniciar o serviço, igual à troca de URL da API).
+
+### Token pronto na instalação (`install-config.json`)
+
+A tela "Adicionar Agent" do site, depois de gerar o token, oferece baixar um
+`install-config.json` (`{ apiUrl, enrollmentToken, agentName, customerName }`, montado no
+navegador, sem endpoint novo). Colocando esse arquivo ao lado de `PrinterAgentSetup.exe`,
+o ConfigTool detecta sozinho na primeira tela, mostra o nome do cliente e preenche o
+token — sem digitação manual. Depois de instalar com sucesso o arquivo é renomeado para
+`install-config.json.used` (evita reuso em outra máquina). Sem o arquivo, a instalação
+continua funcionando exatamente como antes (token digitado à mão).

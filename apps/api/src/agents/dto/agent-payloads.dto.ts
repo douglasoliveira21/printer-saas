@@ -1,6 +1,7 @@
 import { Type } from 'class-transformer';
 import {
   IsArray,
+  IsIn,
   IsInt,
   IsNumber,
   IsOptional,
@@ -128,6 +129,10 @@ class DeviceDto {
   @ValidateNested({ each: true })
   @Type(() => DeviceConsumableDto)
   consumables?: DeviceConsumableDto[];
+
+  @IsOptional()
+  @IsIn(['SNMP', 'MANUAL'])
+  collectionMethod?: 'SNMP' | 'MANUAL';
 }
 
 export class SubmitDevicesDto {
