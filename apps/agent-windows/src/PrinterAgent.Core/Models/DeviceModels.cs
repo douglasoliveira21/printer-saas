@@ -22,6 +22,16 @@ public class DiscoveredDevice
 
     /// <summary>"SNMP" (default, network discovery) or "MANUAL" (added by IP or found via USB, without a network probe).</summary>
     public string? CollectionMethod { get; set; }
+
+    /// <summary>
+    /// Null = couldn't determine (device doesn't expose the input tray
+    /// table at all). True/false = at least one input tray's declared
+    /// media dimensions were read and classified — never guessed from the
+    /// model name (spec §67). Drives whether the UI shows A3-specific
+    /// fields at all, instead of showing "não disponível" for every
+    /// printer regardless of whether it can even take A3 paper.
+    /// </summary>
+    public bool? SupportsA3 { get; set; }
 }
 
 public class DeviceCounters

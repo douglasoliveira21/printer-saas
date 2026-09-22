@@ -360,6 +360,12 @@ model Printer {
 
   slaHours       Int? // overrides location/customer/contract SLA for service orders on this printer
 
+  // Null = never determined (device doesn't expose the Printer-MIB input
+  // tray table). true/false = derived from an actual declared tray size at
+  // least once — never guessed from the model name. Drives whether the UI
+  // shows A3-specific fields at all for this printer.
+  supportsA3     Boolean?
+
   createdAt      DateTime            @default(now())
   updatedAt      DateTime            @updatedAt
 

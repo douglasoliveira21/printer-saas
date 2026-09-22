@@ -80,6 +80,8 @@ export interface Printer {
   monitoredAt: string | null;
   slaHours: number | null;
   collectionMethod: "SNMP" | "MANUAL";
+  /** Null = never determined (device doesn't expose the input tray table). Drives whether A3-specific fields show up at all. */
+  supportsA3: boolean | null;
   createdAt: string;
   customer?: { id: string; legalName: string } | null;
   location?: { id: string; name: string } | null;

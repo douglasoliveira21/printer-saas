@@ -154,6 +154,7 @@ export class AgentsService {
           status: 'DISCOVERED',
           onlineStatus: 'ONLINE',
           collectionMethod: device.collectionMethod ?? 'SNMP',
+          supportsA3: device.supportsA3 ?? undefined,
           lastSeenAt: new Date(),
           lastCollectedAt: new Date(),
         },
@@ -168,6 +169,11 @@ export class AgentsService {
           sysDescr: device.sysDescr ?? undefined,
           onlineStatus: 'ONLINE',
           collectionMethod: device.collectionMethod ?? undefined,
+          // Only overwrite when this scan actually determined it — a scan
+          // that couldn't read the input tray table this round shouldn't
+          // erase a previously-confirmed true/false (spec §67: absence of
+          // new data isn't the same as "unknown").
+          supportsA3: device.supportsA3 ?? undefined,
           lastSeenAt: new Date(),
           lastCollectedAt: new Date(),
         },

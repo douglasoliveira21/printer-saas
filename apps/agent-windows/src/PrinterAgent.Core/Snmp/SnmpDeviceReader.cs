@@ -48,7 +48,10 @@ public class SnmpDeviceReader
         }
 
         var manufacturer = InferManufacturer(sysDescr);
-        var printerName = await TryGetAsync(endpoint, communityOctet, version, PrinterMibOids.PrtGeneralPrinterName, timeoutMs, retries, ct);
+        // Walked, not GET'd at a fixed ".1" — a multi-engine/multi-function
+        // device may index its printer sub-unit at something other than 1,
+        // and a fixed GET would just silently miss it there.
+        var printerName = await WalkFirstNonEmptyAsync(endpoint, communityOctet, version, PrinterMibOids.PrtGeneralPrinterNameTable, timeoutMs, ct);
         var device = new DiscoveredDevice
         {
             Ip = ip.ToString(),
@@ -64,12 +67,19 @@ public class SnmpDeviceReader
         };
 
         device.Hostname = await TryGetAsync(endpoint, communityOctet, version, PrinterMibOids.SysName, timeoutMs, retries, ct);
-        device.Serial = await TryGetAsync(endpoint, communityOctet, version, PrinterMibOids.PrtGeneralSerialNumber, timeoutMs, retries, ct);
-        device.Mac = await ReadMacAddressAsync(endpoint, communityOctet, version, timeoutMs, ct);
+        device.Serial = await WalkFirstNonEmptyAsync(endpoint, communityOctet, version, PrinterMibOids.PrtGeneralSerialNumberTable, timeoutMs, ct);
+
+        // ARP first (works even when SNMP read access is restricted to just
+        // the Printer-MIB subtree, as many consumer/SMB devices do); the
+        // IF-MIB walk only helps when the printer is on a different subnet
+        // from this Agent, where ARP can't see it at all.
+        device.Mac = ArpResolver.ResolveMac(ip) ?? await ReadMacAddressAsync(endpoint, communityOctet, version, timeoutMs, ct);
 
         device.Counters = await ReadCountersAsync(endpoint, communityOctet, version, timeoutMs, retries, ct);
 
         device.Consumables = await ReadSuppliesAsync(endpoint, communityOctet, version, timeoutMs, ct);
+
+        device.SupportsA3 = await DetectSupportsA3Async(endpoint, communityOctet, version, timeoutMs, ct);
 
         return device;
     }
@@ -181,6 +191,81 @@ public class SnmpDeviceReader
             _logger.LogDebug(ex, "Supplies table not available for {Endpoint}", endpoint);
             return null;
         }
+    }
+
+    /// <summary>
+    /// Detects whether this device has at least one input tray physically
+    /// large enough for A3 media (297×420mm), purely from Printer-MIB's own
+    /// declared tray dimensions (RFC 3805 prtInputEntry — never inferred
+    /// from the model name or guessed, spec §67). Returns null when the
+    /// device doesn't expose the input table at all (genuinely unknown —
+    /// distinct from "checked and it's smaller than A3").
+    /// </summary>
+    private async Task<bool?> DetectSupportsA3Async(IPEndPoint endpoint, OctetString community, VersionCode version, int timeoutMs, CancellationToken ct)
+    {
+        var units = await WalkAsync(endpoint, community, version, PrinterMibOids.PrtInputDimUnitTable, timeoutMs, ct);
+        if (units.Count == 0)
+        {
+            return null;
+        }
+        var feedDims = await WalkAsync(endpoint, community, version, PrinterMibOids.PrtInputMediaDimFeedDirTable, timeoutMs, ct);
+        var xFeedDims = await WalkAsync(endpoint, community, version, PrinterMibOids.PrtInputMediaDimXFeedDirTable, timeoutMs, ct);
+
+        var anyTrayDetermined = false;
+        foreach (var (oid, unitRaw) in units)
+        {
+            var index = oid[(oid.LastIndexOf('.') + 1)..];
+            if (!int.TryParse(unitRaw, out var unit))
+            {
+                continue;
+            }
+            if (!feedDims.TryGetValue($"{PrinterMibOids.PrtInputMediaDimFeedDirTable}.{index}", out var feedRaw) ||
+                !xFeedDims.TryGetValue($"{PrinterMibOids.PrtInputMediaDimXFeedDirTable}.{index}", out var xFeedRaw))
+            {
+                continue;
+            }
+            // -1 ("no restriction") and -2 ("unknown") are RFC 3805
+            // sentinels, not real measurements — a tray reporting either
+            // stays inconclusive rather than being treated as "fits A3".
+            if (!int.TryParse(feedRaw, out var feed) || !int.TryParse(xFeedRaw, out var xFeed) || feed <= 0 || xFeed <= 0)
+            {
+                continue;
+            }
+
+            var feedMm = ToMillimeters(feed, unit);
+            var xFeedMm = ToMillimeters(xFeed, unit);
+            if (feedMm is null || xFeedMm is null)
+            {
+                continue;
+            }
+
+            anyTrayDetermined = true;
+            var longSide = Math.Max(feedMm.Value, xFeedMm.Value);
+            var shortSide = Math.Min(feedMm.Value, xFeedMm.Value);
+            // A3 = 297×420mm — a few mm of tolerance for rounding, without
+            // drifting into adjacent formats like Legal (216×356mm) or
+            // Tabloid/Ledger (279×432mm), which shouldn't count as A3.
+            if (longSide >= 410 && shortSide >= 285)
+            {
+                return true;
+            }
+        }
+
+        return anyTrayDetermined ? false : null;
+    }
+
+    private static double? ToMillimeters(int value, int unit) => unit switch
+    {
+        PrinterMibOids.MediaUnitMicrometers => value / 1000.0,
+        PrinterMibOids.MediaUnitTenThousandthsOfInch => value / 10000.0 * 25.4,
+        _ => null,
+    };
+
+    /// <summary>Walks a Printer-MIB general-table column and returns the first non-empty value found (any index, not assumed to be ".1").</summary>
+    private async Task<string?> WalkFirstNonEmptyAsync(IPEndPoint endpoint, OctetString community, VersionCode version, string rootOid, int timeoutMs, CancellationToken ct)
+    {
+        var values = await WalkAsync(endpoint, community, version, rootOid, timeoutMs, ct);
+        return values.Values.Select(v => v.Trim()).FirstOrDefault(v => v.Length > 0);
     }
 
     /// <summary>

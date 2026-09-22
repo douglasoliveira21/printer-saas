@@ -1,6 +1,7 @@
 import { Type } from 'class-transformer';
 import {
   IsArray,
+  IsBoolean,
   IsIn,
   IsInt,
   IsNumber,
@@ -133,6 +134,10 @@ class DeviceDto {
   @IsOptional()
   @IsIn(['SNMP', 'MANUAL'])
   collectionMethod?: 'SNMP' | 'MANUAL';
+
+  @IsOptional()
+  @IsBoolean()
+  supportsA3?: boolean;
 }
 
 export class SubmitDevicesDto {

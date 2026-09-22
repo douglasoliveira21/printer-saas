@@ -70,6 +70,24 @@ O Agent não tem lógica de negócio própria — só descobre, coleta, normaliz
 (spec §65); toda interpretação (o que vira alerta, cálculo de excedente de contrato
 etc.) vive no backend.
 
+## Coleta de dados por impressora (SNMP)
+
+- **MAC**: resolvido primeiro via ARP local (`SendARP`, Win32) — mais confiável que
+  IF-MIB, funciona mesmo quando o dispositivo restringe leitura SNMP só à subárvore
+  Printer-MIB — com fallback pra IF-MIB (`ifPhysAddress`) quando a impressora está em
+  outra sub-rede (ARP não atravessa roteador).
+- **Modelo/número de série**: lidos via *walk* da tabela geral do Printer-MIB (não mais
+  `GET` fixo no índice `.1`), então um dispositivo multi-engine/multi-função que indexa
+  diferente de 1 deixa de ser ignorado.
+- **Suporte a A3**: detectado pelas dimensões declaradas de cada bandeja de entrada
+  (`prtInputEntry`, RFC 3805) — nunca inferido do nome do modelo. `null` = o dispositivo
+  não expõe essa tabela (desconhecido); a UI só mostra os campos de A3 quando o Agent
+  realmente confirmou pelo menos uma bandeja compatível.
+- **Cópias, duplex e o detalhamento impressão vs. cópia** continuam **não implementados**
+  — não existe OID padrão no Printer-MIB pra isso (são vendor-specific, cada fabricante
+  com o seu MIB privado); implementar isso corretamente exigiria uma tabela de OIDs por
+  fabricante, o que ainda não existe neste projeto (ver nota em `PrinterMibOids.cs`).
+
 ## Responsabilidades do Agent
 
 - Descoberta (SNMP) configurável por subnet/faixa/IP individual, com concorrência e

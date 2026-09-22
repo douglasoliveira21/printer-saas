@@ -154,7 +154,7 @@ export default function PrinterDetailPage({ params }: { params: Promise<{ id: st
             </h2>
             <Card>
               <CardContent className="py-4">
-                <CountersList counter={latestCounter} />
+                <CountersList counter={latestCounter} supportsA3={printer.supportsA3} />
               </CardContent>
             </Card>
             {!latestCounter && <p className="mt-2 text-sm text-neutral-400">Nenhuma leitura de contador recebida ainda.</p>}
