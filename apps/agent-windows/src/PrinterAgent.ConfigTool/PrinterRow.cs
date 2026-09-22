@@ -32,7 +32,6 @@ public class PrinterRow(AgentPrinterSummary printer) : INotifyPropertyChanged
         _ => "Desconhecida",
     };
     public string ConnectionLabel => Printer.CollectionMethod == "MANUAL" ? "Manual" : "Rede";
-    public string HomologadoLabel => IsMonitored ? "Sim" : "Não";
     public string Ip => Printer.Ip ?? "—";
     public string Mac => Printer.Mac ?? "—";
     public string Manufacturer => Printer.Manufacturer ?? "—";

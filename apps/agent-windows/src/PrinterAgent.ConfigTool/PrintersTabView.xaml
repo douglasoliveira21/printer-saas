@@ -53,7 +53,9 @@
                 <DataGridTextColumn Header="Monitorada" Binding="{Binding MonitoredLabel}" Width="80"/>
                 <DataGridTextColumn Header="Situação" Binding="{Binding OnlineLabel}" Width="80"/>
                 <DataGridTextColumn Header="Tipo" Binding="{Binding ConnectionLabel}" Width="70"/>
-                <DataGridTextColumn Header="Homologado" Binding="{Binding HomologadoLabel}" Width="90"/>
+                <!-- "Não monitorada" sozinho não diz se dá pra remover — Pendente remove, Desativada não
+                     (o backend só deixa remover status DISCOVERED). Mostrar o status real evita essa ambiguidade. -->
+                <DataGridTextColumn Header="Status" Binding="{Binding StatusLabel}" Width="100"/>
                 <DataGridTextColumn Header="Endereço IP" Binding="{Binding Ip}" Width="110"/>
                 <DataGridTextColumn Header="Fabricante" Binding="{Binding Manufacturer}" Width="100"/>
                 <DataGridTextColumn Header="Modelo" Binding="{Binding Model}" Width="140"/>
