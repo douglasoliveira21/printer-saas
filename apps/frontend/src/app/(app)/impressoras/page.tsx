@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Search, Wifi, WifiOff, HelpCircle, Printer as PrinterIcon } from "lucide-react";
+import { Search, Printer as PrinterIcon } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -10,48 +10,27 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { toast } from "sonner";
 import { PageHeader } from "@/components/shared/page-header";
 import { ResponsiveDataTable, type DataTableColumn } from "@/components/shared/responsive-data-table";
-import { STATUS_BADGE_CLASS } from "@/lib/status-colors";
+import {
+  OnlineBadge,
+  ColorBadge,
+  PRINTER_STATUS_LABEL,
+  connectionLabel,
+  ownerLabel,
+} from "@/components/shared/printer-badges";
 import { useIgnorePrinter, usePrinters, useRestorePrinter } from "@/hooks/use-printers";
 import { getApiErrorMessage } from "@/lib/api-client";
 import type { Printer } from "@/lib/types";
 import { ClaimPrinterDialog } from "./claim-printer-dialog";
 
-const STATUS_LABEL: Record<string, string> = {
-  DISCOVERED: "Descoberta",
-  MONITORED: "Monitorada",
-  IGNORED: "Ignorada",
-  DECOMMISSIONED: "Desativada",
-};
-
-function OnlineBadge({ status }: { status: Printer["onlineStatus"] }) {
-  if (status === "ONLINE") {
-    return (
-      <Badge className={STATUS_BADGE_CLASS.online}>
-        <Wifi className="h-3 w-3" /> Online
-      </Badge>
-    );
-  }
-  if (status === "OFFLINE") {
-    return (
-      <Badge variant="destructive" className="gap-1">
-        <WifiOff className="h-3 w-3" /> Offline
-      </Badge>
-    );
-  }
-  return (
-    <Badge variant="secondary" className="gap-1">
-      <HelpCircle className="h-3 w-3" /> Desconhecido
-    </Badge>
-  );
-}
-
-export default function ImpressorasPage() {
+export default function ParqueCompletoPage() {
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<string>("all");
   const [claiming, setClaiming] = useState<Printer | null>(null);
   const { data, isLoading } = usePrinters({ search: search || undefined, status: status === "all" ? undefined : status });
   const ignorePrinter = useIgnorePrinter();
   const restorePrinter = useRestorePrinter();
+
+  const printers = data?.data ?? [];
 
   async function handleIgnore(printer: Printer) {
     try {
@@ -74,6 +53,7 @@ export default function ImpressorasPage() {
   function renderActions(printer: Printer) {
     return (
       <>
+        <Button size="sm" variant="ghost" render={<Link href={`/impressoras/${printer.id}`}>Detalhes</Link>} />
         {printer.status === "DISCOVERED" && (
           <>
             <Button size="sm" onClick={() => setClaiming(printer)}>
@@ -94,39 +74,39 @@ export default function ImpressorasPage() {
   }
 
   const columns: DataTableColumn<Printer>[] = [
+    { key: "online", header: "Comunicação", cell: (p) => <OnlineBadge status={p.onlineStatus} /> },
     {
       key: "status",
       header: "Status",
-      cell: (p) => <Badge variant={p.status === "MONITORED" ? "default" : "outline"}>{STATUS_LABEL[p.status]}</Badge>,
+      cell: (p) => <Badge variant={p.status === "MONITORED" ? "default" : "outline"}>{PRINTER_STATUS_LABEL[p.status]}</Badge>,
       hideOnMobile: true,
     },
+    { key: "color", header: "Cor", cell: (p) => <ColorBadge capabilities={p.capabilities} /> },
+    { key: "manufacturer", header: "Fabricante", cell: (p) => p.manufacturer || "—" },
     {
-      key: "equipment",
-      header: "Equipamento",
+      key: "model",
+      header: "Modelo",
       cell: (p) => (
-        <>
-          <Link href={`/impressoras/${p.id}`} className="hover:underline">
-            {p.manufacturer || "Fabricante não disponível"} {p.model || ""}
-          </Link>
-          <div className="text-xs text-muted-foreground">{p.serial || "Serial não disponível"}</div>
-        </>
+        <Link href={`/impressoras/${p.id}`} className="hover:underline">
+          {p.model || "—"}
+        </Link>
       ),
+    },
+    { key: "serial", header: "Nº de série", cell: (p) => p.serial || "—", hideOnMobile: true },
+    { key: "connection", header: "Conexão", cell: (p) => connectionLabel(p.collectionMethod), hideOnMobile: true },
+    { key: "owner", header: "Proprietário", cell: (p) => ownerLabel(p) },
+    {
+      key: "location",
+      header: "Localização atual",
+      cell: (p) => p.location?.name || (p.ip ? `IP ${p.ip}` : "—"),
       hideOnMobile: true,
     },
-    { key: "customer", header: "Cliente", cell: (p) => p.customer?.legalName || "—" },
-    { key: "ip", header: "IP", cell: (p) => p.ip || "Não disponível" },
-    { key: "online", header: "Situação", cell: (p) => <OnlineBadge status={p.onlineStatus} />, hideOnMobile: true },
-    {
-      key: "lastCollectedAt",
-      header: "Última coleta",
-      cell: (p) => (p.lastCollectedAt ? new Date(p.lastCollectedAt).toLocaleString("pt-BR") : "Nunca"),
-    },
-    { key: "actions", header: "", cell: (p) => <div className="flex justify-end gap-2">{renderActions(p)}</div>, className: "text-right" },
+    { key: "actions", header: "", cell: (p) => <div className="flex justify-end gap-1">{renderActions(p)}</div>, className: "text-right" },
   ];
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Impressoras" />
+      <PageHeader title="Parque Completo" description="Todo o parque de máquinas monitorado e descoberto pelos Agents." />
 
       <div className="flex flex-wrap items-center gap-3">
         <div className="relative max-w-sm flex-1 min-w-[200px]">
@@ -155,11 +135,16 @@ export default function ImpressorasPage() {
             <SelectItem value="DECOMMISSIONED">Desativadas</SelectItem>
           </SelectContent>
         </Select>
+        {!isLoading && (
+          <span className="text-sm text-muted-foreground">
+            {printers.length} equipamento(s)
+          </span>
+        )}
       </div>
 
       <ResponsiveDataTable
         columns={columns}
-        data={data?.data}
+        data={printers}
         keyField={(p) => p.id}
         isLoading={isLoading}
         emptyIcon={PrinterIcon}

@@ -1,14 +1,32 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiClient } from "@/lib/api-client";
-import type { PageUsagePeriod, PaginatedResponse, Printer, PrinterComment, PrinterTimelineItem } from "@/lib/types";
+import type {
+  PageUsagePeriod,
+  PaginatedResponse,
+  Printer,
+  PrinterComment,
+  PrinterDuplicatesResponse,
+  PrinterTimelineItem,
+} from "@/lib/types";
 
-export function usePrinters(params: { status?: string; search?: string; customerId?: string }) {
+export function usePrinters(params: { status?: string; search?: string; customerId?: string; agentEnrolled?: boolean }) {
   return useQuery({
     queryKey: ["printers", params],
     queryFn: async () => {
       const { data } = await apiClient.get<PaginatedResponse<Printer>>("/printers", {
         params: { ...params, limit: 100 },
       });
+      return data;
+    },
+  });
+}
+
+/** "Monitoramentos duplicados" — same serial tracked more than once. */
+export function usePrinterDuplicates() {
+  return useQuery({
+    queryKey: ["printers", "duplicates"],
+    queryFn: async () => {
+      const { data } = await apiClient.get<PrinterDuplicatesResponse>("/printers/duplicates");
       return data;
     },
   });

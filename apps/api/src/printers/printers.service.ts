@@ -14,10 +14,25 @@ export class PrintersService {
     private readonly dashboardService: DashboardService,
   ) {}
 
+  /** Shared relation shape so every printer list (Parque Completo, por cliente,
+   * Novas, Duplicados) carries the same columns the UI needs: comunicação
+   * (onlineStatus + lastSeenAt), fabricante/modelo/série, tipo de conexão
+   * (collectionMethod), proprietário (customer), localização + departamento,
+   * and which agent found it. */
+  private static readonly LIST_INCLUDE = {
+    customer: { select: { id: true, legalName: true, tradeName: true } },
+    location: { select: { id: true, name: true, department: true, address: true } },
+    agent: { select: { id: true, name: true, status: true, hostname: true, lastHeartbeatAt: true } },
+  } as const;
+
   async findAll(query: ListPrintersQueryDto) {
     const where = {
       ...(query.status ? { status: query.status as any } : {}),
       ...(query.customerId ? { customerId: query.customerId } : {}),
+      // "Novas Impressoras": only devices found by an already-enrolled agent
+      // (status never PENDING) — i.e. clients that really have the agent
+      // installed and running.
+      ...(query.agentEnrolled ? { agent: { is: { status: { not: 'PENDING' as any } } } } : {}),
       ...(query.search
         ? {
             OR: [
@@ -36,12 +51,53 @@ export class PrintersService {
         skip: query.skip,
         take: query.limit,
         orderBy: { lastSeenAt: 'desc' },
-        include: { customer: true, location: true, agent: { select: { id: true, name: true } } },
+        include: PrintersService.LIST_INCLUDE,
       }),
       this.tenantPrisma.client.printer.count({ where }),
     ]);
 
     return paginated(data, total, query);
+  }
+
+  /**
+   * "Monitoramentos duplicados": the same physical device tracked more than
+   * once. Identity is normally the fingerprint (serial > mac > agent+ip), so
+   * a printer that just changed IP is deduped correctly. But when a device
+   * was first discovered by IP only (fingerprint `agent-ip:...`) and later
+   * reported its serial (fingerprint `serial:...`), two rows end up with the
+   * SAME serial — a real duplicate the operator should merge. This groups
+   * non-null serials with 2+ rows and returns each group with its printers.
+   */
+  async duplicates() {
+    const printers = await this.tenantPrisma.client.printer.findMany({
+      where: { serial: { not: null }, status: { not: 'DECOMMISSIONED' as any } },
+      orderBy: { lastSeenAt: 'desc' },
+      include: PrintersService.LIST_INCLUDE,
+    });
+
+    const bySerial = new Map<string, typeof printers>();
+    for (const p of printers) {
+      const key = (p.serial ?? '').trim().toUpperCase();
+      if (!key) continue;
+      const list = bySerial.get(key) ?? [];
+      list.push(p);
+      bySerial.set(key, list);
+    }
+
+    const groups = [...bySerial.entries()]
+      .filter(([, list]) => list.length > 1)
+      .map(([serial, list]) => ({
+        serial: list[0].serial as string,
+        normalizedSerial: serial,
+        count: list.length,
+        // The distinct IPs are usually why it duplicated (device moved subnet
+        // / DHCP renewed) — surfaced so the operator sees the "mudou de IP" case.
+        distinctIps: [...new Set(list.map((p) => p.ip).filter((ip): ip is string => !!ip))],
+        printers: list,
+      }))
+      .sort((a, b) => b.count - a.count);
+
+    return { total: groups.length, groups };
   }
 
   async findOne(id: string) {

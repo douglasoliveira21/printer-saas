@@ -84,7 +84,7 @@ async function seedDemoTenant() {
   });
 
   const locationA = await prisma.location.create({
-    data: { tenantId: tenant.id, customerId: customerA.id, name: 'Matriz' },
+    data: { tenantId: tenant.id, customerId: customerA.id, name: 'Matriz', department: 'Administrativo', address: 'Av. Central, 1000 - Centro' },
   });
 
   const agent = await prisma.agent.create({
@@ -108,13 +108,99 @@ async function seedDemoTenant() {
       locationId: locationA.id,
       status: 'MONITORED',
       onlineStatus: 'ONLINE',
+      collectionMethod: 'SNMP',
       ip: '192.168.1.50',
       serial: 'DEMO-SERIAL-0001',
       manufacturer: 'Ricoh',
       model: 'MP C3004',
       fingerprint: 'serial:DEMO-SERIAL-0001',
+      capabilities: { color: true, duplex: true, a3: true, copy: true, scan: true, fax: true },
       lastSeenAt: new Date(),
       lastCollectedAt: new Date(),
+      monitoredAt: new Date(),
+    },
+  });
+
+  // --- Demo data for the "Impressoras" submenus -------------------------
+  // Two DISCOVERED printers on the (enrolled) Agent Matriz — populate the
+  // "Novas Impressoras" submenu (auto-detected, not yet claimed).
+  await prisma.printer.create({
+    data: {
+      tenantId: tenant.id,
+      agentId: agent.id,
+      status: 'DISCOVERED',
+      onlineStatus: 'ONLINE',
+      collectionMethod: 'SNMP',
+      ip: '192.168.1.60',
+      serial: 'DEMO-SERIAL-0002',
+      manufacturer: 'HP',
+      model: 'LaserJet Pro M404dn',
+      fingerprint: 'serial:DEMO-SERIAL-0002',
+      capabilities: { color: false, duplex: true },
+      lastSeenAt: new Date(),
+      lastCollectedAt: new Date(),
+    },
+  });
+  await prisma.printer.create({
+    data: {
+      tenantId: tenant.id,
+      agentId: agent.id,
+      status: 'DISCOVERED',
+      onlineStatus: 'OFFLINE',
+      collectionMethod: 'SNMP',
+      ip: '192.168.1.61',
+      serial: 'DEMO-SERIAL-0003',
+      manufacturer: 'Epson',
+      model: 'EcoTank L3250',
+      fingerprint: 'serial:DEMO-SERIAL-0003',
+      capabilities: { color: true, duplex: false },
+      lastSeenAt: new Date(Date.now() - 6 * 60 * 60 * 1000),
+      lastCollectedAt: new Date(Date.now() - 6 * 60 * 60 * 1000),
+    },
+  });
+
+  // Same physical device tracked twice: first discovered by IP only (weak
+  // agent-ip fingerprint), then again after it reported its serial and moved
+  // to a new IP. Both rows share serial DEMO-SERIAL-0009 -> populates the
+  // "Monitoramentos Duplicados" submenu (the "mudou de IP" case).
+  await prisma.printer.create({
+    data: {
+      tenantId: tenant.id,
+      agentId: agent.id,
+      customerId: customerA.id,
+      locationId: locationA.id,
+      status: 'MONITORED',
+      onlineStatus: 'OFFLINE',
+      collectionMethod: 'SNMP',
+      ip: '192.168.1.70',
+      serial: 'DEMO-SERIAL-0009',
+      manufacturer: 'Brother',
+      model: 'MFC-L2740DW',
+      fingerprint: `agent-ip:${agent.id}:192.168.1.70`,
+      capabilities: { color: false, duplex: true, scan: true, fax: true },
+      lastSeenAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000),
+      lastCollectedAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000),
+      monitoredAt: new Date(Date.now() - 20 * 24 * 60 * 60 * 1000),
+    },
+  });
+  await prisma.printer.create({
+    data: {
+      tenantId: tenant.id,
+      agentId: agent.id,
+      customerId: customerA.id,
+      locationId: locationA.id,
+      status: 'MONITORED',
+      onlineStatus: 'ONLINE',
+      collectionMethod: 'SNMP',
+      ip: '192.168.1.85',
+      serial: 'DEMO-SERIAL-0009',
+      manufacturer: 'Brother',
+      model: 'MFC-L2740DW',
+      fingerprint: 'serial:DEMO-SERIAL-0009',
+      capabilities: { color: false, duplex: true, scan: true, fax: true },
+      lastSeenAt: new Date(),
+      lastCollectedAt: new Date(),
+      monitoredAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
     },
   });
 

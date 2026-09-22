@@ -1,12 +1,13 @@
 "use client";
 
+import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ShieldCheck } from "lucide-react";
+import { ChevronDown, ShieldCheck } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth-context";
-import { NAV_ITEMS } from "./nav-items";
+import { NAV_ITEMS, type NavItem } from "./nav-items";
 
 export function Sidebar({ className }: { className?: string }) {
   const pathname = usePathname();
@@ -33,26 +34,91 @@ export function Sidebar({ className }: { className?: string }) {
             Plataforma
           </Link>
         )}
-        {NAV_ITEMS.map((item) => {
-          const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
-          const Icon = item.icon;
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={cn(
-                "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
-                active
-                  ? "bg-sidebar-primary text-sidebar-primary-foreground"
-                  : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
-              )}
-            >
-              <Icon className="h-4 w-4 shrink-0" />
-              {item.label}
-            </Link>
-          );
-        })}
+        {NAV_ITEMS.map((item) =>
+          item.children?.length ? (
+            <NavGroup key={item.href} item={item} pathname={pathname} />
+          ) : (
+            <NavLink key={item.href} item={item} active={isActive(pathname, item.href)} />
+          ),
+        )}
       </div>
     </nav>
+  );
+}
+
+/** A child route is active on exact match, or when the current path is nested
+ * under it — except "/" -level parents like /impressoras that are also a
+ * child href, which must match exactly so "Parque Completo" doesn't stay lit
+ * on every sub-route. */
+function isActive(pathname: string, href: string, exact = false) {
+  if (exact) return pathname === href;
+  return pathname === href || pathname.startsWith(`${href}/`);
+}
+
+function NavLink({ item, active }: { item: NavItem; active: boolean }) {
+  const Icon = item.icon;
+  return (
+    <Link
+      href={item.href}
+      className={cn(
+        "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+        active
+          ? "bg-sidebar-primary text-sidebar-primary-foreground"
+          : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+      )}
+    >
+      <Icon className="h-4 w-4 shrink-0" />
+      {item.label}
+    </Link>
+  );
+}
+
+function NavGroup({ item, pathname }: { item: NavItem; pathname: string }) {
+  const Icon = item.icon;
+  const groupActive = isActive(pathname, item.href);
+  const [open, setOpen] = useState(groupActive);
+
+  return (
+    <div>
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        className={cn(
+          "flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+          groupActive
+            ? "bg-sidebar-primary/10 text-sidebar-foreground"
+            : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+        )}
+      >
+        <Icon className="h-4 w-4 shrink-0" />
+        <span className="flex-1 text-left">{item.label}</span>
+        <ChevronDown className={cn("h-4 w-4 shrink-0 transition-transform", open ? "rotate-180" : "")} />
+      </button>
+      {open && (
+        <div className="mt-1 space-y-1 border-l border-sidebar-border pl-3 ml-4">
+          {item.children!.map((child) => {
+            // The parent href (e.g. /impressoras) doubles as the first child,
+            // so it must match exactly; deeper children match by prefix.
+            const exact = child.href === item.href;
+            const active = isActive(pathname, child.href, exact);
+            return (
+              <Link
+                key={child.href}
+                href={child.href}
+                className={cn(
+                  "block rounded-md px-3 py-1.5 text-sm transition-colors",
+                  active
+                    ? "bg-sidebar-primary text-sidebar-primary-foreground font-medium"
+                    : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+                )}
+              >
+                {child.label}
+              </Link>
+            );
+          })}
+        </div>
+      )}
+    </div>
   );
 }

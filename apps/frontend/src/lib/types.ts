@@ -129,11 +129,25 @@ export interface Printer {
   catalogModelId: string | null;
   catalogModel?: { id: string; manufacturer: string; model: string; confidence: string } | null;
   createdAt: string;
-  customer?: { id: string; legalName: string } | null;
-  location?: { id: string; name: string } | null;
-  agent?: { id: string; name: string; hostname: string | null } | null;
+  customer?: { id: string; legalName: string; tradeName?: string | null } | null;
+  location?: { id: string; name: string; department?: string | null; address?: string | null } | null;
+  agent?: { id: string; name: string; hostname: string | null; status?: AgentStatus; lastHeartbeatAt?: string | null } | null;
   counters?: CounterReading[];
   consumables?: ConsumableReading[];
+}
+
+/** One group of printers sharing the same serial number (see GET /printers/duplicates). */
+export interface PrinterDuplicateGroup {
+  serial: string;
+  normalizedSerial: string;
+  count: number;
+  distinctIps: string[];
+  printers: Printer[];
+}
+
+export interface PrinterDuplicatesResponse {
+  total: number;
+  groups: PrinterDuplicateGroup[];
 }
 
 export interface SupplyForecast {

@@ -20,6 +20,13 @@ export class PrintersController {
     return this.printersService.findAll(query);
   }
 
+  /** "Monitoramentos duplicados" — same serial tracked more than once (e.g. printer changed IP). Static route declared before :id so it isn't captured as an id. */
+  @Get('duplicates')
+  @RequirePermissions('printers.view')
+  duplicates() {
+    return this.printersService.duplicates();
+  }
+
   @Get(':id')
   @RequirePermissions('printers.view')
   findOne(@Param('id') id: string) {

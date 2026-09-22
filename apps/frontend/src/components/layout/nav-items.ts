@@ -14,15 +14,32 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
+export interface NavChild {
+  label: string;
+  href: string;
+}
+
 export interface NavItem {
   label: string;
   href: string;
   icon: LucideIcon;
+  /** Optional sub-items rendered as a collapsible group in the sidebar. */
+  children?: NavChild[];
 }
 
 export const NAV_ITEMS: NavItem[] = [
   { label: "Painel", href: "/painel", icon: LayoutDashboard },
-  { label: "Impressoras", href: "/impressoras", icon: Printer },
+  {
+    label: "Impressoras",
+    href: "/impressoras",
+    icon: Printer,
+    children: [
+      { label: "Parque Completo", href: "/impressoras" },
+      { label: "Impressoras por Cliente", href: "/impressoras/por-cliente" },
+      { label: "Novas Impressoras", href: "/impressoras/novas" },
+      { label: "Monitoramentos Duplicados", href: "/impressoras/duplicados" },
+    ],
+  },
   { label: "Clientes", href: "/clientes", icon: Users },
   { label: "Contratos", href: "/contratos", icon: FileText },
   { label: "Ordens de Serviço", href: "/ordens-servico", icon: Wrench },
