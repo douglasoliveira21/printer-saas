@@ -55,17 +55,36 @@ export class CustomersService {
         // customer for any Agent created before that field existed, so old
         // rows don't just silently stop showing up here.
         where: { OR: [{ customerId: { in: ids } }, { location: { customerId: { in: ids } } }] },
-        select: { id: true, status: true, enrollmentToken: true, customerId: true, location: { select: { customerId: true } } },
-        orderBy: { createdAt: 'asc' },
+        select: {
+          id: true,
+          status: true,
+          enrollmentToken: true,
+          customerId: true,
+          location: { select: { customerId: true } },
+          createdAt: true,
+        },
+        orderBy: { createdAt: 'desc' },
       }),
     ]);
 
     const printerCountByCustomer = new Map(printerCounts.map((p) => [p.customerId, p._count]));
-    const agentByCustomer = new Map<string, { id: string; status: string; enrollmentToken: string | null }>();
+
+    // A customer can have more than one Agent (an old, already-enrolled one
+    // sitting OFFLINE, and a freshly-generated PENDING one waiting to be
+    // installed) — picking whichever happened to be created first used to
+    // silently hide a brand new install token behind a long-dead Agent.
+    // PENDING (has a copyable token) always wins; otherwise the most
+    // recently created Agent represents this customer.
+    const STATUS_PRIORITY: Record<string, number> = { PENDING: 0, ONLINE: 1, OFFLINE: 2, DISABLED: 3 };
+    type AgentSummary = { id: string; status: string; enrollmentToken: string | null };
+    const agentByCustomer = new Map<string, AgentSummary>();
     for (const agent of agents) {
       const customerId = agent.customerId ?? agent.location?.customerId;
-      if (!customerId || agentByCustomer.has(customerId)) continue;
-      agentByCustomer.set(customerId, { id: agent.id, status: agent.status, enrollmentToken: agent.enrollmentToken });
+      if (!customerId) continue;
+      const current = agentByCustomer.get(customerId);
+      if (!current || STATUS_PRIORITY[agent.status] < STATUS_PRIORITY[current.status]) {
+        agentByCustomer.set(customerId, { id: agent.id, status: agent.status, enrollmentToken: agent.enrollmentToken });
+      }
     }
 
     const enriched = data.map((customer) => ({
