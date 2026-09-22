@@ -65,16 +65,25 @@ export class AgentsService {
     await this.tenantPrisma.client.agent.delete({ where: { id } });
   }
 
-  /** Re-issues a fresh one-time token for an Agent that never completed enrollment (e.g. the old one expired). */
+  /**
+   * Re-issues a fresh one-time install token — for an Agent that never
+   * finished enrolling (e.g. the old token expired), or to reconfigure/
+   * reinstall one that's already ONLINE/OFFLINE (its current apiKeyHash
+   * stays valid until a new enroll() call overwrites it, but the Agent
+   * goes back to PENDING here so the operator always has a real, working
+   * token to copy for this customer instead of hitting a dead end once a
+   * device has ever enrolled once).
+   */
   async regenerateToken(id: string) {
-    const agent = await this.assertExists(id);
-    if (agent.status !== 'PENDING') {
-      throw new BadRequestException('Este Agent já foi enrollado — não é possível gerar um novo token de instalação para ele');
-    }
+    await this.assertExists(id);
     const token = randomBytes(16).toString('hex').toUpperCase();
     const updated = await this.tenantPrisma.client.agent.update({
       where: { id },
-      data: { enrollmentToken: token, enrollmentTokenExpiresAt: new Date(Date.now() + ENROLLMENT_TOKEN_TTL_MS) },
+      data: {
+        enrollmentToken: token,
+        enrollmentTokenExpiresAt: new Date(Date.now() + ENROLLMENT_TOKEN_TTL_MS),
+        status: 'PENDING',
+      },
     });
     return { agentId: updated.id, enrollmentToken: token, expiresAt: updated.enrollmentTokenExpiresAt };
   }

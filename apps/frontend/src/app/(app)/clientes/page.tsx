@@ -2,57 +2,22 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { toast } from "sonner";
-import { Copy, Search, Users } from "lucide-react";
+import { Search, Users } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/shared/page-header";
 import { ResponsiveDataTable, type DataTableColumn } from "@/components/shared/responsive-data-table";
 import { useCustomers } from "@/hooks/use-customers";
-import type { AgentStatus, Customer, CustomerStatus } from "@/lib/types";
+import type { Customer, CustomerStatus } from "@/lib/types";
 import { CreateCustomerDialog } from "./create-customer-dialog";
 import { CustomerQuickActionsDialog } from "./customer-quick-actions-dialog";
+import { AgentTokenCell } from "./agent-token-cell";
 
 const STATUS_CONFIG: Record<CustomerStatus, { label: string; variant: "default" | "secondary" | "destructive" }> = {
   ACTIVE: { label: "Ativo", variant: "default" },
   INACTIVE: { label: "Inativo", variant: "secondary" },
   BLOCKED: { label: "Bloqueado", variant: "destructive" },
 };
-
-const AGENT_STATUS_LABEL: Record<AgentStatus, string> = {
-  PENDING: "Pendente",
-  ONLINE: "Agent online",
-  OFFLINE: "Agent offline",
-  DISABLED: "Agent desativado",
-};
-
-function AgentCell({ agent }: { agent: Customer["agent"] }) {
-  if (!agent) {
-    return <span className="text-muted-foreground">—</span>;
-  }
-  if (agent.status === "PENDING" && agent.enrollmentToken) {
-    return (
-      <div className="flex items-center gap-1.5 font-mono text-xs">
-        <span className="max-w-24 truncate" title={agent.enrollmentToken}>
-          {agent.enrollmentToken}
-        </span>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-6 w-6"
-          onClick={() => {
-            navigator.clipboard.writeText(agent.enrollmentToken!);
-            toast.success("Token copiado");
-          }}
-        >
-          <Copy className="h-3 w-3" />
-        </Button>
-      </div>
-    );
-  }
-  return <span className="text-xs text-muted-foreground">{AGENT_STATUS_LABEL[agent.status]}</span>;
-}
 
 export default function ClientesPage() {
   const [search, setSearch] = useState("");
@@ -72,7 +37,7 @@ export default function ClientesPage() {
       header: "Impressoras monitoradas",
       cell: (c) => c.monitoredPrinterCount ?? 0,
     },
-    { key: "token", header: "Token do Agent", cell: (c) => <AgentCell agent={c.agent} /> },
+    { key: "token", header: "Token do Agent", cell: (c) => <AgentTokenCell agent={c.agent} /> },
     {
       key: "status",
       header: "Status",
