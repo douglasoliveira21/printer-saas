@@ -16,6 +16,14 @@ public class ModelDatabaseEntry
 
     [JsonPropertyName("deviceTypeHint")]
     public string DeviceTypeHint { get; set; } = "";
+
+    /// <summary>Exact (case-insensitive) match against the raw model string the device itself reported over SNMP/IPP — e.g. some firmwares report a compact internal code like "SAMSUNGM4070" instead of the name printed on the unit.</summary>
+    [JsonPropertyName("rawModelAlias")]
+    public string? RawModelAlias { get; set; }
+
+    /// <summary>Friendlier name to show instead, ONLY used when rawModelAlias matches exactly — never a fuzzy/generic rewrite. Add an entry here only once a specific device's real model has actually been confirmed (e.g. from the unit's own label), never guessed.</summary>
+    [JsonPropertyName("displayName")]
+    public string? DisplayName { get; set; }
 }
 
 /// <summary>
@@ -60,6 +68,40 @@ public class ModelDatabase
             {
                 return type;
             }
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// Some devices report a compact internal model code over SNMP/IPP
+    /// instead of the name printed on the unit (e.g. Samsung's SL-M4070FR
+    /// reports "SAMSUNGM4070"). Only rewrites on an EXACT match against a
+    /// confirmed alias — anything not in the table is shown exactly as the
+    /// device reported it, never reformatted/guessed (spec §67).
+    /// </summary>
+    public string? LookupDisplayName(string? manufacturer, string? rawModel)
+    {
+        if (string.IsNullOrWhiteSpace(rawModel))
+        {
+            return null;
+        }
+        foreach (var entry in _entries)
+        {
+            if (entry.RawModelAlias is null || entry.DisplayName is null)
+            {
+                continue;
+            }
+            if (!string.Equals(entry.RawModelAlias, rawModel, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+            if (entry.ManufacturerAliases.Count > 0 &&
+                !string.IsNullOrWhiteSpace(manufacturer) &&
+                !entry.ManufacturerAliases.Any(a => manufacturer.Contains(a, StringComparison.OrdinalIgnoreCase)))
+            {
+                continue;
+            }
+            return entry.DisplayName;
         }
         return null;
     }

@@ -113,6 +113,17 @@ public class DeviceProbeOrchestrator
 
         MergeIppData(device, ipp);
 
+        // Some devices report a compact internal code instead of the name
+        // printed on the unit (e.g. Samsung's SL-M4070FR reports
+        // "SAMSUNGM4070" over SNMP/IPP) — only rewritten on an exact,
+        // confirmed match in the model database; anything else keeps
+        // exactly what the device itself reported.
+        var displayName = _modelDatabase.LookupDisplayName(device.Manufacturer, device.Model);
+        if (displayName is not null)
+        {
+            device.Model = displayName;
+        }
+
         // Resolve the vendor provider now that a manufacturer is known —
         // scaffold only in this phase (see Vendors/VendorProviders.cs), but
         // resolving it here keeps the extension point wired into the real
