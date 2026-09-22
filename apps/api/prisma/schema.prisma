@@ -249,6 +249,7 @@ model Customer {
   portalUsers   User[]
   monthlyClosings MonthlyClosing[]
   workingHours  CustomerWorkingHours[]
+  agents        Agent[]
 
   @@index([tenantId])
   @@map("customers")
@@ -336,6 +337,14 @@ model Agent {
   id                String      @id @default(uuid())
   tenantId          String
   tenant            Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  // Independent of locationId — a customer with no Location registered yet
+  // can still have an Agent slot created for them (the "Adicionar Agent"
+  // dialog's customer picker used to only narrow the location dropdown and
+  // discard the choice if no location was picked, silently leaving the
+  // Agent unlinked to anything). locationId is still the more specific
+  // "which unit" detail when it's known.
+  customerId        String?
+  customer          Customer?   @relation(fields: [customerId], references: [id])
   locationId        String?
   location          Location?   @relation(fields: [locationId], references: [id])
   name              String

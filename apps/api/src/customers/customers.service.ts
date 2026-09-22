@@ -40,31 +40,32 @@ export class CustomersService {
     }
 
     // Two extra queries (not N+1 per row): printer counts grouped by
-    // customer, and the first Agent found through any of the customer's
-    // locations. Cheap at list-page scale (a page of customers, not the
-    // whole tenant).
+    // customer, and the first Agent found for each customer. Cheap at
+    // list-page scale (a page of customers, not the whole tenant).
     const ids = data.map((c) => c.id);
-    const [printerCounts, locations] = await Promise.all([
+    const [printerCounts, agents] = await Promise.all([
       this.tenantPrisma.client.printer.groupBy({
         by: ['customerId'],
         where: { customerId: { in: ids }, status: 'MONITORED' },
         _count: true,
       }),
-      this.tenantPrisma.client.location.findMany({
-        where: { customerId: { in: ids } },
-        select: {
-          customerId: true,
-          agents: { select: { id: true, status: true, enrollmentToken: true }, take: 1 },
-        },
+      this.tenantPrisma.client.agent.findMany({
+        // customerId is the primary link (set directly at creation — see
+        // AgentsService.createEnrollment); fall back to locationId's own
+        // customer for any Agent created before that field existed, so old
+        // rows don't just silently stop showing up here.
+        where: { OR: [{ customerId: { in: ids } }, { location: { customerId: { in: ids } } }] },
+        select: { id: true, status: true, enrollmentToken: true, customerId: true, location: { select: { customerId: true } } },
+        orderBy: { createdAt: 'asc' },
       }),
     ]);
 
     const printerCountByCustomer = new Map(printerCounts.map((p) => [p.customerId, p._count]));
     const agentByCustomer = new Map<string, { id: string; status: string; enrollmentToken: string | null }>();
-    for (const location of locations) {
-      if (agentByCustomer.has(location.customerId)) continue;
-      const agent = location.agents[0];
-      if (agent) agentByCustomer.set(location.customerId, agent);
+    for (const agent of agents) {
+      const customerId = agent.customerId ?? agent.location?.customerId;
+      if (!customerId || agentByCustomer.has(customerId)) continue;
+      agentByCustomer.set(customerId, { id: agent.id, status: agent.status, enrollmentToken: agent.enrollmentToken });
     }
 
     const enriched = data.map((customer) => ({

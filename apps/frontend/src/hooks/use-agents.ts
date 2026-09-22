@@ -22,7 +22,7 @@ export interface CreateAgentEnrollmentResult {
 export function useCreateAgentEnrollment() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (input: { name: string; locationId?: string }) => {
+    mutationFn: async (input: { name: string; customerId?: string; locationId?: string }) => {
       const { data } = await apiClient.post<CreateAgentEnrollmentResult>("/agents", input);
       return data;
     },

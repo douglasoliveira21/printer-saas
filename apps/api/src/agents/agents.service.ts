@@ -26,10 +26,19 @@ export class AgentsService {
   /** Tenant-admin action: pre-register an Agent slot and hand out a one-time enrollment token. */
   async createEnrollment(dto: CreateAgentDto) {
     const token = randomBytes(16).toString('hex').toUpperCase();
+    // A location always implies its own customer — if only locationId was
+    // given (no explicit customerId), derive it so the Agent is still
+    // linked at the customer level, not just at the location level.
+    let customerId = dto.customerId;
+    if (!customerId && dto.locationId) {
+      const location = await this.tenantPrisma.client.location.findFirst({ where: { id: dto.locationId } });
+      customerId = location?.customerId;
+    }
     // tenantId is injected at runtime by the tenant-scoped Prisma extension.
     const agent = await this.tenantPrisma.client.agent.create({
       data: {
         name: dto.name,
+        customerId,
         locationId: dto.locationId,
         enrollmentToken: token,
         enrollmentTokenExpiresAt: new Date(Date.now() + ENROLLMENT_TOKEN_TTL_MS),

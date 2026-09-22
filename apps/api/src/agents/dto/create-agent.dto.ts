@@ -7,5 +7,9 @@ export class CreateAgentDto {
 
   @IsOptional()
   @IsUUID()
+  customerId?: string;
+
+  @IsOptional()
+  @IsUUID()
   locationId?: string;
 }

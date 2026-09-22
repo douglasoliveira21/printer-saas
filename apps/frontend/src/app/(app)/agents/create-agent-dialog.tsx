@@ -46,7 +46,7 @@ export function CreateAgentDialog() {
 
   async function handleSubmit() {
     try {
-      const data = await createEnrollment.mutateAsync({ name, locationId: locationId || undefined });
+      const data = await createEnrollment.mutateAsync({ name, customerId: customerId || undefined, locationId: locationId || undefined });
       setResult(data);
     } catch (error) {
       toast.error(getApiErrorMessage(error, "Erro ao gerar token"));
