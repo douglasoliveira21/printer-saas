@@ -1,10 +1,10 @@
 <#
 .SYNOPSIS
-  Builds PrinterAgentSetup.msi — the real Windows Installer package.
+  Builds PrinterAgentSetup.msi - the real Windows Installer package.
 
 .DESCRIPTION
   Publishes both apps self-contained win-x64 into two sibling folders
-  (wix\msi-publish\ConfigTool and wix\msi-publish\ServiceFiles — deliberately
+  (wix\msi-publish\ConfigTool and wix\msi-publish\ServiceFiles - deliberately
   NOT nested the way build-package.ps1's ..\publish\ServiceFiles is, so the
   MSI's file-harvesting globs for the two apps can never overlap), then
   invokes `wix build`.
@@ -13,13 +13,13 @@
     dotnet tool install --global wix --version 5.0.2
     wix extension add WixToolset.Util.wixext/5.0.2
     wix extension add WixToolset.UI.wixext/5.0.2
-  (Explicitly pinned to v5 — v7+ requires accepting WiX's paid Open Source
+  (Explicitly pinned to v5 - v7+ requires accepting WiX's paid Open Source
   Maintenance Fee EULA to run at all; v5 is the last fully free major
   version and is what this project is authored against.)
 
 .PARAMETER ProductVersion
   Version stamped into the MSI (Add/Remove Programs + MajorUpgrade
-  comparisons). Bump this on every release you intend to ship — by
+  comparisons). Bump this on every release you intend to ship - by
   convention kept in sync with AgentVersion.Current in
   PrinterAgent.Core/Configuration/AgentEnrollmentService.cs, though nothing
   enforces that automatically.
@@ -64,7 +64,7 @@ finally {
 
 $msiPath = Join-Path $wixDir "bin\x64\Release\PrinterAgentSetup.msi"
 if (-not (Test-Path $msiPath)) {
-    throw "Build reported success but $msiPath wasn't found — something's off."
+    throw "Build reported success but $msiPath was not found - something is off."
 }
 
 Write-Host "Done: $msiPath" -ForegroundColor Green
