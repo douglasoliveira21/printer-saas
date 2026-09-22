@@ -184,12 +184,41 @@ public class PrinterSaasApiClient
                 return null;
             }
             var body = await response.Content.ReadAsStringAsync(ct);
-            return string.IsNullOrWhiteSpace(body) ? $"Falha ({response.StatusCode})" : body;
+            return ExtractErrorMessage(body) ?? $"Falha ({response.StatusCode})";
         }
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Failed to delete printer {Id}", id);
             return ex.Message;
         }
+    }
+
+    /// <summary>
+    /// The API's HttpExceptionFilter always responds with
+    /// <c>{ success: false, error: { code, message } }</c> — pulls out just
+    /// the human-readable message instead of showing the raw JSON envelope
+    /// in a MessageBox.
+    /// </summary>
+    private static string? ExtractErrorMessage(string body)
+    {
+        if (string.IsNullOrWhiteSpace(body))
+        {
+            return null;
+        }
+        try
+        {
+            using var doc = JsonDocument.Parse(body);
+            if (doc.RootElement.TryGetProperty("error", out var error) && error.TryGetProperty("message", out var message))
+            {
+                return message.ValueKind == JsonValueKind.Array
+                    ? string.Join("; ", message.EnumerateArray().Select(m => m.GetString()))
+                    : message.GetString();
+            }
+        }
+        catch (JsonException)
+        {
+            // Not JSON (e.g. a proxy/gateway error page) — fall back to showing the raw body.
+        }
+        return body;
     }
 }
