@@ -323,6 +323,20 @@ public class SnmpDeviceReader
         var results = new Dictionary<string, string>();
         foreach (var variable in received)
         {
+            // SNMP's own "doesn't exist"/"end of subtree" markers — a device
+            // with nothing under this OID (e.g. a router/firewall with no
+            // Printer-MIB at all) can still return ONE of these as its
+            // single walk result. Left unfiltered, that sentinel's own
+            // ToString() (literally the text "NoSuchObject" etc.) gets
+            // treated as if it were real device data — which is exactly
+            // what let non-printers pass the "is this a printer?" check and
+            // corrupted Model/Serial with garbage. TryGetAsync already
+            // filters these for single GETs; WalkAsync needs the same
+            // guard (spec §67: never store a literal error marker as a value).
+            if (variable.Data is null or NoSuchObject or NoSuchInstance or EndOfMibView)
+            {
+                continue;
+            }
             results[variable.Id.ToString()] = variable.Data.ToString() ?? string.Empty;
         }
         return results;
@@ -403,7 +417,13 @@ public class SnmpDeviceReader
     /// </summary>
     private static string ExtractModel(string sysDescr, string? manufacturer)
     {
-        var firstSegment = sysDescr.Split(';')[0].Trim();
+        // Most vendors use ";"-delimited sysDescr; some (notably HP
+        // JetDirect print servers, e.g. "HP ETHERNET MULTI-ENVIRONMENT,
+        // JETDIRECT,JD32,...") use commas instead — only fall back to
+        // comma-splitting when there's no semicolon at all, so a real
+        // ";"-delimited string never gets needlessly re-split.
+        var delimiter = sysDescr.Contains(';') ? ';' : ',';
+        var firstSegment = sysDescr.Split(delimiter)[0].Trim();
 
         if (manufacturer is not null && firstSegment.StartsWith(manufacturer, StringComparison.OrdinalIgnoreCase))
         {
