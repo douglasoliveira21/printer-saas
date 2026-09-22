@@ -81,7 +81,9 @@ reinstalar Agents.
    pendência mais importante antes de considerar isso pronto para produção.**
 2. Testar o Agent Windows de ponta a ponta contra uma API real: enrollment, heartbeat,
    discovery/SNMP contra uma impressora de verdade, fila offline.
-3. Empacotar o Agent como MSI de verdade (WiX Toolset) no lugar do instalador
-   PowerShell atual — ver `apps/agent-windows/README.md`.
-4. Emissão fiscal, notificações por e-mail/WhatsApp, SNMP v3, auto-update assinado do
-   Agent, cobrança automática dos planos do SaaS.
+3. Testar o instalador MSI (`apps/agent-windows/installer/wix/`) de ponta a ponta numa
+   máquina real: instalação limpa, upgrade de versão, reparo, desinstalação — validado
+   até aqui só por `wix build` (0 erros, todas as ICEs passando), nunca por um
+   `msiexec /i` de verdade.
+4. Emissão fiscal, notificações por e-mail/WhatsApp, auto-update assinado do Agent,
+   cobrança automática dos planos do SaaS.

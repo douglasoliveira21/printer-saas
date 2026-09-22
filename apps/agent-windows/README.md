@@ -27,7 +27,11 @@ src/
                            em tempo real.
 installer/
   build-package.ps1        Publica os dois projetos e monta o pacote
-                           distribuível (ver "Como distribuir" abaixo).
+                           distribuível PrinterAgentSetup.exe (ver "Como
+                           distribuir" abaixo).
+  build-msi.ps1            Publica os dois projetos e gera o instalador
+  wix/                     MSI de verdade via WiX Toolset v5 (ver "Sobre o
+                           instalador" abaixo).
   install-agent.ps1        Alternativa por linha de comando/silenciosa (útil
   uninstall-agent.ps1      para instalação em massa via GPO/RMM), sem tela.
 ```
@@ -138,10 +142,38 @@ Os scripts PowerShell (`install-agent.ps1`/`uninstall-agent.ps1`) continuam
 existindo como alternativa silenciosa/scriptável, útil para quem instala em
 várias máquinas via GPO ou uma ferramenta de RMM.
 
-Um instalador MSI de verdade (WiX Toolset, com wizard nativo do Windows —
-spec §11) continua sendo um passo futuro possível, mas não é mais
-estritamente necessário para ter uma experiência de instalação com tela: o
-`PrinterAgentSetup.exe` já cobre isso.
+### Instalador MSI (WiX Toolset)
+
+`installer/wix/PrinterAgentSetup.msi` é um instalador Windows real (WiX
+Toolset v5 — spec §11), útil quando você precisa do que só um MSI de
+verdade oferece: código de upgrade (uma versão nova substitui a antiga
+automaticamente), entrada em Programas e Recursos, instalação
+transacional (falha no meio do caminho desfaz tudo, não deixa
+`Program Files` pela metade) e distribuição via GPO/Intune/RMM que espera
+um `.msi`.
+
+Ele instala os mesmos arquivos que `PrinterAgentSetup.exe` já instalava
+(ConfigTool + ServiceFiles em `C:\Program Files\PrinterSaaS\Agent`) e cria
+um atalho no Menu Iniciar — mas **não registra o Windows Service sozinho**.
+Depois de instalado, abra "Printer SaaS Agent" no Menu Iniciar (é o mesmo
+`PrinterAgentSetup.exe` de sempre) e preencha ApiUrl/token/redes do jeito
+que já fazia: é esse passo que efetivamente cria e inicia o serviço. A
+desinstalação, por outro lado, já limpa o serviço sozinha (`sc.exe stop` +
+`sc.exe delete`, melhor esforço — não falha se o serviço nunca chegou a
+ser criado).
+
+```powershell
+cd installer
+dotnet tool install --global wix --version 5.0.2   # uma vez só
+wix extension add WixToolset.Util.wixext/5.0.2
+wix extension add WixToolset.UI.wixext/5.0.2
+.\build-msi.ps1
+```
+
+Gera `installer\wix\bin\x64\Release\PrinterAgentSetup.msi`. Fixado na v5 de
+propósito — a v7+ do WiX exige aceitar uma taxa de manutenção paga (Open
+Source Maintenance Fee) só para rodar o CLI; a v5 é a última versão major
+totalmente livre e é contra o que este projeto foi escrito.
 
 ## Limitações conhecidas (MVP)
 

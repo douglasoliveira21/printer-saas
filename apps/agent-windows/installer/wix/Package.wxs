@@ -1,0 +1,146 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
+     xmlns:util="http://wixtoolset.org/schemas/v4/wxs/util">
+
+  <Package Name="Printer SaaS Agent"
+           Manufacturer="Printer SaaS"
+           Version="$(var.ProductVersion)"
+           UpgradeCode="E05C2949-EA44-4763-80DD-F89576819E63"
+           Scope="perMachine">
+
+    <!--
+      Real Windows Installer package, replacing installer/install-agent.ps1
+      (still kept for scripted/CI installs). Gives us what the PowerShell
+      script never had: an upgrade code so a newer version cleanly replaces
+      an older one, a proper Add/Remove Programs entry, and transactional
+      install (a failed install rolls back instead of leaving a half-copied
+      Program Files folder).
+
+      Deliberately does NOT register the Windows Service itself (no
+      ServiceInstall element) — that stays exactly as it is today, done by
+      PrinterAgent.ConfigTool.WindowsServiceInstaller.InstallOrUpdate() the
+      first time whoever installs the Agent runs the Setup app and fills in
+      ApiUrl/EnrollmentToken/Networks. Doing it that way here would mean
+      either duplicating that logic in WiX XML (drifts from the real
+      behavior over time) or fighting the app over who owns the service
+      registration. This MSI's job is only "get the right files onto disk,
+      correctly, with a real uninstall/upgrade story" — same division of
+      responsibility as build-package.ps1 already had.
+    -->
+    <MajorUpgrade DowngradeErrorMessage="Uma versão mais nova do Printer SaaS Agent já está instalada." />
+    <MediaTemplate EmbedCab="yes" />
+
+    <Feature Id="Main" Title="Printer SaaS Agent" Level="1">
+      <ComponentGroupRef Id="ConfigToolFiles" />
+      <ComponentGroupRef Id="ServiceFilesGroup" />
+      <ComponentRef Id="AppSettingsComponent" />
+      <ComponentRef Id="StartMenuShortcutComponent" />
+      <ComponentRef Id="ServiceCleanupComponent" />
+    </Feature>
+
+    <StandardDirectory Id="ProgramFiles64Folder">
+      <Directory Id="INSTALLFOLDER" Name="PrinterSaaS">
+        <Directory Id="AGENTFOLDER" Name="Agent">
+          <!-- ConfigTool (PrinterAgentSetup.exe) and its self-contained
+               runtime — published directly into AGENTFOLDER's root, same
+               layout build-package.ps1 already produces. -->
+          <Component Id="StartMenuShortcutComponent" Guid="8F1A6B2E-4C3D-4E5A-9B1C-2D3E4F5A6B7C">
+            <Shortcut Id="StartMenuShortcut"
+                      Directory="ProgramMenuFolder"
+                      Name="Printer SaaS Agent"
+                      Description="Configurar e monitorar o Printer SaaS Agent"
+                      Target="[AGENTFOLDER]PrinterAgentSetup.exe"
+                      WorkingDirectory="AGENTFOLDER" />
+            <RemoveFolder Id="RemoveProgramMenuFolder" Directory="ProgramMenuFolder" On="uninstall" />
+            <!-- ICE43/ICE57: a non-advertised shortcut's KeyPath must be an
+                 HKCU value even in a perMachine install — this is a
+                 documented MSI quirk, not a scope mismatch (the shortcut
+                 itself still goes to the all-users Start Menu). -->
+            <RegistryValue Root="HKCU"
+                            Key="Software\PrinterSaaS\Agent"
+                            Name="StartMenuShortcutInstalled"
+                            Type="integer"
+                            Value="1"
+                            KeyPath="yes" />
+          </Component>
+
+          <!--
+            The Service, registered by the ConfigTool on first configure (see
+            the Package-level comment above), is never created by this MSI —
+            so a plain uninstall wouldn't know to remove it and would leave
+            an orphaned running service behind. This component's whole job
+            is cleanup: best-effort stop+delete on uninstall only (Return
+            "ignore" — a service that was never installed, or already
+            removed by hand, must not fail the uninstall).
+          -->
+          <Component Id="ServiceCleanupComponent" Guid="1B2C3D4E-5F6A-4B7C-8D9E-0F1A2B3C4D5E">
+            <RegistryValue Root="HKLM"
+                            Key="Software\PrinterSaaS\Agent"
+                            Name="ServiceCleanupInstalled"
+                            Type="integer"
+                            Value="1"
+                            KeyPath="yes" />
+          </Component>
+
+          <Directory Id="SERVICEFILESFOLDER" Name="ServiceFiles">
+            <!-- appsettings.json is user-configured at runtime (ApiUrl,
+                 EnrollmentToken, Networks, SnmpV3, ...) by the ConfigTool —
+                 installed once on a fresh install, never overwritten by a
+                 repair or a version upgrade (NeverOverwrite), so upgrading
+                 the Agent never resets an already-configured machine back
+                 to the template defaults. -->
+            <Component Id="AppSettingsComponent" Guid="3A4B5C6D-7E8F-4A1B-9C2D-3E4F5A6B7C8D" NeverOverwrite="yes">
+              <File Id="AppSettingsJson" Source="$(var.PublishDir)ServiceFiles\appsettings.json" />
+            </Component>
+          </Directory>
+        </Directory>
+      </Directory>
+    </StandardDirectory>
+
+    <!-- Harvested (not hand-listed) because a self-contained .NET publish
+         is 200+ files (runtime + every referenced assembly) that changes
+         with every SDK/package bump — listing them by hand would silently
+         drift out of sync with what dotnet publish actually produces.
+         Sourced from two sibling folders (msi-publish\ConfigTool,
+         msi-publish\ServiceFiles) precisely so these two globs can never
+         overlap — see the PublishDir comment in the .wixproj. -->
+    <ComponentGroup Id="ConfigToolFiles" Directory="AGENTFOLDER">
+      <Files Include="$(var.PublishDir)ConfigTool\**" />
+    </ComponentGroup>
+
+    <ComponentGroup Id="ServiceFilesGroup" Directory="SERVICEFILESFOLDER">
+      <Files Include="$(var.PublishDir)ServiceFiles\**">
+        <Exclude Files="$(var.PublishDir)ServiceFiles\appsettings.json" />
+      </Files>
+    </ComponentGroup>
+
+    <ui:WixUI xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui" Id="WixUI_Minimal" />
+    <WixVariable Id="WixUILicenseRtf" Value="License.rtf" />
+
+  </Package>
+
+  <!--
+    Best-effort service removal on uninstall — see ServiceCleanupComponent's
+    comment in the Package above for why this MSI has to clean up a service
+    it never registered in the first place.
+  -->
+  <Fragment>
+    <CustomAction Id="StopAgentServiceOnUninstall"
+                  Directory="AGENTFOLDER"
+                  ExeCommand="&quot;[SystemFolder]sc.exe&quot; stop PrinterSaaSAgent"
+                  Execute="deferred"
+                  Return="ignore"
+                  Impersonate="no" />
+    <CustomAction Id="DeleteAgentServiceOnUninstall"
+                  Directory="AGENTFOLDER"
+                  ExeCommand="&quot;[SystemFolder]sc.exe&quot; delete PrinterSaaSAgent"
+                  Execute="deferred"
+                  Return="ignore"
+                  Impersonate="no" />
+
+    <InstallExecuteSequence>
+      <Custom Action="StopAgentServiceOnUninstall" Before="DeleteAgentServiceOnUninstall" Condition="REMOVE=&quot;ALL&quot; AND NOT UPGRADINGPRODUCTCODE" />
+      <Custom Action="DeleteAgentServiceOnUninstall" Before="RemoveFiles" Condition="REMOVE=&quot;ALL&quot; AND NOT UPGRADINGPRODUCTCODE" />
+    </InstallExecuteSequence>
+  </Fragment>
+</Wix>

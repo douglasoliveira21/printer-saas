@@ -1,0 +1,43 @@
+<Project Sdk="WixToolset.Sdk/5.0.2">
+
+  <PropertyGroup>
+    <!-- Both published apps are win-x64 self-contained (see the publish
+         commands in build-msi.ps1) — without this, harvested components
+         default to 32-bit and fail ICE80 validation against
+         ProgramFiles64Folder/the 64-bit-only directories under it. -->
+    <Platform>x64</Platform>
+    <!-- Version shown in Add/Remove Programs and used by MajorUpgrade to
+         detect newer-vs-older installs — bump this (and AgentVersion.Current
+         in PrinterAgent.Core/Configuration/AgentEnrollmentService.cs, kept
+         in sync by convention, not by build magic) on every release. -->
+    <ProductVersion Condition="'$(ProductVersion)' == ''">1.0.0</ProductVersion>
+    <!-- Two SEPARATE (non-nested) publish outputs this project expects to
+         already exist — see build-msi.ps1, which this project expects to
+         have been run first (keeps "build the app" and "package the app"
+         as independently re-runnable steps). Deliberately not reusing
+         ..\..\publish\ (the folder build-package.ps1/install-agent.ps1
+         already use, with PrinterAgent.Service published INSIDE a
+         ServiceFiles subfolder of the ConfigTool's own output): with that
+         nesting, a recursive "everything under here" harvest of the
+         ConfigTool folder also walks into ServiceFiles and collides with
+         ServiceFiles' own harvest of the same files. Two sibling folders
+         make that overlap structurally impossible instead of relying on
+         glob exclude patterns to prevent it. -->
+    <PublishDir Condition="'$(PublishDir)' == ''">$(MSBuildThisFileDirectory)msi-publish\</PublishDir>
+    <OutputType>Package</OutputType>
+    <OutputName>PrinterAgentSetup</OutputName>
+    <DefineConstants>PublishDir=$(PublishDir);ProductVersion=$(ProductVersion)</DefineConstants>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="WixToolset.Util.wixext" Version="5.0.2" />
+    <PackageReference Include="WixToolset.UI.wixext" Version="5.0.2" />
+  </ItemGroup>
+
+  <!-- No explicit <Compile Include> needed — WixToolset.Sdk globs *.wxs in
+       the project directory by default (same convention as the .NET SDK
+       globbing *.cs). Adding Package.wxs here too used to compile it
+       twice, producing two identical "entry sections" and failing with
+       WIX0089/WIX0090. -->
+
+</Project>
