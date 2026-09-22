@@ -51,11 +51,31 @@ public class DeviceProbeOrchestrator
         var ippTask = SafeAsync(async () => (IppProbeResult?)await _ippClient.ProbeAsync(ipText, auxTimeoutMs, ct), "ipp", diagnostics, _logger);
         var portsTask = TcpPortProbe.ProbeAsync(ipText, auxTimeoutMs, ct);
 
-        await Task.WhenAll(snmpTask, ippTask, portsTask);
+        // Race the whole group against a hard ceiling instead of a bare
+        // `await Task.WhenAll(...)` — SnmpDeviceReader's SNMP calls run via
+        // Task.Run wrapping SharpSnmpLib's synchronous socket I/O, which
+        // does NOT reliably abort just because a CancellationToken was
+        // passed to Task.Run (that only stops it from *starting* if already
+        // cancelled, not a running call). If that blocking call hangs for
+        // any reason, a plain WhenAll would wait on it forever and this
+        // host would permanently occupy one of PrinterDiscoveryService's
+        // limited concurrency slots — exactly the "gets stuck partway
+        // through" symptom this replaces. Whichever task(s) haven't
+        // finished when the ceiling hits are simply abandoned (they'll
+        // finish or get GC'd on their own later) and treated as
+        // "not available" for this round, same as a real timeout.
+        var overallTask = Task.WhenAll(snmpTask, ippTask, portsTask);
+        var ceilingMs = Math.Max(5000, auxTimeoutMs * 3);
+        var winner = await Task.WhenAny(overallTask, Task.Delay(ceilingMs, ct));
 
-        var snmp = snmpTask.Result;
-        var ipp = ippTask.Result;
-        var openPorts = portsTask.Result;
+        var snmp = snmpTask.IsCompletedSuccessfully ? snmpTask.Result : null;
+        var ipp = ippTask.IsCompletedSuccessfully ? ippTask.Result : null;
+        var openPorts = portsTask.IsCompletedSuccessfully ? portsTask.Result : [];
+        if (winner != overallTask)
+        {
+            diagnostics["timeout"] = "host_probe_exceeded_ceiling";
+            _logger.LogDebug("{Ip} exceeded the {CeilingMs}ms probe ceiling — using whatever completed so far", ipText, ceilingMs);
+        }
         diagnostics["tcp_ports"] = openPorts.Count > 0 ? "success" : "not_available";
 
         var mac = snmp?.Device.Mac ?? ArpResolver.ResolveMac(ip);
