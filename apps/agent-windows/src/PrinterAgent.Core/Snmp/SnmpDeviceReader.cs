@@ -124,6 +124,7 @@ public class SnmpDeviceReader
             PrinterMibGeneralFound = !string.IsNullOrWhiteSpace(printerName) || !string.IsNullOrWhiteSpace(device.Serial),
             PrinterMibCountersFound = device.Counters is not null,
             PrinterMibSuppliesFound = device.Consumables is { Count: > 0 },
+            ModelFromPrinterMib = !string.IsNullOrWhiteSpace(printerName),
         };
     }
 

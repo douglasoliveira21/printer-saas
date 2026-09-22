@@ -111,7 +111,7 @@ public class DeviceProbeOrchestrator
         device.Mac ??= mac;
         device.CollectionMethod ??= "SNMP";
 
-        MergeIppData(device, ipp);
+        MergeIppData(device, ipp, modelFromPrinterMib: snmp?.ModelFromPrinterMib ?? false);
 
         // Must run against the RAW model string, before the display-name
         // rewrite below replaces it — only fires for a specifically
@@ -170,14 +170,22 @@ public class DeviceProbeOrchestrator
         return device;
     }
 
-    private static void MergeIppData(DiscoveredDevice device, IppProbeResult? ipp)
+    private static void MergeIppData(DiscoveredDevice device, IppProbeResult? ipp, bool modelFromPrinterMib)
     {
         if (ipp is not { Responded: true })
         {
             return;
         }
 
-        if (string.IsNullOrWhiteSpace(device.Model) && !string.IsNullOrWhiteSpace(ipp.MakeAndModel))
+        // Priority for Model: real Printer-MIB prtGeneralPrinterName > IPP's
+        // printer-make-and-model > sysDescr-parsing fallback (ExtractModel).
+        // The fallback is a crude heuristic that ALWAYS produces something
+        // non-empty (e.g. "ETHERNET MULTI-ENVIRONMENT..." from an HP
+        // JetDirect card's sysDescr) — checking "is Model empty" here would
+        // never be true once that fallback already ran, so IPP's better
+        // answer would never get a chance to override it. modelFromPrinterMib
+        // is what actually gates this, not string emptiness.
+        if (!modelFromPrinterMib && !string.IsNullOrWhiteSpace(ipp.MakeAndModel))
         {
             device.Model = ipp.MakeAndModel;
         }

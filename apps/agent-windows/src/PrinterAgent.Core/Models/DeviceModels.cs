@@ -180,4 +180,13 @@ public class SnmpProbeResult
     public bool PrinterMibGeneralFound { get; set; }
     public bool PrinterMibCountersFound { get; set; }
     public bool PrinterMibSuppliesFound { get; set; }
+
+    /// <summary>
+    /// True only when Device.Model came from the real Printer-MIB
+    /// prtGeneralPrinterName field. False means it's the sysDescr-parsing
+    /// fallback (ExtractModel) — a crude heuristic that should lose to a
+    /// better source (IPP's printer-make-and-model) if one is available,
+    /// unlike a real structured field which shouldn't be second-guessed.
+    /// </summary>
+    public bool ModelFromPrinterMib { get; set; }
 }
