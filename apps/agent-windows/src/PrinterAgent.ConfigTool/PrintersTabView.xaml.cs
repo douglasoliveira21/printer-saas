@@ -87,14 +87,27 @@ public partial class PrintersTabView : UserControl
         if (confirm != MessageBoxResult.Yes) return;
 
         var errors = new List<string>();
+        var removed = 0;
         foreach (var id in ids)
         {
+            var row = _rows.FirstOrDefault(r => r.Id == id);
             var error = await _context.ApiClient.DeletePrinterAsync(id, CancellationToken.None);
-            if (error is not null) errors.Add(error);
+            if (error is not null)
+            {
+                // Identify WHICH printer failed (IP) — several selected rows
+                // can fail for different reasons, and a bare deduplicated
+                // message list previously hid that.
+                errors.Add($"{row?.Ip ?? id}: {error}");
+            }
+            else
+            {
+                removed++;
+            }
         }
         if (errors.Count > 0)
         {
-            MessageBox.Show(Window.GetWindow(this), string.Join("\n", errors.Distinct()), "Printer SaaS Agent", MessageBoxButton.OK, MessageBoxImage.Warning);
+            var summary = removed > 0 ? $"{removed} removida(s). Falhas:\n" : "";
+            MessageBox.Show(Window.GetWindow(this), summary + string.Join("\n", errors), "Printer SaaS Agent", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
         await RefreshAsync();
     }
