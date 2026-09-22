@@ -8,6 +8,10 @@ using PrinterAgent.Core.Snmp;
 using PrinterAgent.Service;
 using Serilog;
 
+// Must happen before any discovery sweep — see ThreadPoolWarmup's own doc
+// comment for why a cold ThreadPool made scans look frozen.
+PrinterAgent.Core.Discovery.ThreadPoolWarmup.EnsureMinThreads(expectedConcurrency: 16);
+
 var logDirectory = Path.Combine(
     Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
     "PrinterSaaS", "Agent", "Logs");

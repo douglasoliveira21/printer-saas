@@ -29,6 +29,11 @@ public class AgentContext
 
     public AgentContext(WindowsServiceInstaller installer)
     {
+        // Same reasoning as the Service's Program.cs — a manual "Buscar
+        // agora" from the ConfigTool runs the exact same concurrent SNMP
+        // discovery and needs the ThreadPool warmed up the same way.
+        ThreadPoolWarmup.EnsureMinThreads(expectedConcurrency: 16);
+
         Installer = installer;
         CredentialStore = new AgentCredentialStore(NullLogger<AgentCredentialStore>.Instance);
         ProxyStore = new AgentProxyStore(NullLogger<AgentProxyStore>.Instance);
