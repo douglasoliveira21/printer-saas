@@ -113,6 +113,31 @@ public class DeviceProbeOrchestrator
 
         MergeIppData(device, ipp);
 
+        // Must run against the RAW model string, before the display-name
+        // rewrite below replaces it — only fires for a specifically
+        // identified unit (exact match), never a fuzzy family guess.
+        if (device.Capabilities.Color is null)
+        {
+            var colorHint = _modelDatabase.LookupColorHint(device.Manufacturer, device.Model);
+            if (colorHint is not null)
+            {
+                device.Capabilities.Color = colorHint;
+                device.CapabilitySources["color"] = "model_database";
+            }
+        }
+
+        // A device with a single marker (no per-colorant breakdown
+        // available — see SnmpDeviceReader.ReadCountersAsync) only ever
+        // fills Counters.Total, leaving BlackWhite/Color null even though,
+        // once color is CONFIRMED false, the total can only be black & white
+        // pages by definition. This is a deduction from a confirmed fact
+        // (color: false), not a guess — it never fires when color is merely
+        // unconfirmed (null), only when a real source said "no color".
+        if (device.Capabilities.Color == false && device.Counters is { Total: not null, BlackWhite: null, Color: null })
+        {
+            device.Counters.BlackWhite = device.Counters.Total;
+        }
+
         // Some devices report a compact internal code instead of the name
         // printed on the unit (e.g. Samsung's SL-M4070FR reports
         // "SAMSUNGM4070" over SNMP/IPP) — only rewritten on an exact,

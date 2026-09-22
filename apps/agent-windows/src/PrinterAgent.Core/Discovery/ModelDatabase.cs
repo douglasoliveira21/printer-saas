@@ -24,6 +24,10 @@ public class ModelDatabaseEntry
     /// <summary>Friendlier name to show instead, ONLY used when rawModelAlias matches exactly — never a fuzzy/generic rewrite. Add an entry here only once a specific device's real model has actually been confirmed (e.g. from the unit's own label), never guessed.</summary>
     [JsonPropertyName("displayName")]
     public string? DisplayName { get; set; }
+
+    /// <summary>Only applied together with an exact rawModelAlias match (never with the fuzzy modelPattern) — confirms a specific, identified unit is monochrome-only when SNMP/IPP didn't otherwise say so.</summary>
+    [JsonPropertyName("colorHint")]
+    public bool? ColorHint { get; set; }
 }
 
 /// <summary>
@@ -102,6 +106,34 @@ public class ModelDatabase
                 continue;
             }
             return entry.DisplayName;
+        }
+        return null;
+    }
+
+    /// <summary>Same exact-match rule as LookupDisplayName — only fires for a specifically identified unit, never a fuzzy family match.</summary>
+    public bool? LookupColorHint(string? manufacturer, string? rawModel)
+    {
+        if (string.IsNullOrWhiteSpace(rawModel))
+        {
+            return null;
+        }
+        foreach (var entry in _entries)
+        {
+            if (entry.RawModelAlias is null || entry.ColorHint is null)
+            {
+                continue;
+            }
+            if (!string.Equals(entry.RawModelAlias, rawModel, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+            if (entry.ManufacturerAliases.Count > 0 &&
+                !string.IsNullOrWhiteSpace(manufacturer) &&
+                !entry.ManufacturerAliases.Any(a => manufacturer.Contains(a, StringComparison.OrdinalIgnoreCase)))
+            {
+                continue;
+            }
+            return entry.ColorHint;
         }
         return null;
     }

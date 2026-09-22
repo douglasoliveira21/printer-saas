@@ -7,31 +7,35 @@ function formatPages(value: number | null | undefined) {
 type CapabilityKey = keyof PrinterCapabilities;
 
 export function CountersList({ counter, capabilities }: { counter: CounterReading | undefined; capabilities: PrinterCapabilities | null }) {
-  const rows: { label: string; value: number | null | undefined; requires?: CapabilityKey }[] = [
+  const rows: { label: string; value: number | null | undefined; requires?: CapabilityKey[] }[] = [
     { label: "Geral", value: counter?.total },
     { label: "Geral P&B", value: counter?.blackWhite },
-    { label: "Geral colorida total", value: counter?.color, requires: "color" },
-    { label: "Geral cor única", value: undefined, requires: "color" },
+    { label: "Geral colorida total", value: counter?.color, requires: ["color"] },
+    { label: "Geral cor única", value: undefined, requires: ["color"] },
     { label: "Impressão P&B", value: undefined },
-    { label: "Impressão colorida total", value: undefined, requires: "color" },
-    { label: "Cópia P&B", value: undefined, requires: "copy" },
-    { label: "Cópia colorida total", value: undefined, requires: "copy" },
-    { label: "Cópia colorida única", value: undefined, requires: "copy" },
-    { label: "A3 colorida total", value: undefined, requires: "a3" },
-    { label: "A3 P&B", value: undefined, requires: "a3" },
-    { label: "Cópia A3 colorida total", value: undefined, requires: "a3" },
-    { label: "Cópia A3 P&B", value: undefined, requires: "a3" },
-    { label: "Duplex", value: undefined, requires: "duplex" },
-    { label: "Impressão A3 colorida total", value: undefined, requires: "a3" },
+    { label: "Impressão colorida total", value: undefined, requires: ["color"] },
+    { label: "Cópia P&B", value: undefined, requires: ["copy"] },
+    // Cópia/A3 "colorida" precisam da impressora ser colorida E ter a
+    // outra capacidade ao mesmo tempo — antes só checava uma das duas, o
+    // que mostrava "colorida" pra multifuncional P&B com cópia (ou pra
+    // impressora A3 sem cor nenhuma).
+    { label: "Cópia colorida total", value: undefined, requires: ["copy", "color"] },
+    { label: "Cópia colorida única", value: undefined, requires: ["copy", "color"] },
+    { label: "A3 colorida total", value: undefined, requires: ["a3", "color"] },
+    { label: "A3 P&B", value: undefined, requires: ["a3"] },
+    { label: "Cópia A3 colorida total", value: undefined, requires: ["a3", "copy", "color"] },
+    { label: "Cópia A3 P&B", value: undefined, requires: ["a3", "copy"] },
+    { label: "Duplex", value: undefined, requires: ["duplex"] },
+    { label: "Impressão A3 colorida total", value: undefined, requires: ["a3", "color"] },
   ];
 
   // Not every printer has every capability — showing a field the equipment
   // doesn't actually have (or that was never confirmed) implies something
-  // untrue about it. A field only renders once its capability was
-  // positively confirmed (true); false/undefined both mean "don't show
-  // it", same rule, never distinguished in the UI (spec: not_supported and
-  // unknown both collapse to "not rendered").
-  const visibleRows = rows.filter((row) => !row.requires || capabilities?.[row.requires] === true);
+  // untrue about it. A field only renders once ALL of its required
+  // capabilities were positively confirmed (true); false/undefined both
+  // mean "don't show it", same rule, never distinguished in the UI (spec:
+  // not_supported and unknown both collapse to "not rendered").
+  const visibleRows = rows.filter((row) => !row.requires || row.requires.every((key) => capabilities?.[key] === true));
   const hiddenCapabilities = (["color", "duplex", "a3", "copy"] as CapabilityKey[]).filter((key) => capabilities?.[key] !== true);
 
   return (

@@ -23,6 +23,6 @@
   { "manufacturerAliases": ["Lexmark"], "modelPattern": "MS", "deviceTypeHint": "Printer" },
   { "manufacturerAliases": ["Konica Minolta"], "modelPattern": "bizhub", "deviceTypeHint": "Mfp" },
   { "manufacturerAliases": ["Samsung"], "modelPattern": "SL-M4", "deviceTypeHint": "Mfp" },
-  { "manufacturerAliases": ["Samsung"], "rawModelAlias": "SAMSUNGM4070", "displayName": "Samsung SL-M4070FR", "deviceTypeHint": "Mfp" },
+  { "manufacturerAliases": ["Samsung"], "rawModelAlias": "SAMSUNGM4070", "displayName": "Samsung SL-M4070FR", "colorHint": false, "deviceTypeHint": "Mfp" },
   { "manufacturerAliases": ["Samsung"], "modelPattern": "SL-M3", "deviceTypeHint": "Printer" }
 ]
