@@ -106,7 +106,12 @@ async function main() {
       if (raw) suppliesAvailable[key] = toTriState(raw);
     }
 
-    const deviceTypeRaw = col(row, 'multifuncional') === 'SIM' ? 'MFP' : 'PRINTER';
+    const categoria = col(row, 'categoria');
+    const deviceTypeRaw = categoria.toUpperCase().includes('PLOTTER')
+      ? 'PLOTTER'
+      : col(row, 'multifuncional') === 'SIM'
+        ? 'MFP'
+        : 'PRINTER';
     const confidence = col(row, 'confianca') || 'BAIXA';
     const status = (col(row, 'status_modelo') || 'A_CONFIRMAR').toUpperCase().replace(/[^A-Z_]/g, '_');
 
