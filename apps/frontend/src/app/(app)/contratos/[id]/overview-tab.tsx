@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { toast } from "sonner";
 import { Trash2, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -45,6 +45,8 @@ export function OverviewTab({ contract }: { contract: Contract }) {
   const addFixedCost = useAddContractFixedCost();
   const removeFixedCost = useRemoveContractFixedCost();
 
+  const [prevContract, setPrevContract] = useState(contract);
+
   function resetFromServer() {
     setMonthlyFee(contract.monthlyFee);
     setDefaultPriceBw(toFormValue(contract.defaultPriceBw));
@@ -60,8 +62,10 @@ export function OverviewTab({ contract }: { contract: Contract }) {
     );
   }
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(resetFromServer, [contract]);
+  if (contract !== prevContract) {
+    setPrevContract(contract);
+    resetFromServer();
+  }
 
   const dirty =
     monthlyFee !== contract.monthlyFee ||

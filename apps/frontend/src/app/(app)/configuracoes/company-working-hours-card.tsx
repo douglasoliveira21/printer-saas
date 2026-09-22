@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -13,14 +13,20 @@ import type { WorkingHourEntry } from "@/lib/types";
 export function CompanyWorkingHoursCard() {
   const { data: savedHours } = useTenantWorkingHours();
   const setWorkingHours = useSetTenantWorkingHours();
-  const [schedule, setSchedule] = useState<WorkingHourEntry[]>([]);
-  const [initialized, setInitialized] = useState(false);
+  const [scheduleState, setScheduleState] = useState<{ initialized: boolean; hours: WorkingHourEntry[] }>({
+    initialized: false,
+    hours: [],
+  });
 
-  useEffect(() => {
-    if (initialized || savedHours === undefined) return;
-    setSchedule(savedHours.length > 0 ? savedHours : DEFAULT_WORK_SCHEDULE);
-    setInitialized(true);
-  }, [savedHours, initialized]);
+  if (!scheduleState.initialized && savedHours !== undefined) {
+    setScheduleState({
+      initialized: true,
+      hours: savedHours.length > 0 ? savedHours : DEFAULT_WORK_SCHEDULE,
+    });
+  }
+
+  const schedule = scheduleState.hours;
+  const setSchedule = (hours: WorkingHourEntry[]) => setScheduleState({ initialized: true, hours });
 
   async function handleSave() {
     try {

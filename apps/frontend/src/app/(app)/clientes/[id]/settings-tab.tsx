@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -23,8 +23,10 @@ export function SettingsTab({ customer }: { customer: Customer }) {
   const [slaEnabled, setSlaEnabled] = useState(customer.slaEnabled);
   const [slaHourMode, setSlaHourMode] = useState<SlaHourMode>(customer.slaHourMode);
   const [slaHours, setSlaHours] = useState(customer.slaHours?.toString() ?? "");
-  const [schedule, setSchedule] = useState<WorkingHourEntry[]>([]);
-  const [scheduleInitialized, setScheduleInitialized] = useState(false);
+  const [scheduleState, setScheduleState] = useState<{ initialized: boolean; hours: WorkingHourEntry[] }>({
+    initialized: false,
+    hours: [],
+  });
 
   const updateCustomer = useUpdateCustomer();
   const { data: savedHours } = useCustomerWorkingHours(customer.id);
@@ -33,11 +35,15 @@ export function SettingsTab({ customer }: { customer: Customer }) {
   // Pré-popula Segunda–Sexta 08:00–18:00 só na primeira vez que o cliente
   // entra no modo "horas úteis do cliente" sem nenhum horário salvo ainda —
   // depois disso, o que já foi salvo sempre tem prioridade.
-  useEffect(() => {
-    if (scheduleInitialized || savedHours === undefined) return;
-    setSchedule(savedHours.length > 0 ? savedHours : DEFAULT_WORK_SCHEDULE);
-    setScheduleInitialized(true);
-  }, [savedHours, scheduleInitialized]);
+  if (!scheduleState.initialized && savedHours !== undefined) {
+    setScheduleState({
+      initialized: true,
+      hours: savedHours.length > 0 ? savedHours : DEFAULT_WORK_SCHEDULE,
+    });
+  }
+
+  const schedule = scheduleState.hours;
+  const setSchedule = (hours: WorkingHourEntry[]) => setScheduleState({ initialized: true, hours });
 
   const dirty =
     slaEnabled !== customer.slaEnabled || slaHourMode !== customer.slaHourMode || slaHours !== (customer.slaHours?.toString() ?? "");

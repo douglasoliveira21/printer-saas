@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import { createContext, useContext, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { apiClient, getApiErrorMessage } from "./api-client";
 import { authStorage, type StoredUser } from "./auth-storage";
@@ -15,14 +15,9 @@ interface AuthContextValue {
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<StoredUser | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [user, setUser] = useState<StoredUser | null>(() => (typeof window !== "undefined" ? authStorage.getUser() : null));
+  const [isLoading] = useState(false);
   const router = useRouter();
-
-  useEffect(() => {
-    setUser(authStorage.getUser());
-    setIsLoading(false);
-  }, []);
 
   async function login(email: string, password: string) {
     try {

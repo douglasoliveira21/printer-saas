@@ -117,11 +117,7 @@ export function useDeleteCustomer() {
 export function useUpdateLocation() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({
-      id,
-      customerId,
-      ...input
-    }: {
+    mutationFn: async (params: {
       id: string;
       customerId: string;
       name?: string;
@@ -132,6 +128,8 @@ export function useUpdateLocation() {
       costCenter?: string;
       slaHours?: number;
     }) => {
+      const { id, customerId: _, ...input } = params;
+      void _;
       const { data } = await apiClient.patch<Location>(`/locations/${id}`, input);
       return data;
     },

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type FormEvent } from "react";
+import { useState, type FormEvent } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -79,11 +79,14 @@ export function CatalogModelDialog({
   const isEditing = !!model;
   const pending = createModel.isPending || updateModel.isPending;
 
-  useEffect(() => {
+  const [prevKey, setPrevKey] = useState({ open: false, model });
+
+  if (open !== prevKey.open || model !== prevKey.model) {
+    setPrevKey({ open, model });
     if (open) {
       setForm(model ? { ...model } : EMPTY);
     }
-  }, [open, model]);
+  }
 
   function patch(update: Partial<CatalogModelInput>) {
     setForm((prev) => ({ ...prev, ...update }));
