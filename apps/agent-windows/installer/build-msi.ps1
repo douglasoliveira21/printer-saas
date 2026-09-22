@@ -1,4 +1,3 @@
-#Requires -Version 7
 <#
 .SYNOPSIS
   Builds PrinterAgentSetup.msi — the real Windows Installer package.
