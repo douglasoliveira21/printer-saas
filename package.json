@@ -7,8 +7,11 @@
     "packages/*"
   ],
   "scripts": {
-    "postinstall": "npm run build -w packages/shared",
+    "postinstall": "npm run prisma:generate -w apps/api && npm run build -w packages/shared",
     "build:shared": "npm run build -w packages/shared",
+    "build": "npm run build -w packages/shared && npm run build -w apps/api && npm run build -w apps/worker && npm run build -w apps/frontend",
+    "lint": "npm run lint -w apps/api && npm run lint -w apps/worker && npm run lint -w apps/frontend",
+    "test": "npm run test -w apps/api && npm run test -w apps/worker",
     "dev:api": "npm run start:dev -w apps/api",
     "dev:worker": "npm run start:dev -w apps/worker",
     "dev:frontend": "npm run dev -w apps/frontend",

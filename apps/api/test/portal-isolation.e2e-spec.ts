@@ -21,8 +21,8 @@ describeIfDb('Portal isolation (e2e)', () => {
   let prisma: PrismaClient;
   let tenant: SeededTenant;
 
-  let customerXId: string;
-  let customerYId: string;
+  let _customerXId: string;
+  let _customerYId: string;
   let printerYId: string;
   let serviceOrderYId: string;
   let portalXAccessToken: string;
@@ -34,9 +34,9 @@ describeIfDb('Portal isolation (e2e)', () => {
     tenant = await registerTenant(app, `Portal Tenant ${Date.now()}`);
 
     const customerX = await prisma.customer.create({ data: { tenantId: tenant.tenantId, legalName: 'Cliente X' } });
-    customerXId = customerX.id;
+    _customerXId = customerX.id;
     const customerY = await prisma.customer.create({ data: { tenantId: tenant.tenantId, legalName: 'Cliente Y (sigiloso para X)' } });
-    customerYId = customerY.id;
+    _customerYId = customerY.id;
 
     const agent = await prisma.agent.create({ data: { tenantId: tenant.tenantId, name: 'Agent', status: 'ONLINE' } });
     const printerY = await prisma.printer.create({
