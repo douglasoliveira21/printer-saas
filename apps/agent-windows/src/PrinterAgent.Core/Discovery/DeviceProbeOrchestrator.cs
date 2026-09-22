@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Net;
 using Microsoft.Extensions.Logging;
 using PrinterAgent.Core.Classification;
@@ -37,7 +38,14 @@ public class DeviceProbeOrchestrator
         IReadOnlyDictionary<string, List<string>> mdnsResults, CancellationToken ct)
     {
         var ipText = ip.ToString();
-        var diagnostics = new Dictionary<string, string>();
+        // ConcurrentDictionary, not Dictionary — snmpTask and ippTask below
+        // write to this from two different tasks running in parallel via
+        // Task.WhenAll. A plain Dictionary corrupted by concurrent writes
+        // can spin forever inside its own internals instead of throwing,
+        // which is exactly what made scans appear to freeze partway through
+        // (every host that happened to race here permanently occupied one
+        // of PrinterDiscoveryService's limited concurrency slots).
+        var diagnostics = new ConcurrentDictionary<string, string>();
 
         var snmpTask = SafeAsync(() => _snmpReader.ProbeAsync(ip, community, snmpTimeoutMs, snmpRetries, ct), "snmp", diagnostics, _logger);
         var ippTask = SafeAsync(async () => (IppProbeResult?)await _ippClient.ProbeAsync(ipText, auxTimeoutMs, ct), "ipp", diagnostics, _logger);
@@ -101,7 +109,7 @@ public class DeviceProbeOrchestrator
         device.DeviceType = finalType.ToString().ToUpperInvariant();
         device.ClassificationConfidence = classification.Confidence;
         device.ClassificationEvidence = classification.Evidence.Select(e => e.ToString()).ToList();
-        device.Diagnostics = diagnostics;
+        device.Diagnostics = new Dictionary<string, string>(diagnostics);
 
         return device;
     }
@@ -145,7 +153,7 @@ public class DeviceProbeOrchestrator
         }
     }
 
-    private static async Task<T?> SafeAsync<T>(Func<Task<T?>> probe, string name, Dictionary<string, string> diagnostics, ILogger logger) where T : class
+    private static async Task<T?> SafeAsync<T>(Func<Task<T?>> probe, string name, ConcurrentDictionary<string, string> diagnostics, ILogger logger) where T : class
     {
         try
         {

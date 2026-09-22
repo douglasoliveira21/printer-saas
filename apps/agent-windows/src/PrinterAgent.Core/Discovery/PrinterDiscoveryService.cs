@@ -62,18 +62,33 @@ public class PrinterDiscoveryService
         var probed = 0;
         progress?.Report((0, targets.Count));
 
+        // A per-host hard ceiling on top of every individual probe's own
+        // timeout — belt and suspenders (spec §18: "um equipamento que não
+        // responde não pode travar o discovery inteiro"). Each host holds
+        // one of the limited DiscoveryConcurrency slots; if a probe ever
+        // hangs for an unforeseen reason (a bug, an unusual device response,
+        // a platform quirk), this guarantees the slot is freed anyway
+        // instead of quietly reducing effective concurrency scan after scan.
+        var hostTimeoutMs = Math.Max(5000, options.SnmpTimeoutMs * 4);
+
         var probes = targets.Select(async ip =>
         {
             await throttle.WaitAsync(ct);
             try
             {
+                using var hostCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+                hostCts.CancelAfter(hostTimeoutMs);
                 var device = await _orchestrator.ProbeAsync(
                     ip, options.SnmpCommunity, options.SnmpTimeoutMs, options.SnmpRetries,
-                    auxTimeoutMs: Math.Max(1000, options.SnmpTimeoutMs), mdnsResults, ct);
+                    auxTimeoutMs: Math.Max(1000, options.SnmpTimeoutMs), mdnsResults, hostCts.Token);
                 if (device is not null)
                 {
                     await channel.Writer.WriteAsync(device, ct);
                 }
+            }
+            catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+            {
+                _logger.LogDebug("Probe for {Ip} exceeded the {TimeoutMs}ms per-host ceiling — skipped", ip, hostTimeoutMs);
             }
             catch (Exception ex)
             {
