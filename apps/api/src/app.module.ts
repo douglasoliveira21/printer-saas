@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { ScheduleModule } from '@nestjs/schedule';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { APP_GUARD } from '@nestjs/core';
 import { ClsModule } from 'nestjs-cls';
@@ -29,6 +30,7 @@ import { HealthController } from './health/health.controller';
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true, validate: validateEnv }),
+    ScheduleModule.forRoot(),
     ClsModule.forRoot({
       global: true,
       middleware: { mount: true },

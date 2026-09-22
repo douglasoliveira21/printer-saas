@@ -113,5 +113,5 @@ Testes de isolamento multi-tenant e de portal do cliente escritos
 (`apps/api/test/tenant-isolation.e2e-spec.ts`, `apps/api/test/portal-isolation.e2e-spec.ts`)
 mas ainda não executados contra um banco real — essa validação continua sendo a
 pendência mais importante antes de produção. Faturamento fiscal (NF-e), notificações
-por e-mail/WhatsApp e SNMP v3 ainda não foram implementados — ver
+por e-mail/WhatsApp ainda não foram implementados — ver
 `docs/architecture.md`.

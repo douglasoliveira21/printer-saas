@@ -65,6 +65,5 @@ ver `PortalGuard`).
 ## Pendências de segurança (não implementadas na Fase 1)
 
 - Auditoria (`AuditLog` já existe no schema, mas ainda não é escrita pelos services).
-- SNMP v3, assinatura de pacotes de auto-update do Agent, Windows Credential Manager/DPAPI
-  para segredos locais do Agent.
+- Assinatura de pacotes de auto-update do Agent.
 - Rotação de secrets da plataforma, 2FA.

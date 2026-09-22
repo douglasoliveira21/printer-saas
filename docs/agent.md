@@ -154,8 +154,10 @@ etc.) vive no backend.
 
 - Descoberta (SNMP) configurável por subnet/faixa/IP individual, com concorrência e
   timeout limitados (nunca scan agressivo por padrão) — implementado.
-- SNMP v1/v2c (v3 fica para uma fase futura) — implementado; community configurável
-  globalmente por Agent (por rede/equipamento individual fica para uma fase futura).
+- SNMP v1/v2c/v3 suportados — implementado; community configurável globalmente
+  por Agent (v3 via seção `SnmpV3` no `appsettings.json`, com suporte a authPriv,
+  authNoPriv e noAuthNoPriv). Quando v3 é configurado, o Agent tenta v3 primeiro
+  e faz fallback para v2c/v1 caso falhe.
 - Fila local (offline-first): continua coletando e reenvia quando a internet volta, com
   tamanho máximo de fila — implementado (`OfflineQueue`).
 - Logs rotativos em `C:\ProgramData\PrinterSaaS\Agent\Logs`, nunca logando segredos —

@@ -45,7 +45,7 @@ Frontend (Next.js) ────────▶ API (NestJS) ◀─────�
 | `platform` | Super Admin da plataforma — cross-tenant, sempre atrás de `SuperAdminGuard` (spec §79) |
 
 Módulos ainda não implementados: emissão fiscal (NF-e), `notifications` (e-mail/WhatsApp
-de verdade — hoje os alertas só existem dentro do SaaS), SNMP v3, auto-update assinado
+de verdade — hoje os alertas só existem dentro do SaaS), auto-update assinado
 do Agent, cobrança automática dos planos do SaaS (o schema já suporta via `Plan`).
 
 ## Worker
