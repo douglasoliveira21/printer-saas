@@ -302,17 +302,36 @@ export class AgentsService {
    * rows pointing at it without cascade delete; those must go through the
    * web app's "Decomissionar" (soft, history-preserving) instead.
    */
+  /**
+   * DISCOVERED/IGNORED are both "never claimed" states — a printer only
+   * gets a customerId via claim() (printers.service.ts), which always sets
+   * status to MONITORED in the same call. So neither state can legitimately
+   * have a customer/contract attached; MONITORED/DECOMMISSIONED can, and
+   * stay blocked here (use "Decomissionar" on the site for those instead).
+   */
   async removePrinterForAgent(agent: Agent, id: string) {
     const printer = await this.prisma.printer.findFirst({ where: { id, agentId: agent.id } });
     if (!printer) {
       throw new NotFoundException('Impressora não encontrada');
     }
-    if (printer.status !== 'DISCOVERED') {
+    if (printer.status !== 'DISCOVERED' && printer.status !== 'IGNORED') {
       throw new BadRequestException(
-        'Só é possível remover impressoras ainda não monitoradas. Para retirar uma impressora monitorada, use "Decomissionar" no site.',
+        'Só é possível remover impressoras ainda não monitoradas (pendentes ou desativadas). Para retirar uma impressora monitorada, use "Decomissionar" no site.',
       );
     }
-    await this.prisma.printer.delete({ where: { id } });
+    try {
+      await this.prisma.printer.delete({ where: { id } });
+    } catch (error) {
+      // FK constraint (P2003) — some record (uma OS, contrato, alerta...)
+      // still references this printer despite it never having been
+      // formally claimed. Surface that plainly instead of a raw 500.
+      if ((error as { code?: string }).code === 'P2003') {
+        throw new BadRequestException(
+          'Esta impressora ainda tem registros vinculados (ordem de serviço, contrato ou alerta) e não pode ser removida.',
+        );
+      }
+      throw error;
+    }
     return { removed: true };
   }
 

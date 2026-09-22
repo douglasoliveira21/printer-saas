@@ -33,7 +33,7 @@
 | GET | `/printers/:id` | detalhe de uma impressora + últimos counters/consumíveis |
 | POST | `/printers/monitor` | `{ ids: string[] }` — marca como monitorada (bulk) |
 | POST | `/printers/deactivate` | `{ ids: string[] }` — desativa (bulk) |
-| DELETE | `/printers/:id` | remove, só se ainda `DISCOVERED` (nunca uma já monitorada) |
+| DELETE | `/printers/:id` | remove, só se `DISCOVERED` ou `IGNORED` (nunca uma já monitorada/claimed) |
 
 Payload de `/devices` (`SubmitDevicesDto`):
 
