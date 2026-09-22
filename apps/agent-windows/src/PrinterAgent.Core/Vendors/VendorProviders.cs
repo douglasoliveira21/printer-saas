@@ -10,6 +10,14 @@ namespace PrinterAgent.Core.Vendors;
 public class HpPrinterProvider : IPrinterVendorProvider
 {
     public IReadOnlyList<string> ManufacturerAliases => ["HP", "Hewlett-Packard"];
+
+    // hpHttpMgSerialNumber, from HP's own HP-httpManageable-MIB —
+    // "Serial number of entity." Confirmed against HP's published MIB
+    // (not guessed), used only as a fallback when the standard Printer-MIB
+    // prtGeneralSerialNumber (RFC 3805) comes back empty, which happens on
+    // several entry-level HP models (e.g. the LaserJet P1102w) that don't
+    // fully implement Printer-MIB but do answer this one.
+    public string? SerialNumberOid => "1.3.6.1.4.1.11.2.36.1.1.2.9";
 }
 
 public class CanonPrinterProvider : IPrinterVendorProvider

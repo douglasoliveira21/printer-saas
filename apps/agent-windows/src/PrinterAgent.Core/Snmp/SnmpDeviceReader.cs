@@ -3,6 +3,7 @@ using Lextm.SharpSnmpLib;
 using Lextm.SharpSnmpLib.Messaging;
 using Microsoft.Extensions.Logging;
 using PrinterAgent.Core.Models;
+using PrinterAgent.Core.Vendors;
 
 namespace PrinterAgent.Core.Snmp;
 
@@ -79,6 +80,20 @@ public class SnmpDeviceReader
             // value the device itself reported isn't guessing (spec §67),
             // unlike trying to pick some unlabeled token out of the string.
             ?? ExtractLabeledSerial(sysDescr);
+
+        if (string.IsNullOrWhiteSpace(device.Serial))
+        {
+            // A handful of entry-level HP models (e.g. LaserJet P1102w)
+            // don't implement the standard Printer-MIB serial OID at all,
+            // but do answer HP's own documented hpHttpMgSerialNumber — see
+            // VendorProviders.cs for the source. Only ever tried as a last
+            // resort, and only a verified per-vendor OID, never a guess.
+            var vendorSerialOid = VendorProviderRegistry.Resolve(manufacturer).SerialNumberOid;
+            if (vendorSerialOid is not null)
+            {
+                device.Serial = await TryGetAsync(endpoint, communityOctet, version, vendorSerialOid, timeoutMs, retries, ct);
+            }
+        }
 
         // ARP first (works even when SNMP read access is restricted to just
         // the Printer-MIB subtree, as many consumer/SMB devices do); the

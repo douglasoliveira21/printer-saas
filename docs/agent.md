@@ -85,10 +85,14 @@ que o Agent mandou.
 `Discovery/ModelDatabase.cs` (+ `printer-model-database.json`, embutido, editável sem
 recompilar a lógica de match) só dá uma dica de família (Impressora/MFP/Plotter) uma
 vez que fabricante/modelo já foram identificados por uma fonte real — nunca decide
-sozinho se algo é impressora. `Vendors/` é um scaffold de providers por fabricante
-(HP/Canon/Brother/…) — hoje todos se comportam como o genérico; é o lugar certo pra
-entrar um OID privado *verificado* de cada marca no futuro (cópias/duplex não têm OID
-padrão, ver nota mais abaixo).
+sozinho se algo é impressora. `Vendors/` é a arquitetura de providers por fabricante
+(HP/Canon/Brother/…) — a maioria ainda se comporta como o genérico, mas já tem um OID
+privado *verificado* real: `HpPrinterProvider.SerialNumberOid` = `hpHttpMgSerialNumber`
+(`1.3.6.1.4.1.11.2.36.1.1.2.9`, do `HP-httpManageable-MIB` da própria HP), usado como
+último recurso pro número de série em modelos de entrada da HP (ex. LaserJet P1102w)
+que não implementam o OID padrão do Printer-MIB. Cópias/duplex continuam sem OID
+padrão (ver nota mais abaixo) — esse é o lugar certo pra entrar o OID de cada marca
+conforme forem confirmados.
 
 **Fora do escopo desta fase** (documentado, não esquecido): WS-Discovery, correlação
 com impressoras instaladas do Windows além da varredura USB local

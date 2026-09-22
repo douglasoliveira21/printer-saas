@@ -13,4 +13,12 @@ public interface IPrinterVendorProvider
 {
     /// <summary>Manufacturer name(s) this provider claims, matched the same way <c>PrinterMibOids.KnownManufacturers</c> already is.</summary>
     IReadOnlyList<string> ManufacturerAliases { get; }
+
+    /// <summary>
+    /// Private-enterprise OID to try for the serial number ONLY as a
+    /// fallback when the standard Printer-MIB one (RFC 3805) came back
+    /// empty — null means this provider has no verified fallback OID
+    /// (the default for every provider until one is confirmed).
+    /// </summary>
+    string? SerialNumberOid => null;
 }
