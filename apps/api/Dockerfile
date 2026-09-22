@@ -9,6 +9,7 @@ COPY apps/frontend/package.json apps/frontend/package.json
 COPY packages/shared packages/shared
 RUN npm ci --workspace=apps/api --include-workspace-root
 COPY apps/api apps/api
+COPY docs/printer-catalog docs/printer-catalog
 RUN npm run prisma:generate --workspace=apps/api
 RUN npm run build --workspace=apps/api
 
@@ -26,6 +27,7 @@ COPY --from=build /repo/node_modules node_modules
 COPY --from=build /repo/packages/shared packages/shared
 COPY --from=build /repo/apps/api/dist apps/api/dist
 COPY --from=build /repo/apps/api/prisma apps/api/prisma
+COPY --from=build /repo/docs/printer-catalog docs/printer-catalog
 COPY --from=build /repo/apps/api/prisma.config.ts apps/api/prisma.config.ts
 COPY --from=build /repo/apps/api/package.json apps/api/package.json
 
