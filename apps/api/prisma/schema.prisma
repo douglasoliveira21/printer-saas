@@ -18,45 +18,46 @@ enum TenantStatus {
 }
 
 model Tenant {
-  id         String       @id @default(uuid())
-  name       String
-  legalName  String?
-  document   String? // CNPJ
-  email      String?
-  phone      String?
-  address    String?
-  timezone   String       @default("America/Sao_Paulo")
-  currency   String       @default("BRL")
-  logoUrl    String?
-  status     TenantStatus @default(ACTIVE)
-  isDemo     Boolean      @default(false)
-  planId     String?
-  plan       Plan?        @relation(fields: [planId], references: [id])
-  createdAt  DateTime     @default(now())
-  updatedAt  DateTime     @updatedAt
+  id        String       @id @default(uuid())
+  name      String
+  legalName String?
+  document  String? // CNPJ
+  email     String?
+  phone     String?
+  address   String?
+  timezone  String       @default("America/Sao_Paulo")
+  currency  String       @default("BRL")
+  logoUrl   String?
+  status    TenantStatus @default(ACTIVE)
+  isDemo    Boolean      @default(false)
+  planId    String?
+  plan      Plan?        @relation(fields: [planId], references: [id])
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
 
-  users             User[]
-  roles             Role[]
-  customers         Customer[]
-  agents            Agent[]
-  printers          Printer[]
-  serviceOrders     ServiceOrder[]
-  contracts         Contract[]
-  auditLogs         AuditLog[]
-  alerts            Alert[]
-  inventoryItems    InventoryItem[]
-  inventoryMovements InventoryMovement[]
-  financialEntries  FinancialEntry[]
-  consumableReplacements ConsumableReplacement[]
-  printerComments   PrinterComment[]
-  monthlyClosings   MonthlyClosing[]
-  contractPrinters  ContractPrinter[]
-  contractFixedCosts ContractFixedCost[]
+  users                   User[]
+  roles                   Role[]
+  customers               Customer[]
+  agents                  Agent[]
+  printers                Printer[]
+  snmpV3Credentials       SnmpV3Credential[]
+  serviceOrders           ServiceOrder[]
+  contracts               Contract[]
+  auditLogs               AuditLog[]
+  alerts                  Alert[]
+  inventoryItems          InventoryItem[]
+  inventoryMovements      InventoryMovement[]
+  financialEntries        FinancialEntry[]
+  consumableReplacements  ConsumableReplacement[]
+  printerComments         PrinterComment[]
+  monthlyClosings         MonthlyClosing[]
+  contractPrinters        ContractPrinter[]
+  contractFixedCosts      ContractFixedCost[]
   contractEmailRecipients ContractEmailRecipient[]
-  contractReadjustments ContractReadjustment[]
-  serviceOrderParts ServiceOrderPart[]
-  serviceOrderPhotos ServiceOrderPhoto[]
-  workingHours      TenantWorkingHours[]
+  contractReadjustments   ContractReadjustment[]
+  serviceOrderParts       ServiceOrderPart[]
+  serviceOrderPhotos      ServiceOrderPhoto[]
+  workingHours            TenantWorkingHours[]
 
   @@map("tenants")
 }
@@ -100,10 +101,10 @@ model PrinterCatalogModel {
   // "SAMSUNGM4070") that should also match this catalog entry.
   aliases           String[]          @default([])
   deviceType        PrinterDeviceType @default(PRINTER)
-  capabilities      Json              // {color, duplex, a3, copy, scan, fax} — true/false/absent=a confirmar
-  countersAvailable Json?             // which counter types to expect (total/pb/colorido/duplex/copias/scanner)
-  suppliesAvailable Json?             // which supply types to expect (toner_preto/ciano/magenta/amarelo/...)
-  confidence        String            // ALTA | MEDIA | BAIXA
+  capabilities      Json // {color, duplex, a3, copy, scan, fax} — true/false/absent=a confirmar
+  countersAvailable Json? // which counter types to expect (total/pb/colorido/duplex/copias/scanner)
+  suppliesAvailable Json? // which supply types to expect (toner_preto/ciano/magenta/amarelo/...)
+  confidence        String // ALTA | MEDIA | BAIXA
   status            String            @default("ATUAL") // ATUAL | DESCONTINUADO | ANTIGO | A_CONFIRMAR
   sourcePrimary     String?
   sourcesSecondary  String?
@@ -144,11 +145,11 @@ model User {
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt
 
-  refreshTokens RefreshToken[]
-  auditLogs     AuditLog[]
-  technicianServiceOrders ServiceOrder[] @relation("technician")
-  createdServiceOrders ServiceOrder[] @relation("createdServiceOrders")
-  printerComments PrinterComment[]
+  refreshTokens           RefreshToken[]
+  auditLogs               AuditLog[]
+  technicianServiceOrders ServiceOrder[]   @relation("technician")
+  createdServiceOrders    ServiceOrder[]   @relation("createdServiceOrders")
+  printerComments         PrinterComment[]
 
   @@unique([tenantId, email])
   @@index([tenantId])
@@ -156,27 +157,27 @@ model User {
 }
 
 model RefreshToken {
-  id        String   @id @default(uuid())
-  userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  tokenHash String
-  expiresAt DateTime
-  revokedAt DateTime?
+  id         String    @id @default(uuid())
+  userId     String
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash  String
+  expiresAt  DateTime
+  revokedAt  DateTime?
   replacedBy String?
-  createdAt DateTime @default(now())
+  createdAt  DateTime  @default(now())
 
   @@index([userId])
   @@map("refresh_tokens")
 }
 
 model Role {
-  id          String   @id @default(uuid())
-  tenantId    String?
-  tenant      Tenant?  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  name        String
-  isSystem    Boolean  @default(false)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id        String   @id @default(uuid())
+  tenantId  String?
+  tenant    Tenant?  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name      String
+  isSystem  Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   users       User[]
   permissions RolePermission[]
@@ -186,8 +187,8 @@ model Role {
 }
 
 model Permission {
-  id          String @id @default(uuid())
-  key         String @unique // e.g. "printers.view"
+  id          String  @id @default(uuid())
+  key         String  @unique // e.g. "printers.view"
   description String?
 
   roles RolePermission[]
@@ -206,18 +207,18 @@ model RolePermission {
 }
 
 model AuditLog {
-  id         String   @id @default(uuid())
-  tenantId   String
-  tenant     Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  userId     String?
-  user       User?    @relation(fields: [userId], references: [id])
-  action     String
-  entity     String
-  entityId   String?
-  ipAddress  String?
-  before     Json?
-  after      Json?
-  createdAt  DateTime @default(now())
+  id        String   @id @default(uuid())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id])
+  action    String
+  entity    String
+  entityId  String?
+  ipAddress String?
+  before    Json?
+  after     Json?
+  createdAt DateTime @default(now())
 
   @@index([tenantId, entity, entityId])
   @@map("audit_logs")
@@ -235,65 +236,65 @@ enum CustomerStatus {
 
 enum CustomerPersonType {
   INDIVIDUAL // Pessoa Física
-  COMPANY    // Pessoa Jurídica
+  COMPANY // Pessoa Jurídica
 }
 
 model Customer {
-  id             String         @id @default(uuid())
-  tenantId       String
-  tenant         Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  personType     CustomerPersonType @default(COMPANY)
-  legalName      String
-  tradeName      String?
-  document       String? // CPF ou CNPJ, conforme personType
-  stateRegistration String?
+  id                    String             @id @default(uuid())
+  tenantId              String
+  tenant                Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  personType            CustomerPersonType @default(COMPANY)
+  legalName             String
+  tradeName             String?
+  document              String? // CPF ou CNPJ, conforme personType
+  stateRegistration     String?
   municipalRegistration String?
-  email          String?
-  phone          String?
-  whatsapp       String?
-  financialEmail String?
-  supportEmail   String?
-  contactName    String?
-  contactRole    String?
-  address        String? // legado — mantido para não perder dado já preenchido, o formulário novo usa os campos estruturados abaixo
-  zipCode        String?
-  street         String?
-  number         String?
-  complement     String?
-  neighborhood   String?
-  city           String?
-  state          String?
-  country        String?        @default("Brasil")
-  notes          String?
-  status         CustomerStatus @default(ACTIVE)
-  slaHours       Int? // overrides the applicable contract's SLA for this customer's service orders
+  email                 String?
+  phone                 String?
+  whatsapp              String?
+  financialEmail        String?
+  supportEmail          String?
+  contactName           String?
+  contactRole           String?
+  address               String? // legado — mantido para não perder dado já preenchido, o formulário novo usa os campos estruturados abaixo
+  zipCode               String?
+  street                String?
+  number                String?
+  complement            String?
+  neighborhood          String?
+  city                  String?
+  state                 String?
+  country               String?            @default("Brasil")
+  notes                 String?
+  status                CustomerStatus     @default(ACTIVE)
+  slaHours              Int? // overrides the applicable contract's SLA for this customer's service orders
   // SLA ligado/desligado por cliente + como contar as horas de atendimento.
   // A matemática de "horas úteis" (pular fim de semana/fora do expediente) no
   // cálculo real de vencimento de OS fica pra uma etapa futura — isto aqui é
   // só o modelo de dados + a tela de configuração.
-  slaEnabled     Boolean        @default(false)
-  slaHourMode    SlaHourMode    @default(CALENDAR)
-  createdAt      DateTime       @default(now())
-  updatedAt      DateTime       @updatedAt
+  slaEnabled            Boolean            @default(false)
+  slaHourMode           SlaHourMode        @default(CALENDAR)
+  createdAt             DateTime           @default(now())
+  updatedAt             DateTime           @updatedAt
 
-  locations     Location[]
-  printers      Printer[]
-  contracts     Contract[]
-  serviceOrders ServiceOrder[]
+  locations        Location[]
+  printers         Printer[]
+  contracts        Contract[]
+  serviceOrders    ServiceOrder[]
   financialEntries FinancialEntry[]
-  portalUsers   User[]
-  monthlyClosings MonthlyClosing[]
-  workingHours  CustomerWorkingHours[]
-  agents        Agent[]
+  portalUsers      User[]
+  monthlyClosings  MonthlyClosing[]
+  workingHours     CustomerWorkingHours[]
+  agents           Agent[]
 
   @@index([tenantId])
   @@map("customers")
 }
 
 enum SlaHourMode {
-  CALENDAR                 // horas corridas
-  BUSINESS_HOURS_COMPANY   // horas úteis da empresa (TenantWorkingHours)
-  BUSINESS_HOURS_CUSTOMER  // horas úteis do cliente (CustomerWorkingHours)
+  CALENDAR // horas corridas
+  BUSINESS_HOURS_COMPANY // horas úteis da empresa (TenantWorkingHours)
+  BUSINESS_HOURS_CUSTOMER // horas úteis do cliente (CustomerWorkingHours)
 }
 
 model CustomerWorkingHours {
@@ -301,9 +302,9 @@ model CustomerWorkingHours {
   tenantId   String
   customerId String
   customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
-  dayOfWeek  Int      // 0 = domingo .. 6 = sábado
-  startTime  String   // "08:00"
-  endTime    String   // "18:00"
+  dayOfWeek  Int // 0 = domingo .. 6 = sábado
+  startTime  String // "08:00"
+  endTime    String // "18:00"
   createdAt  DateTime @default(now())
 
   @@index([tenantId])
@@ -328,13 +329,13 @@ model TenantWorkingHours {
 }
 
 model Location {
-  id         String   @id @default(uuid())
-  tenantId   String
-  customerId String
-  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
-  name       String
-  address    String?
-  contactName String?
+  id           String   @id @default(uuid())
+  tenantId     String
+  customerId   String
+  customer     Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  name         String
+  address      String?
+  contactName  String?
   contactPhone String?
   // Só relevantes pro endereço principal (isPrimary=true) na prática, mas
   // ficam no model todo — um "outro endereço" pode virar principal depois.
@@ -342,11 +343,11 @@ model Location {
   costCenter   String?
   // Só um Location por cliente pode ter isPrimary=true — reforçado no
   // service (CustomersService.setPrimaryLocation), não no schema.
-  isPrimary    Boolean @default(false)
-  notes      String?
-  slaHours   Int? // overrides customer/contract SLA for service orders at this location
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  isPrimary    Boolean  @default(false)
+  notes        String?
+  slaHours     Int? // overrides customer/contract SLA for service orders at this location
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
   agents        Agent[]
   printers      Printer[]
@@ -369,37 +370,74 @@ enum AgentStatus {
 }
 
 model Agent {
-  id                String      @id @default(uuid())
-  tenantId          String
-  tenant            Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  id                        String            @id @default(uuid())
+  tenantId                  String
+  tenant                    Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   // Independent of locationId — a customer with no Location registered yet
   // can still have an Agent slot created for them (the "Adicionar Agent"
   // dialog's customer picker used to only narrow the location dropdown and
   // discard the choice if no location was picked, silently leaving the
   // Agent unlinked to anything). locationId is still the more specific
   // "which unit" detail when it's known.
-  customerId        String?
-  customer          Customer?   @relation(fields: [customerId], references: [id])
-  locationId        String?
-  location          Location?   @relation(fields: [locationId], references: [id])
-  name              String
-  enrollmentToken   String?     @unique // single-use, cleared after enrollment
-  enrollmentTokenExpiresAt DateTime?
-  apiKeyHash        String?     // credential issued after enrollment
-  status            AgentStatus @default(PENDING)
-  hostname          String?
-  localIp           String?
-  osVersion         String?
-  agentVersion      String?
-  lastHeartbeatAt   DateTime?
-  discoveryConfig   Json?       // subnets / ip ranges / snmp settings
-  createdAt         DateTime    @default(now())
-  updatedAt         DateTime    @updatedAt
+  customerId                String?
+  customer                  Customer?         @relation(fields: [customerId], references: [id])
+  locationId                String?
+  location                  Location?         @relation(fields: [locationId], references: [id])
+  name                      String
+  enrollmentToken           String?           @unique // single-use, cleared after enrollment
+  enrollmentTokenExpiresAt  DateTime?
+  apiKeyHash                String? // credential issued after enrollment
+  status                    AgentStatus       @default(PENDING)
+  hostname                  String?
+  localIp                   String?
+  osVersion                 String?
+  agentVersion              String?
+  lastHeartbeatAt           DateTime?
+  discoveryConfig           Json? // subnets / ip ranges / snmp settings
+  // Fallback SNMP v3 credential used for any printer under this Agent that
+  // doesn't have its own snmpV3CredentialId override. Optional — an Agent
+  // with neither this nor any per-printer override just falls back to v1/v2c
+  // community string, same as before this feature existed.
+  defaultSnmpV3CredentialId String?
+  defaultSnmpV3Credential   SnmpV3Credential? @relation("AgentDefaultSnmpV3Credential", fields: [defaultSnmpV3CredentialId], references: [id])
+  createdAt                 DateTime          @default(now())
+  updatedAt                 DateTime          @updatedAt
 
   printers Printer[]
 
   @@index([tenantId])
   @@map("agents")
+}
+
+// ---------------------------------------------------------------------------
+// SNMP V3 CREDENTIALS
+// ---------------------------------------------------------------------------
+
+// Tenant-scoped, reusable SNMP v3 credential set — a tenant typically has one
+// or a handful of these (e.g. "Credencial padrão", "Filial X"), assigned to
+// individual printers (Printer.snmpV3CredentialId) or left as an Agent's
+// default (Agent.defaultSnmpV3CredentialId). Never sent back to the frontend
+// with passwords decrypted — see SecretCryptoService / SnmpCredentialsService.
+model SnmpV3Credential {
+  id                              String   @id @default(uuid())
+  tenantId                        String
+  tenant                          Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name                            String // human label, e.g. "Credencial padrão HQ"
+  userName                        String
+  securityLevel                   String   @default("authPriv") // noAuthNoPriv | authNoPriv | authPriv
+  authenticationProtocol          String? // MD5 | SHA1 | SHA256 | SHA384 | SHA512
+  authenticationPasswordEncrypted String? // AES-256-GCM ciphertext, never plaintext at rest
+  privacyProtocol                 String? // DES | AES128 | AES192 | AES256
+  privacyPasswordEncrypted        String? // AES-256-GCM ciphertext, never plaintext at rest
+  contextName                     String?
+  createdAt                       DateTime @default(now())
+  updatedAt                       DateTime @updatedAt
+
+  printers         Printer[]
+  defaultForAgents Agent[]   @relation("AgentDefaultSnmpV3Credential")
+
+  @@index([tenantId])
+  @@map("snmp_v3_credentials")
 }
 
 // ---------------------------------------------------------------------------
@@ -443,52 +481,52 @@ enum PrinterOnlineStatus {
 }
 
 model Printer {
-  id             String              @id @default(uuid())
-  tenantId       String
-  tenant         Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  agentId        String
-  agent          Agent               @relation(fields: [agentId], references: [id])
-  customerId     String?
-  customer       Customer?           @relation(fields: [customerId], references: [id])
-  locationId     String?
-  location       Location?           @relation(fields: [locationId], references: [id])
+  id         String    @id @default(uuid())
+  tenantId   String
+  tenant     Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  agentId    String
+  agent      Agent     @relation(fields: [agentId], references: [id])
+  customerId String?
+  customer   Customer? @relation(fields: [customerId], references: [id])
+  locationId String?
+  location   Location? @relation(fields: [locationId], references: [id])
 
-  status         PrinterStatus       @default(DISCOVERED)
-  onlineStatus   PrinterOnlineStatus @default(UNKNOWN)
+  status           PrinterStatus           @default(DISCOVERED)
+  onlineStatus     PrinterOnlineStatus     @default(UNKNOWN)
   collectionMethod PrinterCollectionMethod @default(SNMP)
 
-  ip             String?
-  mac            String?
-  hostname       String?
-  serial         String? // primary identity when available
-  manufacturer   String?
-  model          String?
-  firmware       String?
-  sysDescr       String?
+  ip           String?
+  mac          String?
+  hostname     String?
+  serial       String? // primary identity when available
+  manufacturer String?
+  model        String?
+  firmware     String?
+  sysDescr     String?
 
-  fingerprint    String // stable dedup key: serial || mac || (agentId+ip)
+  fingerprint String // stable dedup key: serial || mac || (agentId+ip)
 
-  lastSeenAt     DateTime?
+  lastSeenAt      DateTime?
   lastCollectedAt DateTime?
-  monitoredAt    DateTime? // when this printer's status first became MONITORED (spec: never backfilled/guessed for pre-existing rows)
+  monitoredAt     DateTime? // when this printer's status first became MONITORED (spec: never backfilled/guessed for pre-existing rows)
 
-  slaHours       Int? // overrides location/customer/contract SLA for service orders on this printer
+  slaHours Int? // overrides location/customer/contract SLA for service orders on this printer
 
   // Null = never determined (device doesn't expose the Printer-MIB input
   // tray table). true/false = derived from an actual declared tray size at
   // least once — never guessed from the model name. Drives whether the UI
   // shows A3-specific fields at all for this printer. Kept as its own
   // column for backward compatibility — mirrors capabilities.a3 below.
-  supportsA3     Boolean?
+  supportsA3 Boolean?
 
-  deviceType     PrinterDeviceType @default(UNKNOWN)
+  deviceType               PrinterDeviceType @default(UNKNOWN)
   classificationConfidence Float?
   // Tri-state per capability ({color,duplex,a3,copy,scan,fax}: true/false/absent=unknown) —
   // never a fixed field per capability, since not every printer has every one (spec: never
   // invent, never treat "not reported" as false). See Classification/DeviceClassifier.cs.
-  capabilities   Json?
-  capabilitySources Json? // {"duplex": "ipp", ...} — which source determined each capability, for troubleshooting
-  discoveryDiagnostics Json? // {"snmp": "success", "ipp": "not_available", ...} — per-protocol outcome, troubleshooting only
+  capabilities             Json?
+  capabilitySources        Json? // {"duplex": "ipp", ...} — which source determined each capability, for troubleshooting
+  discoveryDiagnostics     Json? // {"snmp": "success", "ipp": "not_available", ...} — per-protocol outcome, troubleshooting only
 
   // Presence of this FK *is* "homologada" — matched against the global
   // researched catalog by manufacturer+model in AgentsService.submitDevices.
@@ -497,16 +535,22 @@ model Printer {
   catalogModelId String?
   catalogModel   PrinterCatalogModel? @relation(fields: [catalogModelId], references: [id])
 
-  createdAt      DateTime            @default(now())
-  updatedAt      DateTime            @updatedAt
+  // Per-printer SNMP v3 credential override — takes priority over the
+  // owning Agent's defaultSnmpV3CredentialId. Both are optional; a printer
+  // with neither uses v1/v2c community string like before this feature.
+  snmpV3CredentialId String?
+  snmpV3Credential   SnmpV3Credential? @relation(fields: [snmpV3CredentialId], references: [id])
 
-  counters      CounterReading[]
-  consumables   ConsumableReading[]
-  alerts        Alert[]
-  serviceOrders ServiceOrder[]
-  contracts     Contract[]
-  replacements  ConsumableReplacement[]
-  comments      PrinterComment[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  counters         CounterReading[]
+  consumables      ConsumableReading[]
+  alerts           Alert[]
+  serviceOrders    ServiceOrder[]
+  contracts        Contract[]
+  replacements     ConsumableReplacement[]
+  comments         PrinterComment[]
   contractPrinters ContractPrinter[]
 
   @@unique([tenantId, fingerprint])
@@ -517,31 +561,31 @@ model Printer {
 
 // Raw + derived counter snapshot per collection
 model CounterReading {
-  id           String   @id @default(uuid())
-  printerId    String
-  printer      Printer  @relation(fields: [printerId], references: [id], onDelete: Cascade)
-  total        Int?
-  blackWhite   Int?
-  color        Int?
-  copies       Int?
-  raw          Json?    // original values + OIDs as received from agent
-  collectedAt  DateTime @default(now())
+  id          String   @id @default(uuid())
+  printerId   String
+  printer     Printer  @relation(fields: [printerId], references: [id], onDelete: Cascade)
+  total       Int?
+  blackWhite  Int?
+  color       Int?
+  copies      Int?
+  raw         Json? // original values + OIDs as received from agent
+  collectedAt DateTime @default(now())
 
   @@index([printerId, collectedAt])
   @@map("counter_readings")
 }
 
 model ConsumableReading {
-  id          String   @id @default(uuid())
-  printerId   String
-  printer     Printer  @relation(fields: [printerId], references: [id], onDelete: Cascade)
-  type        String // toner, drum, waste_toner, etc.
-  color       String? // black, cyan, magenta, yellow
+  id           String   @id @default(uuid())
+  printerId    String
+  printer      Printer  @relation(fields: [printerId], references: [id], onDelete: Cascade)
+  type         String // toner, drum, waste_toner, etc.
+  color        String? // black, cyan, magenta, yellow
   levelPercent Int?
-  capacity    String?
-  name        String?
-  serial      String?
-  collectedAt DateTime @default(now())
+  capacity     String?
+  name         String?
+  serial       String?
+  collectedAt  DateTime @default(now())
 
   @@index([printerId, collectedAt])
   @@map("consumable_readings")
@@ -558,26 +602,26 @@ enum ConsumableReplacementStatus {
 // forecasted replacement date through to confirmation, so providers can see
 // predicted vs. actual replacements and catch premature (wasteful) swaps.
 model ConsumableReplacement {
-  id          String                       @id @default(uuid())
-  tenantId    String
-  tenant      Tenant                       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  printerId   String
-  printer     Printer                      @relation(fields: [printerId], references: [id], onDelete: Cascade)
-  type        String
-  color       String?
+  id        String  @id @default(uuid())
+  tenantId  String
+  tenant    Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  printerId String
+  printer   Printer @relation(fields: [printerId], references: [id], onDelete: Cascade)
+  type      String
+  color     String?
 
-  predictedAt DateTime?
-  replacedAt  DateTime?
+  predictedAt               DateTime?
+  replacedAt                DateTime?
   levelPercentAtReplacement Int?
-  status      ConsumableReplacementStatus  @default(PREDICTED)
+  status                    ConsumableReplacementStatus @default(PREDICTED)
 
   inventoryMovementId String?
-  inventoryMovement    InventoryMovement?  @relation(fields: [inventoryMovementId], references: [id])
+  inventoryMovement   InventoryMovement? @relation(fields: [inventoryMovementId], references: [id])
 
-  notes       String?
+  notes String?
 
-  createdAt   DateTime                     @default(now())
-  updatedAt   DateTime                     @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([tenantId, status])
   @@index([printerId, type, color])
@@ -629,20 +673,20 @@ enum AlertStatus {
 }
 
 model Alert {
-  id          String      @id @default(uuid())
-  tenantId    String
-  tenant      Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  printerId   String?
-  printer     Printer?    @relation(fields: [printerId], references: [id])
+  id             String        @id @default(uuid())
+  tenantId       String
+  tenant         Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  printerId      String?
+  printer        Printer?      @relation(fields: [printerId], references: [id])
   serviceOrderId String?
   serviceOrder   ServiceOrder? @relation(fields: [serviceOrderId], references: [id])
-  type        AlertType
-  level       AlertLevel
-  status      AlertStatus @default(OPEN)
-  message     String
-  metadata    Json?
-  createdAt   DateTime    @default(now())
-  resolvedAt  DateTime?
+  type           AlertType
+  level          AlertLevel
+  status         AlertStatus   @default(OPEN)
+  message        String
+  metadata       Json?
+  createdAt      DateTime      @default(now())
+  resolvedAt     DateTime?
 
   @@index([tenantId, status])
   @@map("alerts")
@@ -694,27 +738,27 @@ enum ServiceOrderPhotoPhase {
 }
 
 model ServiceOrder {
-  id           String               @id @default(uuid())
-  tenantId     String
-  tenant       Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  number       Int
-  customerId   String
-  customer     Customer             @relation(fields: [customerId], references: [id])
-  locationId   String?
-  location     Location?            @relation(fields: [locationId], references: [id])
-  printerId    String?
-  printer      Printer?             @relation(fields: [printerId], references: [id])
-  technicianId String?
-  technician   User?                @relation("technician", fields: [technicianId], references: [id])
+  id              String    @id @default(uuid())
+  tenantId        String
+  tenant          Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  number          Int
+  customerId      String
+  customer        Customer  @relation(fields: [customerId], references: [id])
+  locationId      String?
+  location        Location? @relation(fields: [locationId], references: [id])
+  printerId       String?
+  printer         Printer?  @relation(fields: [printerId], references: [id])
+  technicianId    String?
+  technician      User?     @relation("technician", fields: [technicianId], references: [id])
   createdByUserId String?
-  createdBy    User?                @relation("createdServiceOrders", fields: [createdByUserId], references: [id])
+  createdBy       User?     @relation("createdServiceOrders", fields: [createdByUserId], references: [id])
 
-  type         String? // legado, sem uso na UI nova — ver serviceType
-  serviceType  ServiceOrderType?
-  priority     ServiceOrderPriority @default(MEDIUM)
-  status       ServiceOrderStatus   @default(OPEN)
-  description  String?
-  symptoms     String[]             @default([])
+  type             String? // legado, sem uso na UI nova — ver serviceType
+  serviceType      ServiceOrderType?
+  priority         ServiceOrderPriority @default(MEDIUM)
+  status           ServiceOrderStatus   @default(OPEN)
+  description      String?
+  symptoms         String[]             @default([])
   counterAtOpening Int? // snapshot do contador total do printer no momento da abertura
 
   diagnosis       String?
@@ -725,9 +769,9 @@ model ServiceOrder {
   technicalNotes  String?
   solution        String?
 
-  billingType  ServiceOrderBillingType?
-  laborCost    Decimal? @db.Decimal(12, 2)
-  travelCost   Decimal? @db.Decimal(12, 2)
+  billingType ServiceOrderBillingType?
+  laborCost   Decimal?                 @db.Decimal(12, 2)
+  travelCost  Decimal?                 @db.Decimal(12, 2)
 
   arrivedAt         DateTime?
   departedAt        DateTime?
@@ -742,19 +786,19 @@ model ServiceOrder {
   approvalSignature String? // PNG base64 data URL captured on a signature canvas
   approvalNotes     String?
 
-  scheduledAt  DateTime?
-  startedAt    DateTime?
-  completedAt  DateTime?
-  slaDueAt     DateTime?
+  scheduledAt DateTime?
+  startedAt   DateTime?
+  completedAt DateTime?
+  slaDueAt    DateTime?
 
-  createdAt    DateTime             @default(now())
-  updatedAt    DateTime             @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  financialEntries FinancialEntry[]
+  financialEntries   FinancialEntry[]
   inventoryMovements InventoryMovement[]
-  alerts           Alert[]
-  parts            ServiceOrderPart[]
-  photos           ServiceOrderPhoto[]
+  alerts             Alert[]
+  parts              ServiceOrderPart[]
+  photos             ServiceOrderPhoto[]
 
   @@unique([tenantId, number])
   @@index([tenantId, status])
@@ -762,17 +806,17 @@ model ServiceOrder {
 }
 
 model ServiceOrderPart {
-  id             String   @id @default(uuid())
-  tenantId       String
-  tenant         Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  serviceOrderId String
-  serviceOrder   ServiceOrder @relation(fields: [serviceOrderId], references: [id], onDelete: Cascade)
-  name           String
-  quantity       Int
-  unitValue      Decimal  @db.Decimal(12, 2)
-  inventoryItemId    String?
+  id                  String       @id @default(uuid())
+  tenantId            String
+  tenant              Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  serviceOrderId      String
+  serviceOrder        ServiceOrder @relation(fields: [serviceOrderId], references: [id], onDelete: Cascade)
+  name                String
+  quantity            Int
+  unitValue           Decimal      @db.Decimal(12, 2)
+  inventoryItemId     String?
   inventoryMovementId String?
-  createdAt      DateTime @default(now())
+  createdAt           DateTime     @default(now())
 
   @@index([tenantId])
   @@map("service_order_parts")
@@ -805,21 +849,21 @@ enum ContractStatus {
 }
 
 model Contract {
-  id                String         @id @default(uuid())
-  tenantId          String
-  tenant            Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  number            Int
-  customerId        String
-  customer          Customer       @relation(fields: [customerId], references: [id])
-  printerId         String?
-  printer           Printer?       @relation(fields: [printerId], references: [id])
+  id         String   @id @default(uuid())
+  tenantId   String
+  tenant     Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  number     Int
+  customerId String
+  customer   Customer @relation(fields: [customerId], references: [id])
+  printerId  String?
+  printer    Printer? @relation(fields: [printerId], references: [id])
 
   startDate         DateTime
   endDate           DateTime?
   monthlyFee        Decimal        @db.Decimal(12, 2)
   franchisePages    Int            @default(0)
-  overagePriceBw    Decimal        @db.Decimal(12, 4) @default(0)
-  overagePriceColor Decimal        @db.Decimal(12, 4) @default(0)
+  overagePriceBw    Decimal        @default(0) @db.Decimal(12, 4)
+  overagePriceColor Decimal        @default(0) @db.Decimal(12, 4)
   billingDay        Int            @default(1)
   slaHours          Int?
   readjustmentIndex String?
@@ -831,12 +875,12 @@ model Contract {
   // franchisePages/overagePriceBw/Color for billing purposes going forward —
   // those columns stay populated for historical contracts but are no longer
   // read by ClosingsService.
-  defaultPriceBw    Decimal?       @db.Decimal(12, 4)
-  defaultPriceColor Decimal?       @db.Decimal(12, 4)
-  defaultPriceScan  Decimal?       @db.Decimal(12, 4)
+  defaultPriceBw    Decimal? @db.Decimal(12, 4)
+  defaultPriceColor Decimal? @db.Decimal(12, 4)
+  defaultPriceScan  Decimal? @db.Decimal(12, 4)
 
-  createdAt         DateTime       @default(now())
-  updatedAt         DateTime       @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   financialEntries FinancialEntry[]
   contractPrinters ContractPrinter[]
@@ -864,9 +908,9 @@ model ContractPrinter {
   priceBw    Decimal? @db.Decimal(12, 4) // null = falls back to Contract.defaultPriceBw
   priceColor Decimal? @db.Decimal(12, 4)
   priceScan  Decimal? @db.Decimal(12, 4)
-  fixedCost  Decimal  @db.Decimal(12, 2) @default(0)
+  fixedCost  Decimal  @default(0) @db.Decimal(12, 2)
 
-  createdAt  DateTime @default(now())
+  createdAt DateTime @default(now())
 
   @@unique([contractId, printerId])
   @@index([tenantId])
@@ -908,19 +952,19 @@ enum ContractReadjustmentStatus {
 }
 
 model ContractReadjustment {
-  id                 String                      @id @default(uuid())
+  id                 String                     @id @default(uuid())
   tenantId           String
-  tenant             Tenant                      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant             Tenant                     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   contractId         String
-  contract           Contract                    @relation(fields: [contractId], references: [id], onDelete: Cascade)
-  percentage         Decimal                     @db.Decimal(6, 2)
+  contract           Contract                   @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  percentage         Decimal                    @db.Decimal(6, 2)
   effectiveMonth     Int // 1-12
   effectiveYear      Int
-  status             ContractReadjustmentStatus  @default(SCHEDULED)
-  previousMonthlyFee Decimal?                    @db.Decimal(12, 2)
-  newMonthlyFee      Decimal?                    @db.Decimal(12, 2)
+  status             ContractReadjustmentStatus @default(SCHEDULED)
+  previousMonthlyFee Decimal?                   @db.Decimal(12, 2)
+  newMonthlyFee      Decimal?                   @db.Decimal(12, 2)
   appliedAt          DateTime?
-  createdAt          DateTime                    @default(now())
+  createdAt          DateTime                   @default(now())
 
   @@index([tenantId, contractId])
   @@map("contract_readjustments")
@@ -951,15 +995,15 @@ model MonthlyClosing {
 // ---------------------------------------------------------------------------
 
 model InventoryItem {
-  id           String   @id @default(uuid())
-  tenantId     String
-  tenant       Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  name         String
-  type         String
-  quantity     Int      @default(0)
-  minQuantity  Int      @default(0)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id          String   @id @default(uuid())
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name        String
+  type        String
+  quantity    Int      @default(0)
+  minQuantity Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   movements InventoryMovement[]
 
@@ -974,17 +1018,17 @@ enum InventoryMovementType {
 }
 
 model InventoryMovement {
-  id             String                 @id @default(uuid())
+  id             String                @id @default(uuid())
   tenantId       String
-  tenant         Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant         Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   itemId         String
-  item           InventoryItem          @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  item           InventoryItem         @relation(fields: [itemId], references: [id], onDelete: Cascade)
   type           InventoryMovementType
   quantity       Int
   reason         String?
   serviceOrderId String?
-  serviceOrder   ServiceOrder?          @relation(fields: [serviceOrderId], references: [id])
-  createdAt      DateTime               @default(now())
+  serviceOrder   ServiceOrder?         @relation(fields: [serviceOrderId], references: [id])
+  createdAt      DateTime              @default(now())
 
   consumableReplacements ConsumableReplacement[]
 
@@ -1010,27 +1054,27 @@ enum FinancialEntryStatus {
 }
 
 model FinancialEntry {
-  id             String               @id @default(uuid())
-  tenantId       String
-  tenant         Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  type           FinancialEntryType
-  category       String
-  costCenter     String?
-  description    String?
-  amount         Decimal              @db.Decimal(12, 2)
-  dueDate        DateTime
-  paidAt         DateTime?
-  status         FinancialEntryStatus @default(PENDING)
+  id          String               @id @default(uuid())
+  tenantId    String
+  tenant      Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  type        FinancialEntryType
+  category    String
+  costCenter  String?
+  description String?
+  amount      Decimal              @db.Decimal(12, 2)
+  dueDate     DateTime
+  paidAt      DateTime?
+  status      FinancialEntryStatus @default(PENDING)
 
   customerId     String?
-  customer       Customer?            @relation(fields: [customerId], references: [id])
+  customer       Customer?     @relation(fields: [customerId], references: [id])
   contractId     String?
-  contract       Contract?            @relation(fields: [contractId], references: [id])
+  contract       Contract?     @relation(fields: [contractId], references: [id])
   serviceOrderId String?
-  serviceOrder   ServiceOrder?        @relation(fields: [serviceOrderId], references: [id])
+  serviceOrder   ServiceOrder? @relation(fields: [serviceOrderId], references: [id])
 
-  createdAt      DateTime             @default(now())
-  updatedAt      DateTime             @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([tenantId, type, status])
   @@index([tenantId, dueDate])

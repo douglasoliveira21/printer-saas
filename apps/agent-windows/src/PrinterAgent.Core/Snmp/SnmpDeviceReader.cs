@@ -22,7 +22,7 @@ namespace PrinterAgent.Core.Snmp;
 public class SnmpDeviceReader
 {
     private readonly ILogger<SnmpDeviceReader> _logger;
-    private readonly SnmpV3Credentials? _v3Credentials;
+    private readonly SnmpV3CredentialStore? _v3CredentialStore;
     private readonly SnmpV3EngineDiscovery? _v3EngineDiscovery;
 
     public SnmpDeviceReader(ILogger<SnmpDeviceReader> logger)
@@ -30,19 +30,22 @@ public class SnmpDeviceReader
     {
     }
 
-    public SnmpDeviceReader(ILogger<SnmpDeviceReader> logger, SnmpV3Credentials? v3Credentials, SnmpV3EngineDiscovery? v3EngineDiscovery)
+    public SnmpDeviceReader(ILogger<SnmpDeviceReader> logger, SnmpV3CredentialStore? v3CredentialStore, SnmpV3EngineDiscovery? v3EngineDiscovery)
     {
         _logger = logger;
-        _v3Credentials = v3Credentials;
+        _v3CredentialStore = v3CredentialStore;
         _v3EngineDiscovery = v3EngineDiscovery;
     }
 
     public async Task<SnmpProbeResult?> ProbeAsync(IPAddress ip, string community, int timeoutMs, int retries, CancellationToken ct)
     {
-        // If v3 credentials are configured, try v3 first (most secure)
-        if (_v3Credentials is not null && _v3EngineDiscovery is not null)
+        // Resolved per-IP (per-printer override, else the Agent/server
+        // default, else null) rather than a single fixed credential — see
+        // SnmpV3CredentialStore's doc comment.
+        var v3Credentials = _v3CredentialStore?.Resolve(ip.ToString());
+        if (v3Credentials is not null && _v3EngineDiscovery is not null)
         {
-            var v3Result = await ProbeWithV3Async(ip, timeoutMs, retries, ct);
+            var v3Result = await ProbeWithV3Async(ip, v3Credentials, timeoutMs, retries, ct);
             if (v3Result is not null)
             {
                 return v3Result;
@@ -488,15 +491,15 @@ public class SnmpDeviceReader
 
     #region SNMP v3 Support
 
-    private async Task<SnmpProbeResult?> ProbeWithV3Async(IPAddress ip, int timeoutMs, int retries, CancellationToken ct)
+    private async Task<SnmpProbeResult?> ProbeWithV3Async(IPAddress ip, SnmpV3Credentials v3Credentials, int timeoutMs, int retries, CancellationToken ct)
     {
-        if (_v3Credentials is null || _v3EngineDiscovery is null)
+        if (_v3EngineDiscovery is null)
         {
             return null;
         }
 
         var endpoint = new IPEndPoint(ip, 161);
-        
+
         // Perform engine discovery first
         var report = await _v3EngineDiscovery.DiscoverAsync(endpoint, timeoutMs, ct);
         if (report is null)
@@ -506,9 +509,9 @@ public class SnmpDeviceReader
         }
 
         // Create security provider
-        var privacyProvider = SnmpV3SecurityProvider.CreateProvider(_v3Credentials);
-        var contextName = _v3Credentials.GetContextName();
-        var userName = new OctetString(_v3Credentials.UserName);
+        var privacyProvider = SnmpV3SecurityProvider.CreateProvider(v3Credentials);
+        var contextName = v3Credentials.GetContextName();
+        var userName = new OctetString(v3Credentials.UserName);
 
         // Try to get sysDescr using v3
         var sysDescr = await TryGetV3Async(endpoint, privacyProvider, contextName, userName, report, PrinterMibOids.SysDescr, timeoutMs, retries, ct);

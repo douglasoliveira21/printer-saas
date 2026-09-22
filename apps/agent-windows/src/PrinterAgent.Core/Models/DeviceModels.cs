@@ -116,12 +116,38 @@ public class HeartbeatRequest
 public class AgentConfigResponse
 {
     public AgentDiscoveryConfig? DiscoveryConfig { get; set; }
+    public AgentSnmpV3Config? SnmpV3 { get; set; }
 }
 
 public class AgentDiscoveryConfig
 {
     public List<string>? Networks { get; set; }
     public string? SnmpCommunity { get; set; }
+}
+
+/// <summary>
+/// SNMP v3 credentials resolved server-side (spec: per-printer SNMP v3, not
+/// just one community string per Agent) and delivered decrypted over HTTPS —
+/// mirrors what <c>AgentsService.resolveSnmpV3ConfigForAgent</c> returns.
+/// <see cref="Default"/> backs any device with no entry in
+/// <see cref="PerIp"/>, which is keyed by IP address (not Printer id — the
+/// prober only ever has an IP at probe time).
+/// </summary>
+public class AgentSnmpV3Config
+{
+    public AgentSnmpV3Credential? Default { get; set; }
+    public Dictionary<string, AgentSnmpV3Credential>? PerIp { get; set; }
+}
+
+public class AgentSnmpV3Credential
+{
+    public required string UserName { get; set; }
+    public required string SecurityLevel { get; set; }
+    public string? AuthenticationProtocol { get; set; }
+    public string? AuthenticationPassword { get; set; }
+    public string? PrivacyProtocol { get; set; }
+    public string? PrivacyPassword { get; set; }
+    public string? ContextName { get; set; }
 }
 
 /// <summary>Mirrors the Printer row shape returned by GET /agent-api/v1/printers — only the fields the ConfigTool's Impressoras tab needs.</summary>

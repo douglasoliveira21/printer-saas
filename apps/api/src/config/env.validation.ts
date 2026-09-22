@@ -9,6 +9,12 @@ export const envSchema = z.object({
   JWT_ACCESS_EXPIRES_IN: z.string().default('15m'),
   JWT_REFRESH_SECRET: z.string().min(16),
   JWT_REFRESH_EXPIRES_IN: z.string().default('30d'),
+  // Key for reversible at-rest encryption of secrets the API must return in
+  // plaintext later (SNMP v3 auth/priv passwords) — see SecretCryptoService.
+  // Distinct from JWT_SECRET on purpose: rotating one shouldn't force
+  // rotating the other, and a JWT secret leak shouldn't also expose SNMP
+  // credentials.
+  SECRET_ENCRYPTION_KEY: z.string().min(16),
   CORS_ORIGINS: z.string().default('http://localhost:3000'),
   AGENT_OFFLINE_THRESHOLD_SECONDS: z.coerce.number().default(120),
   // How often the scheduled sweep runs to flip stale agents/printers to

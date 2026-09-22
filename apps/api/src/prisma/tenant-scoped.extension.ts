@@ -19,6 +19,7 @@ const TENANT_SCOPED_MODELS = new Set([
   'Location',
   'Agent',
   'Printer',
+  'SnmpV3Credential',
   'ConsumableReplacement',
   'PrinterComment',
   'Alert',

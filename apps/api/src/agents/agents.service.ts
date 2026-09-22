@@ -6,7 +6,9 @@ import type { Agent } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { TenantPrismaService } from '../prisma/tenant-prisma.service';
 import type { CreateAgentDto } from './dto/create-agent.dto';
+import type { UpdateAgentDto } from './dto/update-agent.dto';
 import type { EnrollAgentDto, HeartbeatDto, SubmitDevicesDto } from './dto/agent-payloads.dto';
+import { SecretCryptoService } from '../common/crypto/secret-crypto.service';
 
 const ENROLLMENT_TOKEN_TTL_MS = 24 * 60 * 60 * 1000;
 // A level jump this large between consecutive readings can't be explained by
@@ -21,6 +23,7 @@ export class AgentsService {
     private readonly prisma: PrismaService,
     private readonly tenantPrisma: TenantPrismaService,
     private readonly config: ConfigService,
+    private readonly secretCrypto: SecretCryptoService,
   ) {}
 
   /** Tenant-admin action: pre-register an Agent slot and hand out a one-time enrollment token. */
@@ -52,9 +55,21 @@ export class AgentsService {
     return this.tenantPrisma.client.agent.findMany({ orderBy: { createdAt: 'desc' } });
   }
 
-  async rename(id: string, name: string) {
+  async update(id: string, dto: UpdateAgentDto) {
     await this.assertExists(id);
-    return this.tenantPrisma.client.agent.update({ where: { id }, data: { name } });
+    // Same reasoning as PrintersService.update: the tenant-scoped extension
+    // protects the Agent row being written, not a foreign key supplied in
+    // the body, so a cross-tenant credential ID needs an explicit check.
+    if (dto.defaultSnmpV3CredentialId) {
+      const credential = await this.tenantPrisma.client.snmpV3Credential.findFirst({ where: { id: dto.defaultSnmpV3CredentialId } });
+      if (!credential) {
+        throw new NotFoundException('Credencial SNMP v3 não encontrada');
+      }
+    }
+    return this.tenantPrisma.client.agent.update({
+      where: { id },
+      data: { name: dto.name, defaultSnmpV3CredentialId: dto.defaultSnmpV3CredentialId },
+    });
   }
 
   async remove(id: string) {
@@ -138,7 +153,57 @@ export class AgentsService {
   }
 
   async getConfig(agent: Agent) {
-    return { discoveryConfig: agent.discoveryConfig ?? null };
+    return {
+      discoveryConfig: agent.discoveryConfig ?? null,
+      snmpV3: await this.resolveSnmpV3ConfigForAgent(agent),
+    };
+  }
+
+  /**
+   * Resolves every SNMP v3 credential this Agent needs to authenticate with,
+   * decrypted for transport over HTTPS to the Agent that actually has to use
+   * them — this is the one place credentials are ever decrypted server-side.
+   * `default` backs any printer under this Agent with no override.
+   * `perIp` is keyed by the printer's last-known IP (not its database id) —
+   * the Agent's SNMP prober only ever has an IP at probe time, never a
+   * Printer id, since that mapping is resolved server-side by submitDevices
+   * after the fact. Same known limitation as the rest of this system's
+   * IP-based device tracking: if a printer's IP changes via DHCP, its
+   * credential override won't apply at the new IP until the printer is
+   * re-discovered there and this config is re-fetched.
+   */
+  private async resolveSnmpV3ConfigForAgent(agent: Agent) {
+    const [defaultCredential, printersWithOverride] = await Promise.all([
+      agent.defaultSnmpV3CredentialId
+        ? this.prisma.snmpV3Credential.findUnique({ where: { id: agent.defaultSnmpV3CredentialId } })
+        : null,
+      this.prisma.printer.findMany({
+        where: { agentId: agent.id, snmpV3CredentialId: { not: null }, ip: { not: null } },
+        select: { ip: true, snmpV3Credential: true },
+      }),
+    ]);
+
+    const toTransport = (c: NonNullable<typeof defaultCredential>) => ({
+      userName: c.userName,
+      securityLevel: c.securityLevel,
+      authenticationProtocol: c.authenticationProtocol,
+      authenticationPassword: c.authenticationPasswordEncrypted ? this.secretCrypto.decrypt(c.authenticationPasswordEncrypted) : null,
+      privacyProtocol: c.privacyProtocol,
+      privacyPassword: c.privacyPasswordEncrypted ? this.secretCrypto.decrypt(c.privacyPasswordEncrypted) : null,
+      contextName: c.contextName,
+    });
+
+    const perIp: Record<string, ReturnType<typeof toTransport>> = {};
+    for (const p of printersWithOverride) {
+      if (p.ip && p.snmpV3Credential) {
+        perIp[p.ip] = toTransport(p.snmpV3Credential);
+      }
+    }
+
+    return {
+      default: defaultCredential ? toTransport(defaultCredential) : null,
+      perIp,
+    };
   }
 
   /**

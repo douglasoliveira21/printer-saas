@@ -33,6 +33,14 @@ export function PrinterInfoGrid({ printer }: { printer: Printer }) {
       ),
     },
     { label: "Tipo de conexão", value: printer.collectionMethod === "MANUAL" ? "Manual" : "Rede (SNMP)" },
+    {
+      label: "Credencial SNMP v3",
+      value: printer.snmpV3Credential ? (
+        <Badge variant="secondary">{printer.snmpV3Credential.name}</Badge>
+      ) : (
+        <span className="text-muted-foreground">Sem override (v1/v2c ou padrão do Agent)</span>
+      ),
+    },
     { label: "Endereço IP", value: printer.ip || "Não disponível" },
     { label: "Endereço MAC", value: printer.mac || "Não disponível" },
     { label: "Número de série", value: printer.serial || "Não disponível" },

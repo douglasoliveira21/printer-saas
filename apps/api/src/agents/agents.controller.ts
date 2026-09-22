@@ -31,7 +31,7 @@ export class AgentsController {
   @Patch(':id')
   @RequirePermissions('agents.create')
   rename(@Param('id') id: string, @Body() dto: UpdateAgentDto) {
-    return this.agentsService.rename(id, dto.name);
+    return this.agentsService.update(id, dto);
   }
 
   @Delete(':id')

@@ -9,6 +9,7 @@ import { useTenantUsers, type TenantUser } from "@/hooks/use-users";
 import { CreateUserDialog } from "./create-user-dialog";
 import { UserActionsMenu } from "./user-actions-menu";
 import { CompanyWorkingHoursCard } from "./company-working-hours-card";
+import { SnmpCredentialsTab } from "./snmp-credentials-tab";
 
 export default function ConfiguracoesPage() {
   const { data: users, isLoading } = useTenantUsers();
@@ -39,6 +40,7 @@ export default function ConfiguracoesPage() {
         <TabsList>
           <TabsTrigger value="usuarios">Usuários</TabsTrigger>
           <TabsTrigger value="empresa">Empresa</TabsTrigger>
+          <TabsTrigger value="snmp">Credenciais SNMP v3</TabsTrigger>
         </TabsList>
 
         <TabsContent value="usuarios" className="mt-4 space-y-4">
@@ -60,6 +62,10 @@ export default function ConfiguracoesPage() {
 
         <TabsContent value="empresa" className="mt-4">
           <CompanyWorkingHoursCard />
+        </TabsContent>
+
+        <TabsContent value="snmp" className="mt-4">
+          <SnmpCredentialsTab />
         </TabsContent>
       </Tabs>
     </div>

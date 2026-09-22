@@ -108,6 +108,7 @@ export class PrintersService {
         location: true,
         agent: { select: { id: true, name: true, status: true, hostname: true } },
         catalogModel: { select: { id: true, manufacturer: true, model: true, confidence: true } },
+        snmpV3Credential: { select: { id: true, name: true, userName: true, securityLevel: true } },
         counters: { orderBy: { collectedAt: 'desc' }, take: 50 },
         consumables: { orderBy: { collectedAt: 'desc' }, take: 50 },
       },
@@ -243,6 +244,16 @@ export class PrintersService {
   /** Manual correction of vendor-reported fields (spec §18: not every device reports these accurately), plus SLA override. */
   async update(id: string, dto: UpdatePrinterDto) {
     await this.findOne(id);
+    // The tenant-scoped extension protects the Printer row being written,
+    // not a foreign key value supplied in the body — a credential ID from
+    // another tenant would otherwise pass Prisma's FK check (the row exists,
+    // just not for this tenant) and silently leak cross-tenant access.
+    if (dto.snmpV3CredentialId) {
+      const credential = await this.tenantPrisma.client.snmpV3Credential.findFirst({ where: { id: dto.snmpV3CredentialId } });
+      if (!credential) {
+        throw new NotFoundException('Credencial SNMP v3 não encontrada');
+      }
+    }
     return this.tenantPrisma.client.printer.update({ where: { id }, data: dto });
   }
 }

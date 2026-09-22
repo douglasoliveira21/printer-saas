@@ -128,6 +128,9 @@ export interface Printer {
   /** Presence = "homologada" — matched against the global researched catalog by manufacturer+model (see AgentsService.submitDevices). */
   catalogModelId: string | null;
   catalogModel?: { id: string; manufacturer: string; model: string; confidence: string } | null;
+  /** Per-printer SNMP v3 credential override — takes priority over the owning Agent's default. */
+  snmpV3CredentialId: string | null;
+  snmpV3Credential?: { id: string; name: string; userName: string; securityLevel: string } | null;
   createdAt: string;
   customer?: { id: string; legalName: string; tradeName?: string | null } | null;
   location?: { id: string; name: string; department?: string | null; address?: string | null } | null;

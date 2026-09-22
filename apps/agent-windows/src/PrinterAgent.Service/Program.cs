@@ -53,31 +53,38 @@ try
     // misconfigured v3 setup fails loud), which used to crash this singleton
     // factory at first resolution even with v3 left unconfigured. Guarded the
     // same way PrinterAgent.ConfigTool/AgentContext.TryCreateV3Credentials does.
+    //
+    // SnmpV3CredentialStore wraps whatever local fallback this produces —
+    // it's overridden per-printer/tenant-wide-default by AgentWorker as soon
+    // as the Agent successfully polls GET /agent-api/v1/config (see
+    // RefreshRemoteConfigAsync), so this local appsettings.json credential
+    // only matters before that first successful poll, or if the server has
+    // nothing configured for this Agent at all.
     builder.Services.AddSingleton<SnmpV3EngineDiscovery>();
-    builder.Services.AddSingleton<SnmpV3Credentials>(sp =>
+    builder.Services.AddSingleton<SnmpV3CredentialStore>(sp =>
     {
         var options = sp.GetRequiredService<IOptions<AgentOptions>>().Value;
         if (string.IsNullOrWhiteSpace(options.SnmpV3?.UserName))
         {
-            return null!;
+            return new SnmpV3CredentialStore(null);
         }
         try
         {
-            return new SnmpV3Credentials(options.SnmpV3);
+            return new SnmpV3CredentialStore(new SnmpV3Credentials(options.SnmpV3));
         }
         catch (Exception ex)
         {
-            sp.GetRequiredService<ILogger<SnmpV3Credentials>>()
+            sp.GetRequiredService<ILogger<SnmpV3CredentialStore>>()
                 .LogWarning(ex, "SNMP v3 is configured but invalid — falling back to v1/v2c only.");
-            return null!;
+            return new SnmpV3CredentialStore(null);
         }
     });
     builder.Services.AddSingleton<SnmpDeviceReader>(sp =>
     {
         var logger = sp.GetRequiredService<ILogger<SnmpDeviceReader>>();
-        var v3Credentials = sp.GetService<SnmpV3Credentials>();
+        var v3CredentialStore = sp.GetRequiredService<SnmpV3CredentialStore>();
         var v3EngineDiscovery = sp.GetRequiredService<SnmpV3EngineDiscovery>();
-        return new SnmpDeviceReader(logger, v3Credentials, v3EngineDiscovery);
+        return new SnmpDeviceReader(logger, v3CredentialStore, v3EngineDiscovery);
     });
     
     builder.Services.AddSingleton<ModelDatabase>();

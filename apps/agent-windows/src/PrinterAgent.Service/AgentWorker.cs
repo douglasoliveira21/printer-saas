@@ -4,6 +4,7 @@ using PrinterAgent.Core.Configuration;
 using PrinterAgent.Core.Discovery;
 using PrinterAgent.Core.Models;
 using PrinterAgent.Core.Queue;
+using PrinterAgent.Core.Snmp;
 
 namespace PrinterAgent.Service;
 
@@ -19,6 +20,7 @@ public class AgentWorker : BackgroundService
     private readonly PrinterSaasApiClient _apiClient;
     private readonly PrinterDiscoveryService _discovery;
     private readonly OfflineQueue _offlineQueue;
+    private readonly SnmpV3CredentialStore _snmpV3CredentialStore;
     private readonly IOptionsMonitor<AgentOptions> _options;
     private readonly ILogger<AgentWorker> _logger;
 
@@ -30,6 +32,7 @@ public class AgentWorker : BackgroundService
         PrinterSaasApiClient apiClient,
         PrinterDiscoveryService discovery,
         OfflineQueue offlineQueue,
+        SnmpV3CredentialStore snmpV3CredentialStore,
         IOptionsMonitor<AgentOptions> options,
         ILogger<AgentWorker> logger)
     {
@@ -37,6 +40,7 @@ public class AgentWorker : BackgroundService
         _apiClient = apiClient;
         _discovery = discovery;
         _offlineQueue = offlineQueue;
+        _snmpV3CredentialStore = snmpV3CredentialStore;
         _options = options;
         _logger = logger;
     }
@@ -101,6 +105,10 @@ public class AgentWorker : BackgroundService
         {
             options.SnmpCommunity = remote!.DiscoveryConfig!.SnmpCommunity!;
         }
+        // Per-printer/tenant-default SNMP v3 credentials, live-updated on
+        // every poll so a credential created/changed/removed in the web app
+        // reaches the running Agent without a service restart.
+        _snmpV3CredentialStore.UpdateFromRemote(remote?.SnmpV3);
     }
 
     private async Task RunDiscoveryAndCollectionAsync(AgentOptions options, CancellationToken ct)

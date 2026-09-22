@@ -40,10 +40,16 @@ public class AgentContext
         CredentialStore = new AgentCredentialStore(NullLogger<AgentCredentialStore>.Instance);
         ProxyStore = new AgentProxyStore(NullLogger<AgentProxyStore>.Instance);
         
-        // SNMP v3 support - conditionally initialize if configured
+        // SNMP v3 support - conditionally initialize if configured locally.
+        // The ConfigTool never polls GET /agent-api/v1/config itself (that's
+        // the Service's job), so a manual "Buscar agora" here only ever sees
+        // the local appsettings.json fallback, never per-printer overrides
+        // from the web app — same limitation as SnmpCommunity/Networks,
+        // which are also Service-refreshed only.
         var v3Credentials = TryCreateV3Credentials();
         var v3EngineDiscovery = v3Credentials is not null ? new SnmpV3EngineDiscovery(NullLogger<SnmpV3EngineDiscovery>.Instance) : null;
-        SnmpReader = new SnmpDeviceReader(NullLogger<SnmpDeviceReader>.Instance, v3Credentials, v3EngineDiscovery);
+        var v3CredentialStore = new SnmpV3CredentialStore(v3Credentials);
+        SnmpReader = new SnmpDeviceReader(NullLogger<SnmpDeviceReader>.Instance, v3CredentialStore, v3EngineDiscovery);
 
         var ippClient = new IppClient(new HttpClient { Timeout = TimeSpan.FromSeconds(5) }, NullLogger<IppClient>.Instance);
         var modelDatabase = new ModelDatabase(NullLogger<ModelDatabase>.Instance);

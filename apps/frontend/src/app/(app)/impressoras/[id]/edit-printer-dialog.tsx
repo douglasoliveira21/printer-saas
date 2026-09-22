@@ -17,8 +17,11 @@ import {
 } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useUpdatePrinter } from "@/hooks/use-printers";
+import { useSnmpCredentials } from "@/hooks/use-snmp-credentials";
 import { getApiErrorMessage } from "@/lib/api-client";
 import type { Printer } from "@/lib/types";
+
+const NO_CREDENTIAL = "__none__";
 
 export function EditPrinterDialog({ printer }: { printer: Printer }) {
   const [open, setOpen] = useState(false);
@@ -26,7 +29,9 @@ export function EditPrinterDialog({ printer }: { printer: Printer }) {
   const [model, setModel] = useState(printer.model ?? "");
   const [slaHours, setSlaHours] = useState(printer.slaHours?.toString() ?? "");
   const [collectionMethod, setCollectionMethod] = useState<"SNMP" | "MANUAL">(printer.collectionMethod);
+  const [snmpV3CredentialId, setSnmpV3CredentialId] = useState(printer.snmpV3CredentialId ?? NO_CREDENTIAL);
   const updatePrinter = useUpdatePrinter();
+  const { data: credentials } = useSnmpCredentials();
 
   async function handleSave(event: FormEvent) {
     event.preventDefault();
@@ -37,6 +42,7 @@ export function EditPrinterDialog({ printer }: { printer: Printer }) {
         model: model || undefined,
         slaHours: slaHours ? Number(slaHours) : undefined,
         collectionMethod,
+        snmpV3CredentialId: snmpV3CredentialId === NO_CREDENTIAL ? null : snmpV3CredentialId,
       });
       toast.success("Impressora atualizada");
       setOpen(false);
@@ -86,6 +92,24 @@ export function EditPrinterDialog({ printer }: { printer: Printer }) {
                 <SelectContent>
                   <SelectItem value="SNMP">SNMP (automática)</SelectItem>
                   <SelectItem value="MANUAL">Manual</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Credencial SNMP v3</Label>
+              <Select value={snmpV3CredentialId} onValueChange={(v) => v && setSnmpV3CredentialId(v)}>
+                <SelectTrigger className="w-full">
+                  <SelectValue>
+                    {(value: string) => (value === NO_CREDENTIAL ? "Sem override (usa v1/v2c ou padrão do Agent)" : credentials?.find((c) => c.id === value)?.name)}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={NO_CREDENTIAL}>Sem override (usa v1/v2c ou padrão do Agent)</SelectItem>
+                  {credentials?.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>
+                      {c.name}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
