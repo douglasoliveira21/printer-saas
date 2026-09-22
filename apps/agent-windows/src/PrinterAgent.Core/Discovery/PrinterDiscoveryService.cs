@@ -26,7 +26,13 @@ public class PrinterDiscoveryService
         _logger = logger;
     }
 
-    public async Task<List<DiscoveredDevice>> ScanAsync(AgentOptions options, CancellationToken ct)
+    /// <param name="progress">
+    /// Reports (hosts probed so far, total hosts) as the sweep runs — each
+    /// host can take a few seconds now that it's probed over several
+    /// protocols (SNMP+IPP+TCP ports), so a caller showing this is what
+    /// tells the operator the scan is actually moving, not frozen.
+    /// </param>
+    public async Task<List<DiscoveredDevice>> ScanAsync(AgentOptions options, CancellationToken ct, IProgress<(int Done, int Total)>? progress = null)
     {
         var networks = options.Networks;
         if (networks.Count == 0)
@@ -53,6 +59,8 @@ public class PrinterDiscoveryService
 
         var channel = Channel.CreateUnbounded<DiscoveredDevice>();
         using var throttle = new SemaphoreSlim(options.DiscoveryConcurrency);
+        var probed = 0;
+        progress?.Report((0, targets.Count));
 
         var probes = targets.Select(async ip =>
         {
@@ -73,6 +81,8 @@ public class PrinterDiscoveryService
             }
             finally
             {
+                var done = Interlocked.Increment(ref probed);
+                progress?.Report((done, targets.Count));
                 throttle.Release();
             }
         });

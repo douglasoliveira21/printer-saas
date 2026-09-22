@@ -14,6 +14,7 @@
                                Style="{StaticResource CaptionText}" TextWrapping="Wrap"/>
                     <Button x:Name="NetworkScanButton" Content="Buscar agora" Style="{StaticResource PrimaryButton}"
                             HorizontalAlignment="Left" Margin="0,8,0,4" Click="NetworkScanButton_Click"/>
+                    <ProgressBar x:Name="NetworkScanProgress" Height="8" Minimum="0" Margin="0,4,0,4" Visibility="Collapsed"/>
                     <TextBlock x:Name="NetworkScanStatus" FontSize="12" Foreground="{StaticResource MutedBrush}" TextWrapping="Wrap"/>
                 </StackPanel>
             </Border>

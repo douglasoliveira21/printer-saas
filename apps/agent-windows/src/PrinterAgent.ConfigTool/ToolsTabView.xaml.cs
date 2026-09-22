@@ -24,7 +24,9 @@ public partial class ToolsTabView : UserControl
     {
         if (_context is null) return;
         NetworkScanButton.IsEnabled = false;
-        NetworkScanStatus.Text = "Buscando...";
+        NetworkScanProgress.Visibility = Visibility.Visible;
+        NetworkScanProgress.IsIndeterminate = true;
+        NetworkScanStatus.Text = "Preparando varredura (mDNS)...";
         try
         {
             var networksCsv = _context.Installer.GetConfiguredNetworks();
@@ -38,13 +40,25 @@ public partial class ToolsTabView : UserControl
                 SnmpCommunity = _context.Installer.GetConfiguredSnmpCommunity(),
             };
 
-            var devices = await _context.DiscoveryService.ScanAsync(options, CancellationToken.None);
+            // Progress<T> captures this (UI) thread's SynchronizationContext
+            // at construction, so the callback always runs back on the UI
+            // thread even though it's invoked from background probe tasks.
+            var progress = new Progress<(int Done, int Total)>(p =>
+            {
+                NetworkScanProgress.IsIndeterminate = false;
+                NetworkScanProgress.Maximum = Math.Max(1, p.Total);
+                NetworkScanProgress.Value = p.Done;
+                NetworkScanStatus.Text = $"Verificando dispositivos... {p.Done}/{p.Total}";
+            });
+
+            var devices = await _context.DiscoveryService.ScanAsync(options, CancellationToken.None, progress);
             if (devices.Count == 0)
             {
-                NetworkScanStatus.Text = "Nenhum dispositivo foi classificado como impressora nas redes configuradas.";
+                NetworkScanStatus.Text = "Busca concluída — nenhum dispositivo foi classificado como impressora nas redes configuradas.";
                 return;
             }
 
+            NetworkScanStatus.Text = $"Enviando {devices.Count} impressora(s) encontrada(s) ao SaaS...";
             await _context.ApiClient.SubmitDevicesAsync(new SubmitDevicesRequest { Devices = devices }, CancellationToken.None);
             NetworkScanStatus.Text = $"{devices.Count} impressora(s) encontrada(s) e enviada(s) ao SaaS.";
         }
@@ -55,6 +69,7 @@ public partial class ToolsTabView : UserControl
         finally
         {
             NetworkScanButton.IsEnabled = true;
+            NetworkScanProgress.Visibility = Visibility.Collapsed;
         }
     }
 
