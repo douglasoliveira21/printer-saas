@@ -67,12 +67,21 @@ public class SnmpDeviceReader
         };
 
         device.Hostname = await TryGetAsync(endpoint, communityOctet, version, PrinterMibOids.SysName, timeoutMs, retries, ct);
-        device.Serial = await WalkFirstNonEmptyAsync(endpoint, communityOctet, version, PrinterMibOids.PrtGeneralSerialNumberTable, timeoutMs, ct);
+        device.Serial = await WalkFirstNonEmptyAsync(endpoint, communityOctet, version, PrinterMibOids.PrtGeneralSerialNumberTable, timeoutMs, ct)
+            // Last resort: some devices don't implement the standard serial
+            // OID at all but do print it in sysDescr with an explicit label
+            // ("S/N: ...", "Serial: ...") — parsing an explicitly labeled
+            // value the device itself reported isn't guessing (spec §67),
+            // unlike trying to pick some unlabeled token out of the string.
+            ?? ExtractLabeledSerial(sysDescr);
 
         // ARP first (works even when SNMP read access is restricted to just
         // the Printer-MIB subtree, as many consumer/SMB devices do); the
         // IF-MIB walk only helps when the printer is on a different subnet
-        // from this Agent, where ARP can't see it at all.
+        // from this Agent, where ARP can't see it at all. Neither works
+        // when the printer sits behind a router from the Agent (ARP never
+        // crosses a router, and many devices block SNMP reads outside the
+        // Printer-MIB subtree) — that's a real networking limit, not a bug.
         device.Mac = ArpResolver.ResolveMac(ip) ?? await ReadMacAddressAsync(endpoint, communityOctet, version, timeoutMs, ct);
 
         device.Counters = await ReadCountersAsync(endpoint, communityOctet, version, timeoutMs, retries, ct);
@@ -80,6 +89,22 @@ public class SnmpDeviceReader
         device.Consumables = await ReadSuppliesAsync(endpoint, communityOctet, version, timeoutMs, ct);
 
         device.SupportsA3 = await DetectSupportsA3Async(endpoint, communityOctet, version, timeoutMs, ct);
+
+        // sysDescr alone (plain MIB-II) answers from routers, switches, NAS
+        // boxes, servers with an SNMP agent installed — anything, not just
+        // printers. Only claim this is a printer we can manage once we've
+        // actually seen SOME Printer-MIB (RFC 3805) evidence; otherwise this
+        // was never a printer to begin with.
+        var hasPrinterMibEvidence = !string.IsNullOrWhiteSpace(printerName)
+            || !string.IsNullOrWhiteSpace(device.Serial)
+            || device.Counters is not null
+            || device.Consumables is { Count: > 0 }
+            || device.SupportsA3 is not null;
+        if (!hasPrinterMibEvidence)
+        {
+            _logger.LogDebug("{Ip} answered SNMP but has no Printer-MIB data — not managing it as a printer", ip);
+            return null;
+        }
 
         return device;
     }
@@ -386,5 +411,18 @@ public class SnmpDeviceReader
         }
 
         return firstSegment.Length > 0 ? firstSegment : sysDescr;
+    }
+
+    /// <summary>
+    /// Pulls a serial number out of sysDescr only when the device explicitly
+    /// labeled it ("S/N: ABC123", "Serial Number: ABC123", etc.) — never an
+    /// unlabeled token, which would just be a guess (spec §67).
+    /// </summary>
+    private static string? ExtractLabeledSerial(string sysDescr)
+    {
+        var match = System.Text.RegularExpressions.Regex.Match(
+            sysDescr, @"(?:S\s*/\s*N|Serial(?:\s*Number)?)\s*[:#\-]?\s*([A-Za-z0-9]{4,})",
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        return match.Success ? match.Groups[1].Value : null;
     }
 }

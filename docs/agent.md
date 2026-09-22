@@ -87,6 +87,18 @@ etc.) vive no backend.
   — não existe OID padrão no Printer-MIB pra isso (são vendor-specific, cada fabricante
   com o seu MIB privado); implementar isso corretamente exigiria uma tabela de OIDs por
   fabricante, o que ainda não existe neste projeto (ver nota em `PrinterMibOids.cs`).
+- **Filtro "isso é mesmo uma impressora?"**: responder ao `sysDescr` (MIB-II básico)
+  sozinho não basta mais pra virar um registro de impressora — roteador, switch, NAS ou
+  servidor com SNMP habilitado também respondem isso. Só é aceito como impressora quando
+  há alguma evidência real de Printer-MIB (nome, série, contadores, suprimentos ou
+  bandeja de entrada). Registros de não-impressoras já cadastrados antes dessa mudança
+  não somem sozinhos — remova pela aba Impressoras do ConfigTool (só funciona pra
+  status "Pendente"/`DISCOVERED`).
+- **Limite conhecido do MAC**: ARP só resolve dispositivos na mesma sub-rede do
+  computador onde o Agent está instalado (não atravessa roteador); o fallback por
+  IF-MIB só funciona se o dispositivo não bloquear leitura SNMP fora da subárvore
+  Printer-MIB. Impressora em VLAN separada da máquina do Agent pode legitimamente
+  nunca ter MAC disponível — isso é uma limitação de rede, não um bug.
 
 ## Responsabilidades do Agent
 

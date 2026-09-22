@@ -42,7 +42,14 @@
                   BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" RowHeight="32"
                   HeadersVisibility="Column" AlternatingRowBackground="{StaticResource SurfaceBrush}">
             <DataGrid.Columns>
-                <DataGridCheckBoxColumn Header="" Binding="{Binding IsSelected, Mode=TwoWay}" IsReadOnly="False" Width="32"/>
+                <DataGridTemplateColumn Header="" Width="32">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <CheckBox IsChecked="{Binding IsSelected, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                      HorizontalAlignment="Center" VerticalAlignment="Center" Focusable="False"/>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
                 <DataGridTextColumn Header="Monitorada" Binding="{Binding MonitoredLabel}" Width="80"/>
                 <DataGridTextColumn Header="Situação" Binding="{Binding OnlineLabel}" Width="80"/>
                 <DataGridTextColumn Header="Tipo" Binding="{Binding ConnectionLabel}" Width="70"/>
