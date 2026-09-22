@@ -56,6 +56,7 @@ model Tenant {
   contractReadjustments ContractReadjustment[]
   serviceOrderParts ServiceOrderPart[]
   serviceOrderPhotos ServiceOrderPhoto[]
+  workingHours      TenantWorkingHours[]
 
   @@map("tenants")
 }
@@ -231,6 +232,12 @@ model Customer {
   notes          String?
   status         CustomerStatus @default(ACTIVE)
   slaHours       Int? // overrides the applicable contract's SLA for this customer's service orders
+  // SLA ligado/desligado por cliente + como contar as horas de atendimento.
+  // A matemática de "horas úteis" (pular fim de semana/fora do expediente) no
+  // cálculo real de vencimento de OS fica pra uma etapa futura — isto aqui é
+  // só o modelo de dados + a tela de configuração.
+  slaEnabled     Boolean        @default(false)
+  slaHourMode    SlaHourMode    @default(CALENDAR)
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt
 
@@ -241,9 +248,47 @@ model Customer {
   financialEntries FinancialEntry[]
   portalUsers   User[]
   monthlyClosings MonthlyClosing[]
+  workingHours  CustomerWorkingHours[]
 
   @@index([tenantId])
   @@map("customers")
+}
+
+enum SlaHourMode {
+  CALENDAR                 // horas corridas
+  BUSINESS_HOURS_COMPANY   // horas úteis da empresa (TenantWorkingHours)
+  BUSINESS_HOURS_CUSTOMER  // horas úteis do cliente (CustomerWorkingHours)
+}
+
+model CustomerWorkingHours {
+  id         String   @id @default(uuid())
+  tenantId   String
+  customerId String
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  dayOfWeek  Int      // 0 = domingo .. 6 = sábado
+  startTime  String   // "08:00"
+  endTime    String   // "18:00"
+  createdAt  DateTime @default(now())
+
+  @@index([tenantId])
+  @@index([customerId])
+  @@map("customer_working_hours")
+}
+
+// Horário de trabalho da empresa (tenant) — usado quando um cliente está no
+// modo "horas úteis da minha empresa". Mesma forma do CustomerWorkingHours,
+// só que um por tenant, editado em Configurações.
+model TenantWorkingHours {
+  id        String   @id @default(uuid())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  dayOfWeek Int
+  startTime String
+  endTime   String
+  createdAt DateTime @default(now())
+
+  @@index([tenantId])
+  @@map("tenant_working_hours")
 }
 
 model Location {
@@ -255,6 +300,13 @@ model Location {
   address    String?
   contactName String?
   contactPhone String?
+  // Só relevantes pro endereço principal (isPrimary=true) na prática, mas
+  // ficam no model todo — um "outro endereço" pode virar principal depois.
+  department   String?
+  costCenter   String?
+  // Só um Location por cliente pode ter isPrimary=true — reforçado no
+  // service (CustomersService.setPrimaryLocation), não no schema.
+  isPrimary    Boolean @default(false)
   notes      String?
   slaHours   Int? // overrides customer/contract SLA for service orders at this location
   createdAt  DateTime @default(now())

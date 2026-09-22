@@ -46,4 +46,10 @@ export class LocationsController {
   remove(@Param('id') id: string) {
     return this.locationsService.remove(id);
   }
+
+  @Patch(':id/primary')
+  @RequirePermissions('customers.edit')
+  setPrimary(@Param('id') id: string) {
+    return this.locationsService.setPrimary(id);
+  }
 }

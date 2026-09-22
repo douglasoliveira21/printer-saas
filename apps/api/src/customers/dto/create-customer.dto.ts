@@ -1,10 +1,16 @@
-import { IsEmail, IsEnum, IsInt, IsOptional, IsString, Min, MinLength } from 'class-validator';
+import { IsBoolean, IsEmail, IsEnum, IsInt, IsOptional, IsString, Min, MinLength } from 'class-validator';
 import { Type } from 'class-transformer';
 import { IsCpfOrCnpj } from '../../common/validators/br-document.validator';
 
 export enum CustomerPersonTypeDto {
   INDIVIDUAL = 'INDIVIDUAL',
   COMPANY = 'COMPANY',
+}
+
+export enum SlaHourModeDto {
+  CALENDAR = 'CALENDAR',
+  BUSINESS_HOURS_COMPANY = 'BUSINESS_HOURS_COMPANY',
+  BUSINESS_HOURS_CUSTOMER = 'BUSINESS_HOURS_CUSTOMER',
 }
 
 export class CreateCustomerDto {
@@ -106,4 +112,12 @@ export class CreateCustomerDto {
   @IsInt()
   @Min(0)
   slaHours?: number;
+
+  @IsOptional()
+  @IsBoolean()
+  slaEnabled?: boolean;
+
+  @IsOptional()
+  @IsEnum(SlaHourModeDto)
+  slaHourMode?: SlaHourModeDto;
 }

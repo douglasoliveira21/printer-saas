@@ -2,7 +2,8 @@
 
 import { useState, type FormEvent } from "react";
 import { toast } from "sonner";
-import { MapPin, Pencil, Trash2 } from "lucide-react";
+import { MapPin, Pencil, Star, Trash2 } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -15,7 +16,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { useDeleteLocation, useUpdateLocation } from "@/hooks/use-customers";
+import { useDeleteLocation, useSetPrimaryLocation, useUpdateLocation } from "@/hooks/use-customers";
 import { getApiErrorMessage } from "@/lib/api-client";
 import type { Location } from "@/lib/types";
 
@@ -26,10 +27,13 @@ export function LocationCard({ location, customerId }: { location: Location; cus
   const [address, setAddress] = useState(location.address ?? "");
   const [contactName, setContactName] = useState(location.contactName ?? "");
   const [contactPhone, setContactPhone] = useState(location.contactPhone ?? "");
+  const [department, setDepartment] = useState(location.department ?? "");
+  const [costCenter, setCostCenter] = useState(location.costCenter ?? "");
   const [slaHours, setSlaHours] = useState(location.slaHours?.toString() ?? "");
 
   const updateLocation = useUpdateLocation();
   const deleteLocation = useDeleteLocation();
+  const setPrimaryLocation = useSetPrimaryLocation();
 
   async function handleSave(event: FormEvent) {
     event.preventDefault();
@@ -41,6 +45,8 @@ export function LocationCard({ location, customerId }: { location: Location; cus
         address: address || undefined,
         contactName: contactName || undefined,
         contactPhone: contactPhone || undefined,
+        department: department || undefined,
+        costCenter: costCenter || undefined,
         slaHours: slaHours ? Number(slaHours) : undefined,
       });
       toast.success("Local atualizado");
@@ -60,12 +66,27 @@ export function LocationCard({ location, customerId }: { location: Location; cus
     }
   }
 
+  async function handleSetPrimary() {
+    try {
+      await setPrimaryLocation.mutateAsync({ id: location.id, customerId });
+      toast.success("Definido como endereço principal");
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, "Erro ao definir endereço principal"));
+    }
+  }
+
   return (
     <>
-      <Card>
+      <Card className={location.isPrimary ? "border-primary" : undefined}>
         <CardHeader className="flex flex-row items-center gap-2 pb-2">
           <MapPin className="h-4 w-4 text-neutral-400" />
           <CardTitle className="flex-1 text-base">{location.name}</CardTitle>
+          {location.isPrimary && <Badge>Principal</Badge>}
+          {!location.isPrimary && (
+            <Button size="icon" variant="ghost" className="h-7 w-7" title="Definir como principal" onClick={handleSetPrimary}>
+              <Star className="h-3.5 w-3.5" />
+            </Button>
+          )}
           <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setEditing(true)}>
             <Pencil className="h-3.5 w-3.5" />
           </Button>
@@ -76,6 +97,8 @@ export function LocationCard({ location, customerId }: { location: Location; cus
         <CardContent className="space-y-1 text-sm text-neutral-500">
           <p>{location.address || "Endereço não informado"}</p>
           {location.contactName && <p>Responsável: {location.contactName}</p>}
+          {location.department && <p>Departamento: {location.department}</p>}
+          {location.costCenter && <p>Centro de custo: {location.costCenter}</p>}
         </CardContent>
       </Card>
 
@@ -102,6 +125,16 @@ export function LocationCard({ location, customerId }: { location: Location; cus
                 <div className="space-y-2">
                   <Label htmlFor="contactPhone">Telefone</Label>
                   <Input id="contactPhone" value={contactPhone} onChange={(e) => setContactPhone(e.target.value)} />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="department">Departamento</Label>
+                  <Input id="department" value={department} onChange={(e) => setDepartment(e.target.value)} />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="costCenter">Centro de custo</Label>
+                  <Input id="costCenter" value={costCenter} onChange={(e) => setCostCenter(e.target.value)} />
                 </div>
               </div>
               <div className="space-y-2">

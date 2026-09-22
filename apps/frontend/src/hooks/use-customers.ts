@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiClient } from "@/lib/api-client";
-import type { Customer, Location, PaginatedResponse } from "@/lib/types";
+import type { Customer, CustomerHistoryItem, Location, PaginatedResponse, SlaHourMode, WorkingHourEntry } from "@/lib/types";
 
 export function useCustomers(search?: string) {
   return useQuery({
@@ -50,6 +50,8 @@ export interface CreateCustomerInput {
   country?: string;
   notes?: string;
   slaHours?: number;
+  slaEnabled?: boolean;
+  slaHourMode?: SlaHourMode;
 }
 
 export function useCreateCustomer() {
@@ -68,7 +70,15 @@ export function useCreateCustomer() {
 export function useCreateLocation() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (input: { customerId: string; name: string; address?: string; contactName?: string; contactPhone?: string }) => {
+    mutationFn: async (input: {
+      customerId: string;
+      name: string;
+      address?: string;
+      contactName?: string;
+      contactPhone?: string;
+      department?: string;
+      costCenter?: string;
+    }) => {
       const { data } = await apiClient.post<Location>("/locations", input);
       return data;
     },
@@ -118,6 +128,8 @@ export function useUpdateLocation() {
       address?: string;
       contactName?: string;
       contactPhone?: string;
+      department?: string;
+      costCenter?: string;
       slaHours?: number;
     }) => {
       const { data } = await apiClient.patch<Location>(`/locations/${id}`, input);
@@ -138,5 +150,74 @@ export function useDeleteLocation() {
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ["customers", variables.customerId] });
     },
+  });
+}
+
+export function useSetPrimaryLocation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id }: { id: string; customerId: string }) => {
+      const { data } = await apiClient.patch<Location>(`/locations/${id}/primary`);
+      return data;
+    },
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["customers", variables.customerId] });
+    },
+  });
+}
+
+export function useCustomerHistory(id: string | undefined) {
+  return useQuery({
+    queryKey: ["customers", id, "history"],
+    queryFn: async () => {
+      const { data } = await apiClient.get<CustomerHistoryItem[]>(`/customers/${id}/history`);
+      return data;
+    },
+    enabled: !!id,
+  });
+}
+
+export function useCustomerWorkingHours(id: string | undefined) {
+  return useQuery({
+    queryKey: ["customers", id, "working-hours"],
+    queryFn: async () => {
+      const { data } = await apiClient.get<WorkingHourEntry[]>(`/customers/${id}/working-hours`);
+      return data;
+    },
+    enabled: !!id,
+  });
+}
+
+export function useSetCustomerWorkingHours() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, hours }: { id: string; hours: WorkingHourEntry[] }) => {
+      const { data } = await apiClient.put<WorkingHourEntry[]>(`/customers/${id}/working-hours`, { hours });
+      return data;
+    },
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["customers", variables.id, "working-hours"] });
+    },
+  });
+}
+
+export function useTenantWorkingHours() {
+  return useQuery({
+    queryKey: ["tenant", "working-hours"],
+    queryFn: async () => {
+      const { data } = await apiClient.get<WorkingHourEntry[]>("/tenant/working-hours");
+      return data;
+    },
+  });
+}
+
+export function useSetTenantWorkingHours() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (hours: WorkingHourEntry[]) => {
+      const { data } = await apiClient.put<WorkingHourEntry[]>("/tenant/working-hours", { hours });
+      return data;
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["tenant", "working-hours"] }),
   });
 }

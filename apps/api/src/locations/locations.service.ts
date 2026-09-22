@@ -13,8 +13,12 @@ export class LocationsService {
     // explicitly: nothing stops an attacker from supplying another
     // tenant's customerId otherwise.
     await this.assertCustomerBelongsToTenant(dto.customerId);
+    // The customer's very first location becomes the primary one
+    // automatically — every subsequent one stays "outro endereço" until
+    // explicitly promoted via setPrimary.
+    const existingCount = await this.tenantPrisma.client.location.count({ where: { customerId: dto.customerId } });
     // tenantId is injected at runtime by the tenant-scoped Prisma extension.
-    return this.tenantPrisma.client.location.create({ data: dto as any });
+    return this.tenantPrisma.client.location.create({ data: { ...dto, isPrimary: existingCount === 0 } as any });
   }
 
   findByCustomer(customerId: string) {
@@ -40,6 +44,16 @@ export class LocationsService {
   async remove(id: string) {
     await this.findOne(id);
     await this.tenantPrisma.client.location.delete({ where: { id } });
+  }
+
+  /** Only one Location per customer can be isPrimary — clear the others first, then set this one. */
+  async setPrimary(id: string) {
+    const location = await this.findOne(id);
+    await this.tenantPrisma.client.location.updateMany({
+      where: { customerId: location.customerId, isPrimary: true },
+      data: { isPrimary: false },
+    });
+    return this.tenantPrisma.client.location.update({ where: { id }, data: { isPrimary: true } });
   }
 
   private async assertCustomerBelongsToTenant(customerId: string) {

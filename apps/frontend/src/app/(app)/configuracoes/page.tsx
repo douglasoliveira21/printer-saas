@@ -6,9 +6,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PageHeader } from "@/components/shared/page-header";
 import { ResponsiveDataTable, type DataTableColumn } from "@/components/shared/responsive-data-table";
 import { useTenantUsers, type TenantUser } from "@/hooks/use-users";
-import { ComingSoon } from "@/components/layout/coming-soon";
 import { CreateUserDialog } from "./create-user-dialog";
 import { UserActionsMenu } from "./user-actions-menu";
+import { CompanyWorkingHoursCard } from "./company-working-hours-card";
 
 export default function ConfiguracoesPage() {
   const { data: users, isLoading } = useTenantUsers();
@@ -59,7 +59,7 @@ export default function ConfiguracoesPage() {
         </TabsContent>
 
         <TabsContent value="empresa" className="mt-4">
-          <ComingSoon />
+          <CompanyWorkingHoursCard />
         </TabsContent>
       </Tabs>
     </div>

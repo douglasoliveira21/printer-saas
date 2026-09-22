@@ -26,6 +26,14 @@ export class CreateLocationDto {
   notes?: string;
 
   @IsOptional()
+  @IsString()
+  department?: string;
+
+  @IsOptional()
+  @IsString()
+  costCenter?: string;
+
+  @IsOptional()
   @Type(() => Number)
   @IsInt()
   @Min(0)

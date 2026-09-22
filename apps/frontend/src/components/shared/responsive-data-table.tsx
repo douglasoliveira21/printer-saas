@@ -33,6 +33,16 @@ export interface ResponsiveDataTableProps<T> {
   cardActions?: (row: T) => ReactNode;
   /** When set, the whole row/card navigates here on click (clicks on buttons/links/selects inside are excluded). */
   rowHref?: (row: T) => string;
+  /**
+   * Alternative to rowHref for lists that need a different action on a
+   * single click than on navigation — e.g. Clientes: single click opens a
+   * quick-actions dialog, double click opens the detail page. Mutually
+   * exclusive with rowHref (if both are given, rowHref wins for the single
+   * click and onRowDoubleClick still applies). Same interactive-element
+   * exclusion as rowHref.
+   */
+  onRowClick?: (row: T) => void;
+  onRowDoubleClick?: (row: T) => void;
 }
 
 /**
@@ -52,16 +62,33 @@ export function ResponsiveDataTable<T>({
   cardMeta,
   cardActions,
   rowHref,
+  onRowClick,
+  onRowDoubleClick,
 }: ResponsiveDataTableProps<T>) {
   const isEmpty = !isLoading && (!data || data.length === 0);
   const router = useRouter();
+  const isInteractive = !!rowHref || !!onRowClick || !!onRowDoubleClick;
+
+  function isInsideInteractiveElement(event: MouseEvent<HTMLElement>) {
+    const target = event.target as HTMLElement;
+    return !!target.closest('button, a, [role="button"], input, select, textarea');
+  }
 
   function handleRowClick(row: T) {
     return (event: MouseEvent<HTMLElement>) => {
-      if (!rowHref) return;
-      const target = event.target as HTMLElement;
-      if (target.closest('button, a, [role="button"], input, select, textarea')) return;
-      router.push(rowHref(row));
+      if (isInsideInteractiveElement(event)) return;
+      if (rowHref) {
+        router.push(rowHref(row));
+        return;
+      }
+      onRowClick?.(row);
+    };
+  }
+
+  function handleRowDoubleClick(row: T) {
+    return (event: MouseEvent<HTMLElement>) => {
+      if (isInsideInteractiveElement(event)) return;
+      onRowDoubleClick?.(row);
     };
   }
 
@@ -89,7 +116,12 @@ export function ResponsiveDataTable<T>({
               </TableRow>
             )}
             {data?.map((row) => (
-              <TableRow key={keyField(row)} onClick={handleRowClick(row)} className={rowHref ? "cursor-pointer" : undefined}>
+              <TableRow
+                key={keyField(row)}
+                onClick={handleRowClick(row)}
+                onDoubleClick={handleRowDoubleClick(row)}
+                className={isInteractive ? "cursor-pointer" : undefined}
+              >
                 {columns.map((col) => (
                   <TableCell key={col.key} className={col.className}>
                     {col.cell(row)}
@@ -111,7 +143,12 @@ export function ResponsiveDataTable<T>({
           </Card>
         )}
         {data?.map((row) => (
-          <Card key={keyField(row)} className={rowHref ? "cursor-pointer p-4" : "p-4"} onClick={handleRowClick(row)}>
+          <Card
+            key={keyField(row)}
+            className={isInteractive ? "cursor-pointer p-4" : "p-4"}
+            onClick={handleRowClick(row)}
+            onDoubleClick={handleRowDoubleClick(row)}
+          >
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0 flex-1 font-medium">{cardTitle(row)}</div>
               {cardMeta?.(row)}

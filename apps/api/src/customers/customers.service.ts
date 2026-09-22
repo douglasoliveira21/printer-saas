@@ -3,6 +3,7 @@ import { TenantPrismaService } from '../prisma/tenant-prisma.service';
 import { PaginationDto, paginated } from '../common/dto/pagination.dto';
 import type { CreateCustomerDto } from './dto/create-customer.dto';
 import type { UpdateCustomerDto } from './dto/update-customer.dto';
+import type { SetWorkingHoursDto } from './dto/set-working-hours.dto';
 
 @Injectable()
 export class CustomersService {
@@ -34,7 +35,45 @@ export class CustomersService {
       this.tenantPrisma.client.customer.count({ where }),
     ]);
 
-    return paginated(data, total, pagination);
+    if (data.length === 0) {
+      return paginated(data, total, pagination);
+    }
+
+    // Two extra queries (not N+1 per row): printer counts grouped by
+    // customer, and the first Agent found through any of the customer's
+    // locations. Cheap at list-page scale (a page of customers, not the
+    // whole tenant).
+    const ids = data.map((c) => c.id);
+    const [printerCounts, locations] = await Promise.all([
+      this.tenantPrisma.client.printer.groupBy({
+        by: ['customerId'],
+        where: { customerId: { in: ids }, status: 'MONITORED' },
+        _count: true,
+      }),
+      this.tenantPrisma.client.location.findMany({
+        where: { customerId: { in: ids } },
+        select: {
+          customerId: true,
+          agents: { select: { id: true, status: true, enrollmentToken: true }, take: 1 },
+        },
+      }),
+    ]);
+
+    const printerCountByCustomer = new Map(printerCounts.map((p) => [p.customerId, p._count]));
+    const agentByCustomer = new Map<string, { id: string; status: string; enrollmentToken: string | null }>();
+    for (const location of locations) {
+      if (agentByCustomer.has(location.customerId)) continue;
+      const agent = location.agents[0];
+      if (agent) agentByCustomer.set(location.customerId, agent);
+    }
+
+    const enriched = data.map((customer) => ({
+      ...customer,
+      monitoredPrinterCount: printerCountByCustomer.get(customer.id) ?? 0,
+      agent: agentByCustomer.get(customer.id) ?? null,
+    }));
+
+    return paginated(enriched, total, pagination);
   }
 
   async findOne(id: string) {
@@ -56,5 +95,61 @@ export class CustomersService {
   async remove(id: string) {
     await this.findOne(id);
     await this.tenantPrisma.client.customer.delete({ where: { id } });
+  }
+
+  /** Merges service orders, contracts and monthly closings into one chronological feed — same pattern as PrintersService.timeline(), at customer scale. */
+  async history(id: string) {
+    await this.findOne(id);
+    const [serviceOrders, contracts, closings] = await Promise.all([
+      this.tenantPrisma.client.serviceOrder.findMany({ where: { customerId: id }, orderBy: { createdAt: 'desc' } }),
+      this.tenantPrisma.client.contract.findMany({ where: { customerId: id }, orderBy: { createdAt: 'desc' } }),
+      this.tenantPrisma.client.monthlyClosing.findMany({ where: { customerId: id }, orderBy: { generatedAt: 'desc' } }),
+    ]);
+
+    const items = [
+      ...serviceOrders.map((o) => ({
+        type: 'service_order' as const,
+        date: o.completedAt ?? o.createdAt,
+        status: o.status,
+        label: `OS #${o.number}${o.type ? ` — ${o.type}` : ''}`,
+        notes: o.description,
+      })),
+      ...contracts.map((c) => ({
+        type: 'contract' as const,
+        date: c.createdAt,
+        status: c.status,
+        label: `Contrato #${c.number}`,
+        notes: null as string | null,
+      })),
+      ...closings.map((m) => ({
+        type: 'monthly_closing' as const,
+        date: m.generatedAt,
+        status: null as string | null,
+        label: `Fechamento ${String(m.referenceMonth).padStart(2, '0')}/${m.referenceYear}`,
+        notes: null as string | null,
+      })),
+    ];
+
+    return items.sort((a, b) => b.date.getTime() - a.date.getTime());
+  }
+
+  async getWorkingHours(customerId: string) {
+    await this.findOne(customerId);
+    return this.tenantPrisma.client.customerWorkingHours.findMany({
+      where: { customerId },
+      orderBy: [{ dayOfWeek: 'asc' }, { startTime: 'asc' }],
+    });
+  }
+
+  /** Replaces the whole set — simpler and safer than diffing individual rows for a small, fully-owned child list (same pattern as ContractFixedCost editing). */
+  async setWorkingHours(customerId: string, dto: SetWorkingHoursDto) {
+    await this.findOne(customerId);
+    await this.tenantPrisma.client.customerWorkingHours.deleteMany({ where: { customerId } });
+    if (dto.hours.length > 0) {
+      await this.tenantPrisma.client.customerWorkingHours.createMany({
+        data: dto.hours.map((h) => ({ ...h, customerId })) as any,
+      });
+    }
+    return this.getWorkingHours(customerId);
   }
 }

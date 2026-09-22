@@ -33,8 +33,23 @@ export interface Customer {
   notes: string | null;
   status: CustomerStatus;
   slaHours: number | null;
+  slaEnabled: boolean;
+  slaHourMode: SlaHourMode;
   createdAt: string;
   locations?: Location[];
+  /** List page only — see CustomersService.findAll. */
+  monitoredPrinterCount?: number;
+  /** List page only — first Agent found through any of the customer's locations, or null. */
+  agent?: { id: string; status: AgentStatus; enrollmentToken: string | null } | null;
+}
+
+export type SlaHourMode = "CALENDAR" | "BUSINESS_HOURS_COMPANY" | "BUSINESS_HOURS_CUSTOMER";
+
+export interface WorkingHourEntry {
+  id?: string;
+  dayOfWeek: number;
+  startTime: string;
+  endTime: string;
 }
 
 export interface Location {
@@ -44,6 +59,9 @@ export interface Location {
   address: string | null;
   contactName: string | null;
   contactPhone: string | null;
+  department: string | null;
+  costCenter: string | null;
+  isPrimary: boolean;
   slaHours: number | null;
 }
 
@@ -156,6 +174,16 @@ export interface PrinterTimelineItem {
   type: PrinterTimelineItemType;
   date: string;
   status: string;
+  label: string;
+  notes: string | null;
+}
+
+export type CustomerHistoryItemType = "service_order" | "contract" | "monthly_closing";
+
+export interface CustomerHistoryItem {
+  type: CustomerHistoryItemType;
+  date: string;
+  status: string | null;
   label: string;
   notes: string | null;
 }

@@ -24,6 +24,8 @@ export function CreateLocationDialog({ customerId }: { customerId: string }) {
   const [address, setAddress] = useState("");
   const [contactName, setContactName] = useState("");
   const [contactPhone, setContactPhone] = useState("");
+  const [department, setDepartment] = useState("");
+  const [costCenter, setCostCenter] = useState("");
   const createLocation = useCreateLocation();
 
   async function handleSubmit(event: FormEvent) {
@@ -35,12 +37,16 @@ export function CreateLocationDialog({ customerId }: { customerId: string }) {
         address: address || undefined,
         contactName: contactName || undefined,
         contactPhone: contactPhone || undefined,
+        department: department || undefined,
+        costCenter: costCenter || undefined,
       });
       toast.success("Local cadastrado com sucesso");
       setName("");
       setAddress("");
       setContactName("");
       setContactPhone("");
+      setDepartment("");
+      setCostCenter("");
       setOpen(false);
     } catch (error) {
       toast.error(getApiErrorMessage(error, "Erro ao cadastrar local"));
@@ -76,6 +82,16 @@ export function CreateLocationDialog({ customerId }: { customerId: string }) {
               <div className="space-y-2">
                 <Label htmlFor="contactPhone">Telefone</Label>
                 <Input id="contactPhone" value={contactPhone} onChange={(e) => setContactPhone(e.target.value)} />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="department">Departamento</Label>
+                <Input id="department" value={department} onChange={(e) => setDepartment(e.target.value)} />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="costCenter">Centro de custo</Label>
+                <Input id="costCenter" value={costCenter} onChange={(e) => setCostCenter(e.target.value)} />
               </div>
             </div>
           </div>

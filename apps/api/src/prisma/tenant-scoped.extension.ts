@@ -34,6 +34,8 @@ const TENANT_SCOPED_MODELS = new Set([
   'InventoryMovement',
   'FinancialEntry',
   'MonthlyClosing',
+  'CustomerWorkingHours',
+  'TenantWorkingHours',
 ]);
 
 const READ_OPS = new Set(['findFirst', 'findFirstOrThrow', 'findMany', 'count', 'aggregate', 'groupBy']);
