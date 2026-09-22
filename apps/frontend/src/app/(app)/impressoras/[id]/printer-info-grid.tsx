@@ -24,6 +24,14 @@ export function PrinterInfoGrid({ printer }: { printer: Printer }) {
     ...(DEVICE_TYPE_LABEL[printer.deviceType]
       ? [{ label: "Tipo de equipamento", value: DEVICE_TYPE_LABEL[printer.deviceType]! }]
       : []),
+    {
+      label: "Homologação",
+      value: printer.catalogModel ? (
+        <Badge variant="default">Homologada — {printer.catalogModel.manufacturer} {printer.catalogModel.model}</Badge>
+      ) : (
+        <Badge variant="outline">Não homologada</Badge>
+      ),
+    },
     { label: "Tipo de conexão", value: printer.collectionMethod === "MANUAL" ? "Manual" : "Rede (SNMP)" },
     { label: "Endereço IP", value: printer.ip || "Não disponível" },
     { label: "Endereço MAC", value: printer.mac || "Não disponível" },

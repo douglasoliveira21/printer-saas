@@ -51,6 +51,7 @@ export class PrintersService {
         customer: true,
         location: true,
         agent: { select: { id: true, name: true, status: true, hostname: true } },
+        catalogModel: { select: { id: true, manufacturer: true, model: true, confidence: true } },
         counters: { orderBy: { collectedAt: 'desc' }, take: 50 },
         consumables: { orderBy: { collectedAt: 'desc' }, take: 50 },
       },

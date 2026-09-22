@@ -83,6 +83,41 @@ model Plan {
   @@map("plans")
 }
 
+// Global (not tenant-scoped) researched catalog of exact printer models —
+// same category as Plan/Permission: platform-wide hardware facts, not
+// tenant commercial data (see PlatformController's own comment). Populated
+// via real research (manufacturer datasheets/docs, see
+// docs/printer-catalog/), managed by the Super Admin at
+// /plataforma → "Catálogo de impressoras". Never guessed — a field left
+// null in `capabilities` means "a confirmar", same tri-state rule as
+// Printer.capabilities itself.
+model PrinterCatalogModel {
+  id                String            @id @default(uuid())
+  manufacturer      String
+  model             String
+  family            String?
+  // Alternate raw strings (e.g. a compact SNMP/IPP-reported code like
+  // "SAMSUNGM4070") that should also match this catalog entry.
+  aliases           String[]          @default([])
+  deviceType        PrinterDeviceType @default(PRINTER)
+  capabilities      Json              // {color, duplex, a3, copy, scan, fax} — true/false/absent=a confirmar
+  countersAvailable Json?             // which counter types to expect (total/pb/colorido/duplex/copias/scanner)
+  suppliesAvailable Json?             // which supply types to expect (toner_preto/ciano/magenta/amarelo/...)
+  confidence        String            // ALTA | MEDIA | BAIXA
+  status            String            @default("ATUAL") // ATUAL | DESCONTINUADO | ANTIGO | A_CONFIRMAR
+  sourcePrimary     String?
+  sourcesSecondary  String?
+  notes             String?
+  researchedAt      DateTime?
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+
+  printers Printer[]
+
+  @@index([manufacturer, model])
+  @@map("printer_catalog_models")
+}
+
 enum UserStatus {
   ACTIVE
   INACTIVE
@@ -454,6 +489,13 @@ model Printer {
   capabilities   Json?
   capabilitySources Json? // {"duplex": "ipp", ...} — which source determined each capability, for troubleshooting
   discoveryDiagnostics Json? // {"snmp": "success", "ipp": "not_available", ...} — per-protocol outcome, troubleshooting only
+
+  // Presence of this FK *is* "homologada" — matched against the global
+  // researched catalog by manufacturer+model in AgentsService.submitDevices.
+  // Only ever fills capabilities the live probe left null, never overrides
+  // a live-confirmed true/false (same priority rule already used for A3).
+  catalogModelId String?
+  catalogModel   PrinterCatalogModel? @relation(fields: [catalogModelId], references: [id])
 
   createdAt      DateTime            @default(now())
   updatedAt      DateTime            @updatedAt

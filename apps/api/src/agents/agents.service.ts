@@ -224,6 +224,10 @@ export class AgentsService {
         },
       });
 
+      if (device.manufacturer || device.model) {
+        await this.applyCatalogMatch(printer.id, device.manufacturer, device.model);
+      }
+
       if (device.counters) {
         await this.prisma.counterReading.create({
           data: {
@@ -295,6 +299,58 @@ export class AgentsService {
     if (device.mac) return `mac:${device.mac}`;
     if (device.ip) return `agent-ip:${agentId}:${device.ip}`;
     return null;
+  }
+
+  private static readonly CAPABILITY_KEYS = ['color', 'duplex', 'a3', 'copy', 'scan', 'fax'] as const;
+
+  /**
+   * Matches the discovered manufacturer/model against the researched global
+   * catalog (see docs/printer-catalog/) — "homologada" just means this FK is
+   * set. Only fills capability fields the live probe left null; a value
+   * already confirmed live (true or false) is never overwritten by the
+   * catalog, same priority rule already used for A3 elsewhere in this file.
+   */
+  private async applyCatalogMatch(printerId: string, manufacturer: string | undefined, model: string | undefined) {
+    if (!model && !manufacturer) return;
+
+    const candidates = await this.prisma.printerCatalogModel.findMany({
+      where: manufacturer ? { manufacturer: { equals: manufacturer, mode: 'insensitive' } } : undefined,
+    });
+    const modelLower = model?.toLowerCase();
+    const match = candidates.find((c) => {
+      if (!modelLower) return false;
+      if (c.model.toLowerCase() === modelLower) return true;
+      if (modelLower.includes(c.model.toLowerCase()) || c.model.toLowerCase().includes(modelLower)) return true;
+      return c.aliases.some((a) => a.toLowerCase() === modelLower);
+    });
+    if (!match) return;
+
+    const printer = await this.prisma.printer.findUnique({ where: { id: printerId } });
+    if (!printer) return;
+
+    const currentCaps = (printer.capabilities as Record<string, boolean | null>) ?? {};
+    const currentSources = (printer.capabilitySources as Record<string, string>) ?? {};
+    const catalogCaps = (match.capabilities as Record<string, boolean | null>) ?? {};
+
+    const mergedCaps = { ...currentCaps };
+    const mergedSources = { ...currentSources };
+    for (const key of AgentsService.CAPABILITY_KEYS) {
+      if ((mergedCaps[key] === undefined || mergedCaps[key] === null) && catalogCaps[key] !== undefined && catalogCaps[key] !== null) {
+        mergedCaps[key] = catalogCaps[key];
+        mergedSources[key] = 'catalog';
+      }
+    }
+
+    await this.prisma.printer.update({
+      where: { id: printerId },
+      data: {
+        catalogModelId: match.id,
+        capabilities: mergedCaps as any,
+        capabilitySources: mergedSources as any,
+        // Legacy standalone field mirrors capabilities.a3 — same rule as everywhere else this field is touched.
+        supportsA3: printer.supportsA3 ?? (mergedCaps.a3 ?? undefined),
+      },
+    });
   }
 
   // ---------------------------------------------------------------------

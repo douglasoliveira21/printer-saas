@@ -125,6 +125,9 @@ export interface Printer {
   classificationConfidence: number | null;
   /** Tri-state per field: true = show it, false/absent = never show it (spec: never invent, never show "not supported" as if it were a real 0 reading). */
   capabilities: PrinterCapabilities | null;
+  /** Presence = "homologada" — matched against the global researched catalog by manufacturer+model (see AgentsService.submitDevices). */
+  catalogModelId: string | null;
+  catalogModel?: { id: string; manufacturer: string; model: string; confidence: string } | null;
   createdAt: string;
   customer?: { id: string; legalName: string } | null;
   location?: { id: string; name: string } | null;
