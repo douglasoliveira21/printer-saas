@@ -8,9 +8,14 @@ namespace PrinterAgent.Core.Snmp;
 
 /// <summary>
 /// Reads one host over SNMP v1/v2c (spec §16-17) and normalizes whatever it
-/// finds into a <see cref="DiscoveredDevice"/>. A field the device doesn't
-/// expose is left null — never guessed (spec §67). Returns null entirely
-/// when the host doesn't answer SNMP at all (not a printer we can manage).
+/// finds into a <see cref="SnmpProbeResult"/>. A field the device doesn't
+/// expose is left null — never guessed (spec §67). Returns null only when
+/// the host doesn't answer SNMP at all (no sysDescr on either version) —
+/// this class no longer decides "is this a printer?" by itself (that
+/// verdict now needs multiple sources; see
+/// <see cref="Classification.DeviceClassifier"/> and
+/// <see cref="Discovery.DeviceProbeOrchestrator"/>). It just reports
+/// whatever Printer-MIB evidence it found, positive or none.
 /// </summary>
 public class SnmpDeviceReader
 {
@@ -21,18 +26,18 @@ public class SnmpDeviceReader
         _logger = logger;
     }
 
-    public async Task<DiscoveredDevice?> ReadAsync(IPAddress ip, string community, int timeoutMs, int retries, CancellationToken ct)
+    public async Task<SnmpProbeResult?> ProbeAsync(IPAddress ip, string community, int timeoutMs, int retries, CancellationToken ct)
     {
         // Most modern printers speak v2c, but plenty of older/cheaper ones
         // (and some consumer inkjets) only implement v1 — falling back
         // instead of giving up means those devices actually get discovered
         // rather than silently skipped.
-        var device = await ReadWithVersionAsync(ip, community, VersionCode.V2, timeoutMs, retries, ct);
-        device ??= await ReadWithVersionAsync(ip, community, VersionCode.V1, timeoutMs, retries, ct);
-        return device;
+        var result = await ProbeWithVersionAsync(ip, community, VersionCode.V2, timeoutMs, retries, ct);
+        result ??= await ProbeWithVersionAsync(ip, community, VersionCode.V1, timeoutMs, retries, ct);
+        return result;
     }
 
-    private async Task<DiscoveredDevice?> ReadWithVersionAsync(
+    private async Task<SnmpProbeResult?> ProbeWithVersionAsync(
         IPAddress ip, string community, VersionCode version, int timeoutMs, int retries, CancellationToken ct)
     {
         var endpoint = new IPEndPoint(ip, 161);
@@ -89,24 +94,22 @@ public class SnmpDeviceReader
         device.Consumables = await ReadSuppliesAsync(endpoint, communityOctet, version, timeoutMs, ct);
 
         device.SupportsA3 = await DetectSupportsA3Async(endpoint, communityOctet, version, timeoutMs, ct);
+        device.Capabilities.A3 = device.SupportsA3;
+        if (device.SupportsA3 is not null) device.CapabilitySources["a3"] = "printer_mib";
 
         // sysDescr alone (plain MIB-II) answers from routers, switches, NAS
-        // boxes, servers with an SNMP agent installed — anything, not just
-        // printers. Only claim this is a printer we can manage once we've
-        // actually seen SOME Printer-MIB (RFC 3805) evidence; otherwise this
-        // was never a printer to begin with.
-        var hasPrinterMibEvidence = !string.IsNullOrWhiteSpace(printerName)
-            || !string.IsNullOrWhiteSpace(device.Serial)
-            || device.Counters is not null
-            || device.Consumables is { Count: > 0 }
-            || device.SupportsA3 is not null;
-        if (!hasPrinterMibEvidence)
+        // boxes, servers with an SNMP agent installed too — this reader just
+        // reports what it found, it no longer decides "is this a printer?"
+        // by itself. That verdict is DeviceClassifier's job, combining this
+        // with IPP/mDNS/TCP-port/OUI evidence (spec: don't depend on one
+        // protocol alone).
+        return new SnmpProbeResult
         {
-            _logger.LogDebug("{Ip} answered SNMP but has no Printer-MIB data — not managing it as a printer", ip);
-            return null;
-        }
-
-        return device;
+            Device = device,
+            PrinterMibGeneralFound = !string.IsNullOrWhiteSpace(printerName) || !string.IsNullOrWhiteSpace(device.Serial),
+            PrinterMibCountersFound = device.Counters is not null,
+            PrinterMibSuppliesFound = device.Consumables is { Count: > 0 },
+        };
     }
 
     /// <summary>

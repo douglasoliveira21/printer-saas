@@ -1,25 +1,28 @@
 using System.Threading.Channels;
 using Microsoft.Extensions.Logging;
 using PrinterAgent.Core.Configuration;
+using PrinterAgent.Core.Discovery.Dns;
 using PrinterAgent.Core.Models;
-using PrinterAgent.Core.Snmp;
 
 namespace PrinterAgent.Core.Discovery;
 
 /// <summary>
-/// Sweeps the configured networks and probes each host over SNMP (spec
-/// §15). Bounded concurrency so this never turns into an aggressive scan
-/// (spec §15's own explicit requirement) — <see cref="AgentOptions.DiscoveryConcurrency"/>
+/// Sweeps the configured networks and probes each host with every available
+/// protocol via <see cref="DeviceProbeOrchestrator"/> (spec §15). Bounded
+/// concurrency so this never turns into an aggressive scan (spec §15's own
+/// explicit requirement) — <see cref="AgentOptions.DiscoveryConcurrency"/>
 /// caps how many hosts are probed at once.
 /// </summary>
 public class PrinterDiscoveryService
 {
-    private readonly SnmpDeviceReader _snmpReader;
+    private readonly DeviceProbeOrchestrator _orchestrator;
+    private readonly MdnsProbe _mdnsProbe;
     private readonly ILogger<PrinterDiscoveryService> _logger;
 
-    public PrinterDiscoveryService(SnmpDeviceReader snmpReader, ILogger<PrinterDiscoveryService> logger)
+    public PrinterDiscoveryService(DeviceProbeOrchestrator orchestrator, MdnsProbe mdnsProbe, ILogger<PrinterDiscoveryService> logger)
     {
-        _snmpReader = snmpReader;
+        _orchestrator = orchestrator;
+        _mdnsProbe = mdnsProbe;
         _logger = logger;
     }
 
@@ -44,6 +47,10 @@ public class PrinterDiscoveryService
         var targets = networks.SelectMany(NetworkRange.Expand).Distinct().ToList();
         _logger.LogInformation("Scanning {Count} hosts across {Networks} network target(s)", targets.Count, networks.Count);
 
+        // mDNS is multicast — one query for the whole sweep, not one per
+        // host, unlike every other protocol here.
+        var mdnsResults = await _mdnsProbe.DiscoverAsync(listenMs: 1200, ct);
+
         var channel = Channel.CreateUnbounded<DiscoveredDevice>();
         using var throttle = new SemaphoreSlim(options.DiscoveryConcurrency);
 
@@ -52,7 +59,9 @@ public class PrinterDiscoveryService
             await throttle.WaitAsync(ct);
             try
             {
-                var device = await _snmpReader.ReadAsync(ip, options.SnmpCommunity, options.SnmpTimeoutMs, options.SnmpRetries, ct);
+                var device = await _orchestrator.ProbeAsync(
+                    ip, options.SnmpCommunity, options.SnmpTimeoutMs, options.SnmpRetries,
+                    auxTimeoutMs: Math.Max(1000, options.SnmpTimeoutMs), mdnsResults, ct);
                 if (device is not null)
                 {
                     await channel.Writer.WriteAsync(device, ct);
@@ -76,7 +85,7 @@ public class PrinterDiscoveryService
             found.Add(device);
         }
 
-        _logger.LogInformation("Discovery complete: {Found} SNMP-responsive device(s) found", found.Count);
+        _logger.LogInformation("Discovery complete: {Found} printer(s) found (classified from {TotalHosts} hosts probed)", found.Count, targets.Count);
         return found;
     }
 }

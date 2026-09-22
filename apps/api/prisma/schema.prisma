@@ -322,6 +322,24 @@ enum PrinterCollectionMethod {
   MANUAL
 }
 
+// Only PRINTER/MFP/PLOTTER ever reach here via submitDevices — the API
+// re-validates this server-side (defense in depth), it doesn't just trust
+// the Agent's own classification. Everything else exists so a rejected
+// device's classification can still be logged/diagnosed.
+enum PrinterDeviceType {
+  UNKNOWN
+  PRINTER
+  MFP
+  PLOTTER
+  ROUTER
+  FIREWALL
+  SWITCH
+  ACCESS_POINT
+  SERVER
+  COMPUTER
+  CAMERA
+}
+
 enum PrinterOnlineStatus {
   UNKNOWN
   ONLINE
@@ -363,8 +381,18 @@ model Printer {
   // Null = never determined (device doesn't expose the Printer-MIB input
   // tray table). true/false = derived from an actual declared tray size at
   // least once — never guessed from the model name. Drives whether the UI
-  // shows A3-specific fields at all for this printer.
+  // shows A3-specific fields at all for this printer. Kept as its own
+  // column for backward compatibility — mirrors capabilities.a3 below.
   supportsA3     Boolean?
+
+  deviceType     PrinterDeviceType @default(UNKNOWN)
+  classificationConfidence Float?
+  // Tri-state per capability ({color,duplex,a3,copy,scan,fax}: true/false/absent=unknown) —
+  // never a fixed field per capability, since not every printer has every one (spec: never
+  // invent, never treat "not reported" as false). See Classification/DeviceClassifier.cs.
+  capabilities   Json?
+  capabilitySources Json? // {"duplex": "ipp", ...} — which source determined each capability, for troubleshooting
+  discoveryDiagnostics Json? // {"snmp": "success", "ipp": "not_available", ...} — per-protocol outcome, troubleshooting only
 
   createdAt      DateTime            @default(now())
   updatedAt      DateTime            @updatedAt

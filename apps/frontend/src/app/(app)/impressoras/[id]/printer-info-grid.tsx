@@ -8,6 +8,11 @@ const STATUS_LABEL: Record<Printer["status"], string> = {
   DECOMMISSIONED: "Desativada",
 };
 
+const DEVICE_TYPE_LABEL: Partial<Record<Printer["deviceType"], string>> = {
+  MFP: "Multifuncional",
+  PLOTTER: "Plotter",
+};
+
 function formatDate(value: string | null) {
   return value ? new Date(value).toLocaleString("pt-BR") : "Não disponível";
 }
@@ -16,6 +21,9 @@ export function PrinterInfoGrid({ printer }: { printer: Printer }) {
   const rows: { label: string; value: React.ReactNode }[] = [
     { label: "Fabricante", value: printer.manufacturer || "Não disponível" },
     { label: "Modelo", value: printer.model || "Não disponível" },
+    ...(DEVICE_TYPE_LABEL[printer.deviceType]
+      ? [{ label: "Tipo de equipamento", value: DEVICE_TYPE_LABEL[printer.deviceType]! }]
+      : []),
     { label: "Tipo de conexão", value: printer.collectionMethod === "MANUAL" ? "Manual" : "Rede (SNMP)" },
     { label: "Endereço IP", value: printer.ip || "Não disponível" },
     { label: "Endereço MAC", value: printer.mac || "Não disponível" },

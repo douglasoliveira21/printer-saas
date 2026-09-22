@@ -1,8 +1,6 @@
 using System.Windows;
 using System.Windows.Controls;
-using Microsoft.Extensions.Logging.Abstractions;
 using PrinterAgent.Core.Configuration;
-using PrinterAgent.Core.Discovery;
 using PrinterAgent.Core.Models;
 
 namespace PrinterAgent.ConfigTool;
@@ -11,7 +9,6 @@ public partial class ToolsTabView : UserControl
 {
     private AgentContext? _context;
     private readonly UsbPrinterDiscoveryService _usbDiscovery = new();
-    private readonly PrinterDiscoveryService _networkDiscovery = new(new PrinterAgent.Core.Snmp.SnmpDeviceReader(NullLogger<PrinterAgent.Core.Snmp.SnmpDeviceReader>.Instance), NullLogger<PrinterDiscoveryService>.Instance);
 
     public ToolsTabView()
     {
@@ -41,10 +38,10 @@ public partial class ToolsTabView : UserControl
                 SnmpCommunity = _context.Installer.GetConfiguredSnmpCommunity(),
             };
 
-            var devices = await _networkDiscovery.ScanAsync(options, CancellationToken.None);
+            var devices = await _context.DiscoveryService.ScanAsync(options, CancellationToken.None);
             if (devices.Count == 0)
             {
-                NetworkScanStatus.Text = "Nenhuma impressora respondeu SNMP nas redes configuradas.";
+                NetworkScanStatus.Text = "Nenhum dispositivo foi classificado como impressora nas redes configuradas.";
                 return;
             }
 

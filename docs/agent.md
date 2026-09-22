@@ -55,12 +55,56 @@ Payload de `/devices` (`SubmitDevicesDto`):
 Campos não coletáveis pelo equipamento simplesmente são omitidos — tanto o Agent
 (`SnmpDeviceReader`) quanto a API nunca preenchem com valor inventado (spec §67).
 
+`/devices` também aceita (opcionais, retrocompatíveis — um Agent antigo que não os
+envia continua funcionando exatamente como antes): `deviceType` (`PRINTER`/`MFP`/
+`PLOTTER`/…, ver seção de classificação abaixo — a API só cria/atualiza um `Printer`
+quando esse campo, se presente, for um dos três tipos "impressora"; ausência do campo
+= fluxo manual/USB, que não passa pelo classificador), `classificationConfidence`,
+`classificationEvidence`, `capabilities` (`{ color, duplex, a3, copy, scan, fax }`,
+cada um `true`/`false`/ausente — ausente = nunca determinado, nunca tratado como
+`false`), `capabilitySources` e `diagnostics` (resultado por protocolo, só
+troubleshooting).
+
+## Discovery multiprotocolo e classificação de dispositivo
+
+O Agent não decide mais "isso é impressora?" só pelo SNMP responder. Por host, o
+`DeviceProbeOrchestrator` (`PrinterAgent.Core/Discovery/DeviceProbeOrchestrator.cs`)
+roda em paralelo: SNMP (`SnmpDeviceReader` — agora só *coleta* evidência, não decide
+mais sozinho), IPP (`Discovery/Ipp/IppClient.cs`, cliente mínimo RFC 8011), varredura
+de portas TCP (`Discovery/TcpPortProbe.cs` — 9100/515/631/80/443), ARP (`ArpResolver`)
+e OUI do MAC (`Discovery/OuiVendorLookup.cs`); mDNS (`Discovery/Dns/MdnsProbe.cs`,
+`_ipp._tcp.local`/`_printer._tcp.local`) roda uma vez por varredura inteira (é
+multicast, não por host). Tudo isso vira `DeviceSignals`, que o
+`Classification/DeviceClassifier.cs` pesa — qualquer palavra-chave de infraestrutura
+(roteador/firewall/switch/AP/câmera/servidor) no sysDescr/HTTP veta a classificação
+como impressora imediatamente, e sem nenhuma evidência forte (Printer-MIB, IPP ou
+porta 9100) o dispositivo fica `UNKNOWN` e nunca vira registro. A API repete essa
+validação do lado dela (`AgentsService.submitDevices`) — nunca confia cegamente no
+que o Agent mandou.
+
+`Discovery/ModelDatabase.cs` (+ `printer-model-database.json`, embutido, editável sem
+recompilar a lógica de match) só dá uma dica de família (Impressora/MFP/Plotter) uma
+vez que fabricante/modelo já foram identificados por uma fonte real — nunca decide
+sozinho se algo é impressora. `Vendors/` é um scaffold de providers por fabricante
+(HP/Canon/Brother/…) — hoje todos se comportam como o genérico; é o lugar certo pra
+entrar um OID privado *verificado* de cada marca no futuro (cópias/duplex não têm OID
+padrão, ver nota mais abaixo).
+
+**Fora do escopo desta fase** (documentado, não esquecido): WS-Discovery, correlação
+com impressoras instaladas do Windows além da varredura USB local
+(`UsbPrinterDiscoveryService`, no ConfigTool), banco OUI completo (fica só um
+subconjunto curado e verificado), e OIDs privados de fabricante (arquitetura pronta,
+população incremental conforme forem confirmados).
+
 ## Implementação do Agent (`apps/agent-windows/`)
 
 | Componente | Responsabilidade |
 |---|---|
-| `PrinterAgent.Core/Snmp` | `SnmpDeviceReader` — GET/WALK SNMP v1/v2c sobre OIDs padrão MIB-II/Printer-MIB (`PrinterMibOids`) |
-| `PrinterAgent.Core/Discovery` | `PrinterDiscoveryService` — varredura de `Networks` (CIDR/faixa/IP único) com concorrência limitada |
+| `PrinterAgent.Core/Snmp` | `SnmpDeviceReader` — GET/WALK SNMP v1/v2c sobre OIDs padrão MIB-II/Printer-MIB (`PrinterMibOids`); só coleta evidência, não classifica |
+| `PrinterAgent.Core/Discovery` | `PrinterDiscoveryService` (varredura + mDNS sweep) → `DeviceProbeOrchestrator` (SNMP+IPP+TCP+ARP+OUI por host) → `Classification/DeviceClassifier` |
+| `PrinterAgent.Core/Discovery/Ipp` | `IppClient` — cliente IPP mínimo (Get-Printer-Attributes) |
+| `PrinterAgent.Core/Discovery/Dns` | `MdnsProbe` — descoberta mDNS/DNS-SD |
+| `PrinterAgent.Core/Vendors` | Scaffold de providers por fabricante (extensão futura) |
 | `PrinterAgent.Core/Api` | `PrinterSaasApiClient` — único ponto de contato HTTP com a API |
 | `PrinterAgent.Core/Queue` | `OfflineQueue` — fila local em JSON, offline-first (spec §39) |
 | `PrinterAgent.Core/Configuration` | `AgentCredentialStore` (DPAPI), `AgentEnrollmentService` |
@@ -79,14 +123,16 @@ etc.) vive no backend.
 - **Modelo/número de série**: lidos via *walk* da tabela geral do Printer-MIB (não mais
   `GET` fixo no índice `.1`), então um dispositivo multi-engine/multi-função que indexa
   diferente de 1 deixa de ser ignorado.
-- **Suporte a A3**: detectado pelas dimensões declaradas de cada bandeja de entrada
-  (`prtInputEntry`, RFC 3805) — nunca inferido do nome do modelo. `null` = o dispositivo
-  não expõe essa tabela (desconhecido); a UI só mostra os campos de A3 quando o Agent
-  realmente confirmou pelo menos uma bandeja compatível.
-- **Cópias, duplex e o detalhamento impressão vs. cópia** continuam **não implementados**
-  — não existe OID padrão no Printer-MIB pra isso (são vendor-specific, cada fabricante
-  com o seu MIB privado); implementar isso corretamente exigiria uma tabela de OIDs por
-  fabricante, o que ainda não existe neste projeto (ver nota em `PrinterMibOids.cs`).
+- **Capacidades (`Printer.capabilities`, tri-state)**: `color`/`duplex` vêm de IPP
+  (`color-supported`/`sides-supported`); `a3` vem das dimensões declaradas de cada
+  bandeja de entrada (`prtInputEntry`, RFC 3805, prioridade Printer-MIB > IPP) — nunca
+  inferido do nome do modelo. Ausente/`null` = nunca determinado; a UI só mostra o
+  campo correspondente quando `true` (ver `counters-list.tsx`/`printer-info-grid.tsx`).
+- **Cópias, scan, fax e o detalhamento impressão vs. cópia** continuam **sem fonte real
+  implementada nesta fase** (`capabilities.copy`/`scan`/`fax` ficam sempre ausentes) —
+  não existe OID padrão no Printer-MIB pra isso (são vendor-specific, cada fabricante
+  com o seu MIB privado); a arquitetura de providers por fabricante (`Vendors/`) já
+  existe pronta pra receber OIDs verificados incrementalmente.
 - **Filtro "isso é mesmo uma impressora?"**: responder ao `sysDescr` (MIB-II básico)
   sozinho não basta mais pra virar um registro de impressora — roteador, switch, NAS ou
   servidor com SNMP habilitado também respondem isso. Só é aceito como impressora quando

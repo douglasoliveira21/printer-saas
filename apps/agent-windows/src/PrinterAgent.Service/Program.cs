@@ -1,6 +1,8 @@
 using PrinterAgent.Core.Api;
 using PrinterAgent.Core.Configuration;
 using PrinterAgent.Core.Discovery;
+using PrinterAgent.Core.Discovery.Dns;
+using PrinterAgent.Core.Discovery.Ipp;
 using PrinterAgent.Core.Queue;
 using PrinterAgent.Core.Snmp;
 using PrinterAgent.Service;
@@ -38,7 +40,14 @@ try
     builder.Services.AddSingleton<AgentEnrollmentService>();
     builder.Services.AddSingleton<OfflineQueue>();
     builder.Services.AddSingleton<SnmpDeviceReader>();
+    builder.Services.AddSingleton<ModelDatabase>();
+    builder.Services.AddSingleton<MdnsProbe>();
+    builder.Services.AddSingleton<DeviceProbeOrchestrator>();
     builder.Services.AddSingleton<PrinterDiscoveryService>();
+
+    // Own short-timeout HttpClient — IPP probes must never share the
+    // 30s-timeout, proxy-routed client used for talking to the SaaS API.
+    builder.Services.AddHttpClient<IppClient>(http => http.Timeout = TimeSpan.FromSeconds(5));
 
     builder.Services.AddHttpClient<PrinterSaasApiClient>((sp, http) =>
         {

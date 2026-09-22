@@ -87,6 +87,36 @@ class DeviceConsumableDto {
   serial?: string;
 }
 
+class DeviceCapabilitiesDto {
+  @IsOptional()
+  @IsBoolean()
+  color?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  duplex?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  a3?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  copy?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  scan?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  fax?: boolean;
+}
+
+const DEVICE_TYPES = [
+  'UNKNOWN', 'PRINTER', 'MFP', 'PLOTTER', 'ROUTER', 'FIREWALL', 'SWITCH', 'ACCESS_POINT', 'SERVER', 'COMPUTER', 'CAMERA',
+] as const;
+
 class DeviceDto {
   @IsOptional()
   @IsString()
@@ -138,6 +168,30 @@ class DeviceDto {
   @IsOptional()
   @IsBoolean()
   supportsA3?: boolean;
+
+  @IsOptional()
+  @IsIn(DEVICE_TYPES)
+  deviceType?: (typeof DEVICE_TYPES)[number];
+
+  @IsOptional()
+  @IsNumber()
+  classificationConfidence?: number;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  classificationEvidence?: string[];
+
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => DeviceCapabilitiesDto)
+  capabilities?: DeviceCapabilitiesDto;
+
+  @IsOptional()
+  capabilitySources?: Record<string, string>;
+
+  @IsOptional()
+  diagnostics?: Record<string, string>;
 }
 
 export class SubmitDevicesDto {

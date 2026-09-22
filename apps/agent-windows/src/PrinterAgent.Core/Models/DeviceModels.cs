@@ -29,9 +29,40 @@ public class DiscoveredDevice
     /// media dimensions were read and classified — never guessed from the
     /// model name (spec §67). Drives whether the UI shows A3-specific
     /// fields at all, instead of showing "não disponível" for every
-    /// printer regardless of whether it can even take A3 paper.
+    /// printer regardless of whether it can even take A3 paper. Kept for
+    /// backward compatibility — mirrors Capabilities.A3, see submitDevices
+    /// on the API side, which accepts either.
     /// </summary>
     public bool? SupportsA3 { get; set; }
+
+    /// <summary>What kind of device this is (Printer/Mfp/Plotter — only these three ever get submitted) and how confident the classifier was, plus the evidence that led there. See Classification.DeviceClassifier.</summary>
+    public string? DeviceType { get; set; }
+    public double? ClassificationConfidence { get; set; }
+    public List<string>? ClassificationEvidence { get; set; }
+
+    public DeviceCapabilities Capabilities { get; set; } = new();
+
+    /// <summary>Which source determined each capability (e.g. {"duplex": "ipp"}) — for troubleshooting why a field shows/doesn't show.</summary>
+    public Dictionary<string, string> CapabilitySources { get; set; } = [];
+
+    /// <summary>Per-protocol outcome (e.g. {"snmp": "success", "ipp": "success", "mdns": "not_available"}) — troubleshooting only, never used to decide anything itself.</summary>
+    public Dictionary<string, string>? Diagnostics { get; set; }
+}
+
+/// <summary>
+/// Tri-state on purpose: null = never determined, true/false = confirmed by
+/// a real source (IPP > Printer-MIB > model database, in that priority —
+/// never guessed, spec §67). Printing capability itself isn't listed
+/// separately — reaching this class at all already implies it prints.
+/// </summary>
+public class DeviceCapabilities
+{
+    public bool? Color { get; set; }
+    public bool? Duplex { get; set; }
+    public bool? A3 { get; set; }
+    public bool? Copy { get; set; }
+    public bool? Scan { get; set; }
+    public bool? Fax { get; set; }
 }
 
 public class DeviceCounters
@@ -140,4 +171,13 @@ public class AgentConsumableReading
 public class AgentPrinterIdsRequest
 {
     public required List<string> Ids { get; set; }
+}
+
+/// <summary>What SnmpDeviceReader.ProbeAsync found — a partially-filled DiscoveredDevice plus which kinds of Printer-MIB evidence were actually present, for DeviceClassifier to weigh alongside IPP/mDNS/TCP/OUI evidence.</summary>
+public class SnmpProbeResult
+{
+    public required DiscoveredDevice Device { get; set; }
+    public bool PrinterMibGeneralFound { get; set; }
+    public bool PrinterMibCountersFound { get; set; }
+    public bool PrinterMibSuppliesFound { get; set; }
 }

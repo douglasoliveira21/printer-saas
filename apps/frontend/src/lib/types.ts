@@ -62,6 +62,27 @@ export interface Agent {
 
 export type PrinterStatus = "DISCOVERED" | "MONITORED" | "IGNORED" | "DECOMMISSIONED";
 export type PrinterOnlineStatus = "UNKNOWN" | "ONLINE" | "OFFLINE";
+export type PrinterDeviceType =
+  | "UNKNOWN"
+  | "PRINTER"
+  | "MFP"
+  | "PLOTTER"
+  | "ROUTER"
+  | "FIREWALL"
+  | "SWITCH"
+  | "ACCESS_POINT"
+  | "SERVER"
+  | "COMPUTER"
+  | "CAMERA";
+
+export interface PrinterCapabilities {
+  color?: boolean;
+  duplex?: boolean;
+  a3?: boolean;
+  copy?: boolean;
+  scan?: boolean;
+  fax?: boolean;
+}
 
 export interface Printer {
   id: string;
@@ -80,8 +101,12 @@ export interface Printer {
   monitoredAt: string | null;
   slaHours: number | null;
   collectionMethod: "SNMP" | "MANUAL";
-  /** Null = never determined (device doesn't expose the input tray table). Drives whether A3-specific fields show up at all. */
+  /** Null = never determined (device doesn't expose the input tray table). Drives whether A3-specific fields show up at all. Mirrors capabilities.a3. */
   supportsA3: boolean | null;
+  deviceType: PrinterDeviceType;
+  classificationConfidence: number | null;
+  /** Tri-state per field: true = show it, false/absent = never show it (spec: never invent, never show "not supported" as if it were a real 0 reading). */
+  capabilities: PrinterCapabilities | null;
   createdAt: string;
   customer?: { id: string; legalName: string } | null;
   location?: { id: string; name: string } | null;

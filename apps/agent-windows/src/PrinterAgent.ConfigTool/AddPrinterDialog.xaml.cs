@@ -32,12 +32,16 @@ public partial class AddPrinterDialog : Window
         StatusText.Text = "Consultando a impressora via SNMP...";
         try
         {
-            var device = await _context.SnmpReader.ReadAsync(ip, community, 2000, 2, CancellationToken.None);
-            if (device is null)
+            // Manual add bypasses the multi-protocol classifier on purpose —
+            // the operator already knows this IP is a printer, so plain
+            // SNMP data (whatever this device reports) is enough here.
+            var probe = await _context.SnmpReader.ProbeAsync(ip, community, 2000, 2, CancellationToken.None);
+            if (probe is null)
             {
                 StatusText.Text = "Não foi possível ler dados SNMP desse endereço. Verifique o IP e a community.";
                 return;
             }
+            var device = probe.Device;
             device.CollectionMethod = "MANUAL";
             Result = device;
             DialogResult = true;

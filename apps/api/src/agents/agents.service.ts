@@ -132,10 +132,27 @@ export class AgentsService {
   async submitDevices(agent: Agent, dto: SubmitDevicesDto) {
     const results = [];
     for (const device of dto.devices) {
+      // Server-side re-validation of the Agent's own classification —
+      // never just trust the client. Manual/USB additions (AddPrinterDialog,
+      // UsbPrinterDiscoveryService) don't run the classifier at all and
+      // omit deviceType entirely, which stays allowed (the operator already
+      // confirmed by hand it's a printer). Only an EXPLICIT non-printer
+      // classification is rejected.
+      const PRINT_CAPABLE_TYPES = ['PRINTER', 'MFP', 'PLOTTER'];
+      if (device.deviceType && !PRINT_CAPABLE_TYPES.includes(device.deviceType)) {
+        continue;
+      }
+
       const fingerprint = this.computeFingerprint(agent.id, device);
       if (!fingerprint) {
         continue;
       }
+
+      // capabilities.a3 (new, generalized) takes priority over the legacy
+      // standalone supportsA3 flag when both are present — same value
+      // either way in practice, this just keeps one source of truth.
+      const supportsA3 = device.capabilities?.a3 ?? device.supportsA3 ?? undefined;
+      const capabilities = device.capabilities ? (device.capabilities as any) : undefined;
 
       const printer = await this.prisma.printer.upsert({
         where: { tenantId_fingerprint: { tenantId: agent.tenantId, fingerprint } },
@@ -154,7 +171,12 @@ export class AgentsService {
           status: 'DISCOVERED',
           onlineStatus: 'ONLINE',
           collectionMethod: device.collectionMethod ?? 'SNMP',
-          supportsA3: device.supportsA3 ?? undefined,
+          supportsA3,
+          deviceType: (device.deviceType as any) ?? undefined,
+          classificationConfidence: device.classificationConfidence ?? undefined,
+          capabilities,
+          capabilitySources: (device.capabilitySources as any) ?? undefined,
+          discoveryDiagnostics: (device.diagnostics as any) ?? undefined,
           lastSeenAt: new Date(),
           lastCollectedAt: new Date(),
         },
@@ -173,7 +195,12 @@ export class AgentsService {
           // that couldn't read the input tray table this round shouldn't
           // erase a previously-confirmed true/false (spec §67: absence of
           // new data isn't the same as "unknown").
-          supportsA3: device.supportsA3 ?? undefined,
+          supportsA3,
+          deviceType: (device.deviceType as any) ?? undefined,
+          classificationConfidence: device.classificationConfidence ?? undefined,
+          capabilities,
+          capabilitySources: (device.capabilitySources as any) ?? undefined,
+          discoveryDiagnostics: (device.diagnostics as any) ?? undefined,
           lastSeenAt: new Date(),
           lastCollectedAt: new Date(),
         },
