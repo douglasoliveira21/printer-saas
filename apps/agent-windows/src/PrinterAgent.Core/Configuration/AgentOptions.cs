@@ -39,4 +39,35 @@ public class AgentOptions
 
     /// <summary>Max number of pending submissions kept in the offline queue (spec §39) before oldest entries are dropped.</summary>
     public int OfflineQueueMaxEntries { get; set; } = 200;
+
+    /// <summary>SNMP v3 configuration - when enabled, v3 is tried before v2c/v1 fallback.</summary>
+    public SnmpV3Options? SnmpV3 { get; set; }
+}
+
+/// <summary>
+/// SNMP v3 security configuration (spec §16). All fields are optional to support
+/// different security levels (noAuthNoPriv, authNoPriv, authPriv).
+/// </summary>
+public class SnmpV3Options
+{
+    /// <summary>Security name (username) for SNMP v3 authentication.</summary>
+    public string? UserName { get; set; }
+
+    /// <summary>Security level: noAuthNoPriv, authNoPriv, or authPriv.</summary>
+    public string SecurityLevel { get; set; } = "authPriv";
+
+    /// <summary>Authentication protocol: MD5, SHA1, SHA256, SHA384, or SHA512. Required for authNoPriv and authPriv.</summary>
+    public string? AuthenticationProtocol { get; set; }
+
+    /// <summary>Authentication passphrase. Required for authNoPriv and authPriv.</summary>
+    public string? AuthenticationPassword { get; set; }
+
+    /// <summary>Privacy protocol: DES, AES128, AES192, or AES256. Required for authPriv.</summary>
+    public string? PrivacyProtocol { get; set; }
+
+    /// <summary>Privacy passphrase. Required for authPriv.</summary>
+    public string? PrivacyPassword { get; set; }
+
+    /// <summary>Context name (optional, most devices use empty context).</summary>
+    public string? ContextName { get; set; }
 }

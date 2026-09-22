@@ -1,5 +1,7 @@
+using System.IO;
 using System.Net;
 using System.Net.Http;
+using System.Text.Json;
 using Microsoft.Extensions.Logging.Abstractions;
 using PrinterAgent.Core.Api;
 using PrinterAgent.Core.Configuration;
@@ -37,7 +39,11 @@ public class AgentContext
         Installer = installer;
         CredentialStore = new AgentCredentialStore(NullLogger<AgentCredentialStore>.Instance);
         ProxyStore = new AgentProxyStore(NullLogger<AgentProxyStore>.Instance);
-        SnmpReader = new SnmpDeviceReader(NullLogger<SnmpDeviceReader>.Instance);
+        
+        // SNMP v3 support - conditionally initialize if configured
+        var v3Credentials = TryCreateV3Credentials();
+        var v3EngineDiscovery = v3Credentials is not null ? new SnmpV3EngineDiscovery(NullLogger<SnmpV3EngineDiscovery>.Instance) : null;
+        SnmpReader = new SnmpDeviceReader(NullLogger<SnmpDeviceReader>.Instance, v3Credentials, v3EngineDiscovery);
 
         var ippClient = new IppClient(new HttpClient { Timeout = TimeSpan.FromSeconds(5) }, NullLogger<IppClient>.Instance);
         var modelDatabase = new ModelDatabase(NullLogger<ModelDatabase>.Instance);
@@ -71,5 +77,57 @@ public class AgentContext
         }
         var http = new HttpClient(handler) { BaseAddress = new Uri(apiUrl.TrimEnd('/') + "/"), Timeout = TimeSpan.FromSeconds(15) };
         return new PrinterSaasApiClient(http, CredentialStore, NullLogger<PrinterSaasApiClient>.Instance);
+    }
+
+    private static SnmpV3Credentials? TryCreateV3Credentials()
+    {
+        try
+        {
+            var options = new AgentOptions();
+            var configPath = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
+                "PrinterSaaS", "Agent", "appsettings.json");
+            
+            if (!File.Exists(configPath))
+            {
+                return null;
+            }
+
+            var configJson = File.ReadAllText(configPath);
+            using var doc = System.Text.Json.JsonDocument.Parse(configJson);
+            if (!doc.RootElement.TryGetProperty("Agent", out var agentSection))
+            {
+                return null;
+            }
+
+            if (!agentSection.TryGetProperty("SnmpV3", out var v3Section))
+            {
+                return null;
+            }
+
+            var v3Options = new SnmpV3Options
+            {
+                UserName = v3Section.TryGetProperty("UserName", out var userName) ? userName.GetString() : null,
+                SecurityLevel = v3Section.TryGetProperty("SecurityLevel", out var secLevel) ? secLevel.GetString() ?? "authPriv" : "authPriv",
+                AuthenticationProtocol = v3Section.TryGetProperty("AuthenticationProtocol", out var authProto) ? authProto.GetString() : null,
+                AuthenticationPassword = v3Section.TryGetProperty("AuthenticationPassword", out var authPass) ? authPass.GetString() : null,
+                PrivacyProtocol = v3Section.TryGetProperty("PrivacyProtocol", out var privProto) ? privProto.GetString() : null,
+                PrivacyPassword = v3Section.TryGetProperty("PrivacyPassword", out var privPass) ? privPass.GetString() : null,
+                ContextName = v3Section.TryGetProperty("ContextName", out var ctxName) ? ctxName.GetString() : null,
+            };
+
+            // Only create credentials if UserName is provided
+            if (string.IsNullOrWhiteSpace(v3Options.UserName))
+            {
+                return null;
+            }
+
+            return new SnmpV3Credentials(v3Options);
+        }
+        catch
+        {
+            // If configuration is invalid, just fall back to v1/v2c
+            return null;
+        }
     }
 }

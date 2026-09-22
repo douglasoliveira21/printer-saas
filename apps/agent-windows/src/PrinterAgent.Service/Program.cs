@@ -1,3 +1,5 @@
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using PrinterAgent.Core.Api;
 using PrinterAgent.Core.Configuration;
 using PrinterAgent.Core.Discovery;
@@ -43,7 +45,41 @@ try
     builder.Services.AddSingleton<AgentProxyStore>();
     builder.Services.AddSingleton<AgentEnrollmentService>();
     builder.Services.AddSingleton<OfflineQueue>();
-    builder.Services.AddSingleton<SnmpDeviceReader>();
+    
+    // SNMP v3 support - conditionally enabled: appsettings.json always ships an
+    // "SnmpV3" section (even when empty), so options.SnmpV3 is never null here —
+    // the real signal is whether UserName was actually filled in. Constructing
+    // SnmpV3Credentials with an empty UserName throws (by design, so a genuinely
+    // misconfigured v3 setup fails loud), which used to crash this singleton
+    // factory at first resolution even with v3 left unconfigured. Guarded the
+    // same way PrinterAgent.ConfigTool/AgentContext.TryCreateV3Credentials does.
+    builder.Services.AddSingleton<SnmpV3EngineDiscovery>();
+    builder.Services.AddSingleton<SnmpV3Credentials>(sp =>
+    {
+        var options = sp.GetRequiredService<IOptions<AgentOptions>>().Value;
+        if (string.IsNullOrWhiteSpace(options.SnmpV3?.UserName))
+        {
+            return null!;
+        }
+        try
+        {
+            return new SnmpV3Credentials(options.SnmpV3);
+        }
+        catch (Exception ex)
+        {
+            sp.GetRequiredService<ILogger<SnmpV3Credentials>>()
+                .LogWarning(ex, "SNMP v3 is configured but invalid — falling back to v1/v2c only.");
+            return null!;
+        }
+    });
+    builder.Services.AddSingleton<SnmpDeviceReader>(sp =>
+    {
+        var logger = sp.GetRequiredService<ILogger<SnmpDeviceReader>>();
+        var v3Credentials = sp.GetService<SnmpV3Credentials>();
+        var v3EngineDiscovery = sp.GetRequiredService<SnmpV3EngineDiscovery>();
+        return new SnmpDeviceReader(logger, v3Credentials, v3EngineDiscovery);
+    });
+    
     builder.Services.AddSingleton<ModelDatabase>();
     builder.Services.AddSingleton<MdnsProbe>();
     builder.Services.AddSingleton<DeviceProbeOrchestrator>();

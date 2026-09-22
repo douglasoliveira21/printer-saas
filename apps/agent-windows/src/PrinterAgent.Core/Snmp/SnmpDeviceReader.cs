@@ -1,6 +1,7 @@
 using System.Net;
 using Lextm.SharpSnmpLib;
 using Lextm.SharpSnmpLib.Messaging;
+using Lextm.SharpSnmpLib.Security;
 using Microsoft.Extensions.Logging;
 using PrinterAgent.Core.Models;
 using PrinterAgent.Core.Vendors;
@@ -8,7 +9,7 @@ using PrinterAgent.Core.Vendors;
 namespace PrinterAgent.Core.Snmp;
 
 /// <summary>
-/// Reads one host over SNMP v1/v2c (spec §16-17) and normalizes whatever it
+/// Reads one host over SNMP v1/v2c/v3 (spec §16-17) and normalizes whatever it
 /// finds into a <see cref="SnmpProbeResult"/>. A field the device doesn't
 /// expose is left null — never guessed (spec §67). Returns null only when
 /// the host doesn't answer SNMP at all (no sysDescr on either version) —
@@ -21,14 +22,34 @@ namespace PrinterAgent.Core.Snmp;
 public class SnmpDeviceReader
 {
     private readonly ILogger<SnmpDeviceReader> _logger;
+    private readonly SnmpV3Credentials? _v3Credentials;
+    private readonly SnmpV3EngineDiscovery? _v3EngineDiscovery;
 
     public SnmpDeviceReader(ILogger<SnmpDeviceReader> logger)
+        : this(logger, null, null)
+    {
+    }
+
+    public SnmpDeviceReader(ILogger<SnmpDeviceReader> logger, SnmpV3Credentials? v3Credentials, SnmpV3EngineDiscovery? v3EngineDiscovery)
     {
         _logger = logger;
+        _v3Credentials = v3Credentials;
+        _v3EngineDiscovery = v3EngineDiscovery;
     }
 
     public async Task<SnmpProbeResult?> ProbeAsync(IPAddress ip, string community, int timeoutMs, int retries, CancellationToken ct)
     {
+        // If v3 credentials are configured, try v3 first (most secure)
+        if (_v3Credentials is not null && _v3EngineDiscovery is not null)
+        {
+            var v3Result = await ProbeWithV3Async(ip, timeoutMs, retries, ct);
+            if (v3Result is not null)
+            {
+                return v3Result;
+            }
+            _logger.LogDebug("SNMP v3 failed for {Ip}, falling back to v2c/v1", ip);
+        }
+
         // Most modern printers speak v2c, but plenty of older/cheaper ones
         // (and some consumer inkjets) only implement v1 — falling back
         // instead of giving up means those devices actually get discovered
@@ -370,7 +391,7 @@ public class SnmpDeviceReader
             {
                 Messenger.Walk(version, endpoint, community, new ObjectIdentifier(rootOid), received, timeoutMs, WalkMode.WithinSubtree);
             }
-            catch (Lextm.SharpSnmpLib.Messaging.TimeoutException)
+            catch (System.TimeoutException)
             {
                 // Expected for devices without this table — return whatever we collected before timing out.
             }
@@ -388,7 +409,7 @@ public class SnmpDeviceReader
                 var variables = new List<Variable> { new(new ObjectIdentifier(oid)) };
                 var result = await Task.Run(
                     () => Messenger.Get(version, endpoint, community, variables, timeoutMs), ct);
-                var data = result.FirstOrDefault()?.Data;
+                var data = result.Count > 0 ? result[0].Data : null;
 
                 // SNMP's own "this OID doesn't exist on this device" markers —
                 // e.g. a firewall/switch answering sysDescr but having no
@@ -403,7 +424,7 @@ public class SnmpDeviceReader
                 var value = data.ToString()?.Trim();
                 return string.IsNullOrEmpty(value) ? null : value;
             }
-            catch (Lextm.SharpSnmpLib.Messaging.TimeoutException)
+            catch (System.TimeoutException)
             {
                 // try again if attempts remain, otherwise fall through to null
             }
@@ -464,4 +485,349 @@ public class SnmpDeviceReader
             System.Text.RegularExpressions.RegexOptions.IgnoreCase);
         return match.Success ? match.Groups[1].Value : null;
     }
+
+    #region SNMP v3 Support
+
+    private async Task<SnmpProbeResult?> ProbeWithV3Async(IPAddress ip, int timeoutMs, int retries, CancellationToken ct)
+    {
+        if (_v3Credentials is null || _v3EngineDiscovery is null)
+        {
+            return null;
+        }
+
+        var endpoint = new IPEndPoint(ip, 161);
+        
+        // Perform engine discovery first
+        var report = await _v3EngineDiscovery.DiscoverAsync(endpoint, timeoutMs, ct);
+        if (report is null)
+        {
+            _logger.LogDebug("SNMP v3 engine discovery failed for {Ip}", ip);
+            return null;
+        }
+
+        // Create security provider
+        var privacyProvider = SnmpV3SecurityProvider.CreateProvider(_v3Credentials);
+        var contextName = _v3Credentials.GetContextName();
+        var userName = new OctetString(_v3Credentials.UserName);
+
+        // Try to get sysDescr using v3
+        var sysDescr = await TryGetV3Async(endpoint, privacyProvider, contextName, userName, report, PrinterMibOids.SysDescr, timeoutMs, retries, ct);
+        if (sysDescr is null)
+        {
+            // No SNMP response at all on v3
+            return null;
+        }
+
+        var manufacturer = InferManufacturer(sysDescr);
+        var printerName = await WalkFirstNonEmptyV3Async(endpoint, privacyProvider, contextName, userName, report, PrinterMibOids.PrtGeneralPrinterNameTable, timeoutMs, ct);
+        var device = new DiscoveredDevice
+        {
+            Ip = ip.ToString(),
+            SysDescr = sysDescr,
+            Manufacturer = manufacturer,
+            Model = !string.IsNullOrWhiteSpace(printerName) ? printerName : ExtractModel(sysDescr, manufacturer),
+        };
+
+        device.Hostname = await TryGetV3Async(endpoint, privacyProvider, contextName, userName, report, PrinterMibOids.SysName, timeoutMs, retries, ct);
+        device.Serial = await WalkFirstNonEmptyV3Async(endpoint, privacyProvider, contextName, userName, report, PrinterMibOids.PrtGeneralSerialNumberTable, timeoutMs, ct)
+            ?? ExtractLabeledSerial(sysDescr);
+
+        if (string.IsNullOrWhiteSpace(device.Serial))
+        {
+            var vendorSerialOid = VendorProviderRegistry.Resolve(manufacturer).SerialNumberOid;
+            if (vendorSerialOid is not null)
+            {
+                device.Serial = await TryGetV3Async(endpoint, privacyProvider, contextName, userName, report, vendorSerialOid, timeoutMs, retries, ct);
+            }
+        }
+
+        device.Mac = ArpResolver.ResolveMac(ip) ?? await ReadMacAddressV3Async(endpoint, privacyProvider, contextName, userName, report, timeoutMs, ct);
+        device.Counters = await ReadCountersV3Async(endpoint, privacyProvider, contextName, userName, report, timeoutMs, retries, ct);
+        device.Consumables = await ReadSuppliesV3Async(endpoint, privacyProvider, contextName, userName, report, timeoutMs, ct);
+        device.SupportsA3 = await DetectSupportsA3V3Async(endpoint, privacyProvider, contextName, userName, report, timeoutMs, ct);
+        device.Capabilities.A3 = device.SupportsA3;
+        if (device.SupportsA3 is not null) device.CapabilitySources["a3"] = "printer_mib";
+
+        return new SnmpProbeResult
+        {
+            Device = device,
+            PrinterMibGeneralFound = !string.IsNullOrWhiteSpace(printerName) || !string.IsNullOrWhiteSpace(device.Serial),
+            PrinterMibCountersFound = device.Counters is not null,
+            PrinterMibSuppliesFound = device.Consumables is { Count: > 0 },
+            ModelFromPrinterMib = !string.IsNullOrWhiteSpace(printerName),
+        };
+    }
+
+    private async Task<string?> TryGetV3Async(IPEndPoint endpoint, IPrivacyProvider privacyProvider, OctetString contextName, OctetString userName, ISnmpMessage report, string oid, int timeoutMs, int retries, CancellationToken ct)
+    {
+        for (var attempt = 0; attempt <= retries; attempt++)
+        {
+            ct.ThrowIfCancellationRequested();
+            try
+            {
+                var variables = new List<Variable> { new(new ObjectIdentifier(oid)) };
+                var request = new GetRequestMessage(
+                    VersionCode.V3,
+                    Messenger.NextMessageId,
+                    Messenger.NextRequestId,
+                    userName,
+                    contextName,
+                    variables,
+                    privacyProvider,
+                    Messenger.MaxMessageSize,
+                    report);
+                
+                // GetResponseAsync in this library version needs an externally
+                // managed Socket (connection-reuse overload) — GetResponse is
+                // the self-contained sync call that opens/closes its own
+                // socket per request, same shape as the v1/v2c Messenger.Get
+                // call above, so it's wrapped in Task.Run the same way.
+                var result = await Task.Run(() => request.GetResponse(timeoutMs, endpoint), ct);
+                var data = result.Pdu()?.Variables.Count > 0 ? result.Pdu().Variables[0].Data : null;
+
+                if (data is null or NoSuchObject or NoSuchInstance or EndOfMibView)
+                {
+                    return null;
+                }
+
+                var value = data.ToString()?.Trim();
+                return string.IsNullOrEmpty(value) ? null : value;
+            }
+            catch (System.TimeoutException)
+            {
+                // try again if attempts remain, otherwise fall through to null
+            }
+            catch (Exception ex)
+            {
+                _logger.LogDebug(ex, "SNMP v3 GET {Oid} failed for {Endpoint}", oid, endpoint);
+                return null;
+            }
+        }
+        return null;
+    }
+
+    private async Task<int?> TryGetIntV3Async(IPEndPoint endpoint, IPrivacyProvider privacyProvider, OctetString contextName, OctetString userName, ISnmpMessage report, string oid, int timeoutMs, int retries, CancellationToken ct)
+    {
+        var raw = await TryGetV3Async(endpoint, privacyProvider, contextName, userName, report, oid, timeoutMs, retries, ct);
+        return int.TryParse(raw, out var value) ? value : null;
+    }
+
+    private async Task<Dictionary<string, string>> WalkV3Async(IPEndPoint endpoint, IPrivacyProvider privacyProvider, OctetString contextName, OctetString userName, ISnmpMessage report, string rootOid, int timeoutMs, CancellationToken ct)
+    {
+        var received = await WalkRawV3Async(endpoint, privacyProvider, contextName, userName, report, rootOid, timeoutMs, ct);
+        var results = new Dictionary<string, string>();
+        foreach (var variable in received)
+        {
+            if (variable.Data is null or NoSuchObject or NoSuchInstance or EndOfMibView)
+            {
+                continue;
+            }
+            results[variable.Id.ToString()] = variable.Data.ToString() ?? string.Empty;
+        }
+        return results;
+    }
+
+    private const int V3MaxRepetitions = 10;
+
+    /// <summary>
+    /// Was previously calling <c>Messenger.Walk(VersionCode.V3, endpoint, userName, ...)</c> —
+    /// that overload only takes a community/userName string with no privacy provider or
+    /// discovery report, so it silently performed an unauthenticated, unencrypted walk that
+    /// fails against any real authNoPriv/authPriv device (only noAuthNoPriv would have worked).
+    /// <see cref="Messenger.BulkWalkAsync"/> is the overload that actually accepts the privacy
+    /// provider and the cached engine-discovery report, matching what <see cref="TryGetV3Async"/>
+    /// already does correctly for single GETs.
+    /// </summary>
+    private static async Task<List<Variable>> WalkRawV3Async(IPEndPoint endpoint, IPrivacyProvider privacyProvider, OctetString contextName, OctetString userName, ISnmpMessage report, string rootOid, int timeoutMs, CancellationToken ct)
+    {
+        var received = new List<Variable>();
+        try
+        {
+            await Messenger.BulkWalkAsync(
+                VersionCode.V3,
+                endpoint,
+                userName,
+                contextName,
+                new ObjectIdentifier(rootOid),
+                received,
+                V3MaxRepetitions,
+                WalkMode.WithinSubtree,
+                privacyProvider,
+                report,
+                ct);
+        }
+        catch (System.TimeoutException)
+        {
+            // Expected for devices without this table — return whatever we collected before timing out.
+        }
+        return received;
+    }
+
+    private async Task<string?> WalkFirstNonEmptyV3Async(IPEndPoint endpoint, IPrivacyProvider privacyProvider, OctetString contextName, OctetString userName, ISnmpMessage report, string rootOid, int timeoutMs, CancellationToken ct)
+    {
+        var values = await WalkV3Async(endpoint, privacyProvider, contextName, userName, report, rootOid, timeoutMs, ct);
+        return values.Values.Select(v => v.Trim()).FirstOrDefault(v => v.Length > 0);
+    }
+
+    private async Task<string?> ReadMacAddressV3Async(IPEndPoint endpoint, IPrivacyProvider privacyProvider, OctetString contextName, OctetString userName, ISnmpMessage report, int timeoutMs, CancellationToken ct)
+    {
+        var received = await WalkRawV3Async(endpoint, privacyProvider, contextName, userName, report, PrinterMibOids.IfPhysAddressTable, timeoutMs, ct);
+        foreach (var variable in received)
+        {
+            if (variable.Data is not OctetString octet)
+            {
+                continue;
+            }
+            var bytes = octet.ToBytes();
+            if (bytes.Length == 6 && bytes.Any(b => b != 0))
+            {
+                return string.Join(":", bytes.Select(b => b.ToString("X2")));
+            }
+        }
+        return null;
+    }
+
+    private async Task<DeviceCounters?> ReadCountersV3Async(IPEndPoint endpoint, IPrivacyProvider privacyProvider, OctetString contextName, OctetString userName, ISnmpMessage report, int timeoutMs, int retries, CancellationToken ct)
+    {
+        var lifeCounts = await WalkV3Async(endpoint, privacyProvider, contextName, userName, report, PrinterMibOids.PrtMarkerLifeCountTable, timeoutMs, ct);
+        if (lifeCounts.Count == 0)
+        {
+            var fallbackTotal = await TryGetIntV3Async(endpoint, privacyProvider, contextName, userName, report, PrinterMibOids.PrtMarkerLifeCountTotal, timeoutMs, retries, ct);
+            return fallbackTotal is null ? null : new DeviceCounters { Total = fallbackTotal };
+        }
+
+        var colorants = await WalkV3Async(endpoint, privacyProvider, contextName, userName, report, PrinterMibOids.PrtMarkerProcessColorantsTable, timeoutMs, ct);
+
+        int? total = null, blackWhite = null, color = null;
+        foreach (var (oid, raw) in lifeCounts)
+        {
+            if (!int.TryParse(raw, out var count))
+            {
+                continue;
+            }
+            total = (total ?? 0) + count;
+
+            var index = oid[(oid.LastIndexOf('.') + 1)..];
+            var colorant = colorants.GetValueOrDefault($"{PrinterMibOids.PrtMarkerProcessColorantsTable}.{index}");
+            if (colorant is null)
+            {
+                continue;
+            }
+
+            var isMono = !new[] { "cyan", "magenta", "yellow" }.Any(c => colorant.Contains(c, StringComparison.OrdinalIgnoreCase));
+            if (isMono)
+            {
+                blackWhite = (blackWhite ?? 0) + count;
+            }
+            else
+            {
+                color = (color ?? 0) + count;
+            }
+        }
+
+        return new DeviceCounters { Total = total, BlackWhite = blackWhite, Color = color };
+    }
+
+    private async Task<List<DeviceConsumable>?> ReadSuppliesV3Async(IPEndPoint endpoint, IPrivacyProvider privacyProvider, OctetString contextName, OctetString userName, ISnmpMessage report, int timeoutMs, CancellationToken ct)
+    {
+        try
+        {
+            var descriptions = await WalkV3Async(endpoint, privacyProvider, contextName, userName, report, PrinterMibOids.PrtMarkerSuppliesDescriptionTable, timeoutMs, ct);
+            if (descriptions.Count == 0)
+            {
+                return null;
+            }
+
+            var levels = await WalkV3Async(endpoint, privacyProvider, contextName, userName, report, PrinterMibOids.PrtMarkerSuppliesLevelTable, timeoutMs, ct);
+            var capacities = await WalkV3Async(endpoint, privacyProvider, contextName, userName, report, PrinterMibOids.PrtMarkerSuppliesMaxCapacityTable, timeoutMs, ct);
+
+            var result = new List<DeviceConsumable>();
+            foreach (var (oid, description) in descriptions)
+            {
+                var index = oid[(oid.LastIndexOf('.') + 1)..];
+                var name = description.Trim();
+                if (name.Length == 0)
+                {
+                    continue;
+                }
+
+                var color = PrinterMibOids.SupplyColorKeywords
+                    .FirstOrDefault(k => name.Contains(k.Keyword, StringComparison.OrdinalIgnoreCase))
+                    .Color;
+
+                double? levelPercent = null;
+                if (levels.TryGetValue($"{PrinterMibOids.PrtMarkerSuppliesLevelTable}.{index}", out var levelRaw) &&
+                    capacities.TryGetValue($"{PrinterMibOids.PrtMarkerSuppliesMaxCapacityTable}.{index}", out var capacityRaw) &&
+                    int.TryParse(levelRaw, out var level) && int.TryParse(capacityRaw, out var capacity) && capacity > 0 && level >= 0)
+                {
+                    levelPercent = Math.Round(level * 100.0 / capacity, 1);
+                }
+
+                result.Add(new DeviceConsumable
+                {
+                    Type = "toner",
+                    Color = color,
+                    Name = name,
+                    LevelPercent = levelPercent,
+                    Capacity = capacities.GetValueOrDefault($"{PrinterMibOids.PrtMarkerSuppliesMaxCapacityTable}.{index}"),
+                });
+            }
+
+            return result.Count > 0 ? result : null;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "Supplies table not available for {Endpoint}", endpoint);
+            return null;
+        }
+    }
+
+    private async Task<bool?> DetectSupportsA3V3Async(IPEndPoint endpoint, IPrivacyProvider privacyProvider, OctetString contextName, OctetString userName, ISnmpMessage report, int timeoutMs, CancellationToken ct)
+    {
+        var units = await WalkV3Async(endpoint, privacyProvider, contextName, userName, report, PrinterMibOids.PrtInputDimUnitTable, timeoutMs, ct);
+        if (units.Count == 0)
+        {
+            return null;
+        }
+        var feedDims = await WalkV3Async(endpoint, privacyProvider, contextName, userName, report, PrinterMibOids.PrtInputMediaDimFeedDirTable, timeoutMs, ct);
+        var xFeedDims = await WalkV3Async(endpoint, privacyProvider, contextName, userName, report, PrinterMibOids.PrtInputMediaDimXFeedDirTable, timeoutMs, ct);
+
+        var anyTrayDetermined = false;
+        foreach (var (oid, unitRaw) in units)
+        {
+            var index = oid[(oid.LastIndexOf('.') + 1)..];
+            if (!int.TryParse(unitRaw, out var unit))
+            {
+                continue;
+            }
+            if (!feedDims.TryGetValue($"{PrinterMibOids.PrtInputMediaDimFeedDirTable}.{index}", out var feedRaw) ||
+                !xFeedDims.TryGetValue($"{PrinterMibOids.PrtInputMediaDimXFeedDirTable}.{index}", out var xFeedRaw))
+            {
+                continue;
+            }
+            if (!int.TryParse(feedRaw, out var feed) || !int.TryParse(xFeedRaw, out var xFeed) || feed <= 0 || xFeed <= 0)
+            {
+                continue;
+            }
+
+            var feedMm = ToMillimeters(feed, unit);
+            var xFeedMm = ToMillimeters(xFeed, unit);
+            if (feedMm is null || xFeedMm is null)
+            {
+                continue;
+            }
+
+            anyTrayDetermined = true;
+            var longSide = Math.Max(feedMm.Value, xFeedMm.Value);
+            var shortSide = Math.Min(feedMm.Value, xFeedMm.Value);
+            if (longSide >= 410 && shortSide >= 285)
+            {
+                return true;
+            }
+        }
+
+        return anyTrayDetermined ? false : null;
+    }
+
+    #endregion
 }

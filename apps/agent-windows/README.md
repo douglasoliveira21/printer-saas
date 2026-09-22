@@ -86,12 +86,37 @@ reiniciando o serviço (ou clicando **Parar**/**Iniciar** na tela):
 | `CollectionIntervalSeconds` | Padrão 900s (recoleta de equipamentos já conhecidos) |
 | `Networks` | Lista de alvos: `"192.168.1.0/24"`, `"192.168.1.10"` ou `"192.168.1.100-192.168.1.200"` — também pode ser recebida remotamente via `GET /agent-api/v1/config` |
 | `SnmpCommunity`, `SnmpTimeoutMs`, `SnmpRetries`, `DiscoveryConcurrency` | Ajustes de varredura — concorrência limitada por padrão (spec §15) |
+| `SnmpV3` | Configuração SNMP v3 (opcional) — se configurado, v3 é tentado antes de fallback para v2c/v1 |
 | `OfflineQueueMaxEntries` | Tamanho máximo da fila local antes de descartar os lotes mais antigos (spec §39) |
 
 Depois do primeiro `enroll` bem-sucedido, o Agent nunca mais usa o
 `EnrollmentToken` — a credencial permanente (`AgentId` + secret) fica
 armazenada criptografada via DPAPI em
 `C:\ProgramData\PrinterSaaS\Agent\credentials.dat`.
+
+### Configuração SNMP v3
+
+Para usar SNMP v3 em vez de v1/v2c, adicione a seção `SnmpV3` ao `appsettings.json`:
+
+```json
+"SnmpV3": {
+  "UserName": "snmpUser",
+  "SecurityLevel": "authPriv",
+  "AuthenticationProtocol": "SHA256",
+  "AuthenticationPassword": "authPassword123",
+  "PrivacyProtocol": "AES128",
+  "PrivacyPassword": "privPassword123",
+  "ContextName": ""
+}
+```
+
+**Opções de configuração:**
+- `SecurityLevel`: `noAuthNoPriv` (sem autenticação/privacidade), `authNoPriv` (autenticação apenas), ou `authPriv` (autenticação + privacidade)
+- `AuthenticationProtocol`: `MD5`, `SHA1`, `SHA256`, `SHA384`, ou `SHA512`
+- `PrivacyProtocol`: `DES`, `AES128`, `AES192`, ou `AES256`
+- `ContextName`: Opcional, a maioria dos dispositivos usa contexto vazio
+
+Quando o SNMP v3 é configurado, o Agent tenta v3 primeiro e faz fallback para v2c/v1 caso falhe.
 
 ## Logs
 
@@ -120,7 +145,7 @@ estritamente necessário para ter uma experiência de instalação com tela: o
 
 ## Limitações conhecidas (MVP)
 
-- SNMP v1/v2c apenas (v3 fica para uma fase futura — spec §16).
+- SNMP v1/v2c/v3 suportados (v3 com authPriv, authNoPriv, noAuthNoPriv).
 - OIDs padronizados (MIB-II / Printer-MIB RFC 3805); nenhum OID
   específico de fabricante ainda (spec §18 — arquitetura já é extensível
   para isso via `PrinterMibOids`/`SnmpDeviceReader`).
