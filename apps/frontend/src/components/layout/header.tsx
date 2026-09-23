@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
 import { toast } from "sonner";
 import { Download, FileText, KeyRound, LogOut, Menu, Shield, User as UserIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -76,11 +75,11 @@ export function Header({ title, className }: { title?: string; className?: strin
             Baixar Agent (MSI)
           </DropdownMenuItem>
           <DropdownMenuSeparator />
-          <DropdownMenuItem render={<Link href="/termos" target="_blank" />}>
+          <DropdownMenuItem onClick={() => window.open("/termos", "_blank")}>
             <FileText className="mr-2 h-4 w-4" />
             Termos de uso
           </DropdownMenuItem>
-          <DropdownMenuItem render={<Link href="/privacidade" target="_blank" />}>
+          <DropdownMenuItem onClick={() => window.open("/privacidade", "_blank")}>
             <Shield className="mr-2 h-4 w-4" />
             Política de privacidade
           </DropdownMenuItem>
