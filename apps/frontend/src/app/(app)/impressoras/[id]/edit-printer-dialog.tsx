@@ -18,10 +18,12 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useUpdatePrinter } from "@/hooks/use-printers";
 import { useSnmpCredentials } from "@/hooks/use-snmp-credentials";
+import { useDepartments } from "@/hooks/use-departments";
 import { getApiErrorMessage } from "@/lib/api-client";
 import type { Printer } from "@/lib/types";
 
 const NO_CREDENTIAL = "__none__";
+const NO_DEPARTMENT = "__none__";
 
 export function EditPrinterDialog({ printer }: { printer: Printer }) {
   const [open, setOpen] = useState(false);
@@ -30,8 +32,10 @@ export function EditPrinterDialog({ printer }: { printer: Printer }) {
   const [slaHours, setSlaHours] = useState(printer.slaHours?.toString() ?? "");
   const [collectionMethod, setCollectionMethod] = useState<"SNMP" | "MANUAL">(printer.collectionMethod);
   const [snmpV3CredentialId, setSnmpV3CredentialId] = useState(printer.snmpV3CredentialId ?? NO_CREDENTIAL);
+  const [departmentId, setDepartmentId] = useState(printer.departmentId ?? NO_DEPARTMENT);
   const updatePrinter = useUpdatePrinter();
   const { data: credentials } = useSnmpCredentials();
+  const { data: departments } = useDepartments();
 
   async function handleSave(event: FormEvent) {
     event.preventDefault();
@@ -43,6 +47,7 @@ export function EditPrinterDialog({ printer }: { printer: Printer }) {
         slaHours: slaHours ? Number(slaHours) : undefined,
         collectionMethod,
         snmpV3CredentialId: snmpV3CredentialId === NO_CREDENTIAL ? null : snmpV3CredentialId,
+        departmentId: departmentId === NO_DEPARTMENT ? null : departmentId,
       });
       toast.success("Impressora atualizada");
       setOpen(false);
@@ -92,6 +97,22 @@ export function EditPrinterDialog({ printer }: { printer: Printer }) {
                 <SelectContent>
                   <SelectItem value="SNMP">SNMP (automática)</SelectItem>
                   <SelectItem value="MANUAL">Manual</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Departamento</Label>
+              <Select value={departmentId} onValueChange={(v) => v && setDepartmentId(v)}>
+                <SelectTrigger className="w-full">
+                  <SelectValue>{(value: string) => (value === NO_DEPARTMENT ? "Sem departamento" : departments?.find((d) => d.id === value)?.name)}</SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={NO_DEPARTMENT}>Sem departamento</SelectItem>
+                  {departments?.map((d) => (
+                    <SelectItem key={d.id} value={d.id}>
+                      {d.name}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>

@@ -48,6 +48,17 @@ export function useUnfreezeClosing() {
   });
 }
 
+export function useUpdateClosingDocumentNumber() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, documentNumber }: { id: string; customerId: string; documentNumber: string | null }) => {
+      const { data } = await apiClient.patch<MonthlyClosing>(`/closings/${id}/document-number`, { documentNumber });
+      return data;
+    },
+    onSuccess: (_data, variables) => queryClient.invalidateQueries({ queryKey: ["closings", variables.customerId] }),
+  });
+}
+
 export async function downloadClosingPdf(id: string, filename: string) {
   const { data } = await apiClient.get(`/closings/${id}/pdf`, { responseType: "blob" });
   const url = URL.createObjectURL(data);

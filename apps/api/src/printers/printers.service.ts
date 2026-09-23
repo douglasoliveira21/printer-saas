@@ -109,6 +109,7 @@ export class PrintersService {
         agent: { select: { id: true, name: true, status: true, hostname: true } },
         catalogModel: { select: { id: true, manufacturer: true, model: true, confidence: true } },
         snmpV3Credential: { select: { id: true, name: true, userName: true, securityLevel: true } },
+        department: { select: { id: true, name: true } },
         counters: { orderBy: { collectedAt: 'desc' }, take: 50 },
         consumables: { orderBy: { collectedAt: 'desc' }, take: 50 },
       },
@@ -252,6 +253,12 @@ export class PrintersService {
       const credential = await this.tenantPrisma.client.snmpV3Credential.findFirst({ where: { id: dto.snmpV3CredentialId } });
       if (!credential) {
         throw new NotFoundException('Credencial SNMP v3 não encontrada');
+      }
+    }
+    if (dto.departmentId) {
+      const department = await this.tenantPrisma.client.department.findFirst({ where: { id: dto.departmentId } });
+      if (!department) {
+        throw new NotFoundException('Departamento não encontrado');
       }
     }
     return this.tenantPrisma.client.printer.update({ where: { id }, data: dto });

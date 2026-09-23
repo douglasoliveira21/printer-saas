@@ -62,6 +62,9 @@ export const NAV_ITEMS: NavItem[] = [
     children: [
       { label: "Geral", href: "/configuracoes" },
       { label: "E-mail", href: "/configuracoes/email" },
+      { label: "Alertas", href: "/configuracoes/alertas" },
+      { label: "Chamados", href: "/configuracoes/chamados" },
+      { label: "Informações da empresa", href: "/configuracoes/empresa" },
     ],
   },
 ];

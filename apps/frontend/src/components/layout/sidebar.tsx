@@ -7,17 +7,25 @@ import { usePathname } from "next/navigation";
 import { ChevronDown, ShieldCheck } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth-context";
+import { uploadedFileUrl } from "@/lib/api-client";
+import { useTenantInfo } from "@/hooks/use-tenant-settings";
 import { NAV_ITEMS, type NavItem } from "./nav-items";
 
 export function Sidebar({ className }: { className?: string }) {
   const pathname = usePathname();
   const { user } = useAuth();
+  const { data: tenant } = useTenantInfo();
 
   return (
     <nav className={cn("flex h-full w-64 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground", className)}>
       <div className="flex h-16 items-center gap-2 border-b border-sidebar-border px-6">
-        <Image src="/logo.png" alt="Printer SaaS" width={28} height={28} className="rounded" />
-        <span className="font-semibold text-lg tracking-tight">Printer SaaS</span>
+        {tenant?.logoUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element -- tenant logo is an arbitrary uploaded file, not a build-time-known asset
+          <img src={uploadedFileUrl(tenant.logoUrl)} alt={tenant.name} width={28} height={28} className="rounded object-contain" />
+        ) : (
+          <Image src="/logo.png" alt="Printer SaaS" width={28} height={28} className="rounded" />
+        )}
+        <span className="font-semibold text-lg tracking-tight">{tenant?.name || "Printer SaaS"}</span>
       </div>
       <div className="flex-1 space-y-1 overflow-y-auto p-3">
         {user?.isSuperAdmin && (

@@ -19,6 +19,7 @@ import {
   useUpdateContract,
   useUpdateContractPrinter,
 } from "@/hooks/use-contracts";
+import { useClosingSettings } from "@/hooks/use-tenant-settings";
 import { getApiErrorMessage } from "@/lib/api-client";
 import type { Contract } from "@/lib/types";
 import { AddContractPrinterDialog } from "./add-contract-printer-dialog";
@@ -72,6 +73,7 @@ export function OverviewTab({ contract }: { contract: Contract }) {
   const updateContract = useUpdateContract();
   const updateContractPrinter = useUpdateContractPrinter();
   const removeContractPrinter = useRemoveContractPrinter();
+  const { data: closingSettings } = useClosingSettings();
   const addFixedCost = useAddContractFixedCost();
   const removeFixedCost = useRemoveContractFixedCost();
   const addPricingTier = useAddContractPricingTier();
@@ -174,6 +176,14 @@ export function OverviewTab({ contract }: { contract: Contract }) {
       toast.success("Impressora removida do contrato");
     } catch (error) {
       toast.error(getApiErrorMessage(error, "Erro ao remover impressora"));
+    }
+  }
+
+  async function handleToggleMonitoring(contractPrinterId: string, monitoringDisabled: boolean) {
+    try {
+      await updateContractPrinter.mutateAsync({ contractId: contract.id, contractPrinterId, monitoringDisabled });
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, "Erro ao atualizar monitoramento"));
     }
   }
 
@@ -373,6 +383,7 @@ export function OverviewTab({ contract }: { contract: Contract }) {
                 <TableHead>Custo colorida</TableHead>
                 <TableHead>Custo digitação</TableHead>
                 <TableHead>Custo fixo</TableHead>
+                {closingSettings?.allowDisablingPrinterMonitoring && <TableHead>Monitoramento</TableHead>}
                 <TableHead />
               </TableRow>
             </TableHeader>
@@ -434,6 +445,14 @@ export function OverviewTab({ contract }: { contract: Contract }) {
                         onChange={(e) => setPrinterPrices((prev) => ({ ...prev, [cp.id]: { ...form, fixedCost: e.target.value } }))}
                       />
                     </TableCell>
+                    {closingSettings?.allowDisablingPrinterMonitoring && (
+                      <TableCell>
+                        <label className="flex items-center gap-2 text-sm">
+                          <Checkbox checked={cp.monitoringDisabled} onCheckedChange={(v) => handleToggleMonitoring(cp.id, v === true)} />
+                          Desabilitado
+                        </label>
+                      </TableCell>
+                    )}
                     <TableCell>
                       <Button variant="ghost" size="icon" className="text-destructive" onClick={() => handleRemovePrinter(cp.id)}>
                         <Trash2 className="h-4 w-4" />

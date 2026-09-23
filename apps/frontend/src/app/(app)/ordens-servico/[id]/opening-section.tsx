@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useUpdateServiceOrder } from "@/hooks/use-service-orders";
+import { useServiceOrderTypes } from "@/hooks/use-service-order-types";
 import { getApiErrorMessage } from "@/lib/api-client";
 import type { ServiceOrder, ServiceOrderPriority, ServiceOrderType } from "@/lib/types";
 import { PRIORITY_LABEL, SERVICE_TYPE_LABEL } from "./labels";
@@ -22,14 +23,24 @@ function Field({ label, value }: { label: string; value: string }) {
 
 export function OpeningSection({ order }: { order: ServiceOrder }) {
   const [serviceType, setServiceType] = useState<ServiceOrderType | "">(order.serviceType ?? "");
+  const [typeCatalogId, setTypeCatalogId] = useState(order.serviceOrderTypeCatalogId ?? "");
   const [priority, setPriority] = useState<ServiceOrderPriority>(order.priority);
   const updateOrder = useUpdateServiceOrder();
+  const { data: catalogTypes } = useServiceOrderTypes();
 
-  const dirty = serviceType !== (order.serviceType ?? "") || priority !== order.priority;
+  const dirty =
+    serviceType !== (order.serviceType ?? "") ||
+    typeCatalogId !== (order.serviceOrderTypeCatalogId ?? "") ||
+    priority !== order.priority;
 
   async function handleSave() {
     try {
-      await updateOrder.mutateAsync({ id: order.id, serviceType: serviceType || undefined, priority });
+      await updateOrder.mutateAsync({
+        id: order.id,
+        serviceType: serviceType || undefined,
+        serviceOrderTypeCatalogId: typeCatalogId || undefined,
+        priority,
+      });
       toast.success("Salvo");
     } catch (error) {
       toast.error(getApiErrorMessage(error, "Erro ao salvar"));
@@ -53,6 +64,21 @@ export function OpeningSection({ order }: { order: ServiceOrder }) {
         </div>
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div className="space-y-2">
+            <Label>Tipo de chamado (Configurações &gt; Chamados)</Label>
+            <Select value={typeCatalogId} onValueChange={(v) => setTypeCatalogId(v ?? "")}>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Selecione (opcional)" />
+              </SelectTrigger>
+              <SelectContent>
+                {catalogTypes?.filter((t) => t.active).map((t) => (
+                  <SelectItem key={t.id} value={t.id}>
+                    {t.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
           <div className="space-y-2">
             <Label>Tipo de atendimento</Label>
             <Select value={serviceType} onValueChange={(v) => setServiceType((v ?? "") as ServiceOrderType)}>

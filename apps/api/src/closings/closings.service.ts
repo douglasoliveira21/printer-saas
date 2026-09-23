@@ -6,6 +6,13 @@ import { TenantPrismaService } from '../prisma/tenant-prisma.service';
 interface PrinterLine {
   printerId: string;
   printerModel: string | null;
+  // Identificação, pra "Configurações de relatório" (Configurações >
+  // Informações da empresa) — só as colunas com dado real hoje.
+  printerSerial: string | null;
+  printerIp: string | null;
+  printerMac: string | null;
+  printerLocation: string | null;
+  printerDepartment: string | null;
   pagesBw: number | null;
   pagesColor: number | null;
   pagesScan: number | null;
@@ -64,7 +71,13 @@ export class ClosingsService {
       include: {
         fixedCosts: true,
         pricingTiers: true,
-        contractPrinters: { include: { printer: { select: { id: true, model: true, ip: true } } } },
+        contractPrinters: {
+          include: {
+            printer: {
+              select: { id: true, model: true, ip: true, serial: true, mac: true, location: { select: { name: true } }, department: { select: { name: true } } },
+            },
+          },
+        },
       },
     });
 
@@ -110,6 +123,11 @@ export class ClosingsService {
         printerLines.push({
           printerId: cp.printerId,
           printerModel: cp.printer.model ?? cp.printer.ip ?? null,
+          printerSerial: cp.printer.serial ?? null,
+          printerIp: cp.printer.ip ?? null,
+          printerMac: cp.printer.mac ?? null,
+          printerLocation: cp.printer.location?.name ?? null,
+          printerDepartment: cp.printer.department?.name ?? null,
           pagesBw: bw.pagesUsed,
           pagesColor: color.pagesUsed,
           pagesScan: scan.pagesUsed,
@@ -182,6 +200,16 @@ export class ClosingsService {
     });
   }
 
+  /** Only allowed when TenantClosingSettings.allowEditingClosingDocumentNumber is on (Configurações > Informações da empresa). */
+  async updateDocumentNumber(id: string, documentNumber: string | null) {
+    await this.findOne(id);
+    const settings = await this.tenantPrisma.client.tenantClosingSettings.findFirst({});
+    if (!settings?.allowEditingClosingDocumentNumber) {
+      throw new ConflictException('Edição do número do documento não está habilitada em Configurações > Informações da empresa.');
+    }
+    return this.tenantPrisma.client.monthlyClosing.update({ where: { id }, data: { documentNumber } });
+  }
+
   async findAllForCustomer(customerId: string, year?: number) {
     return this.tenantPrisma.client.monthlyClosing.findMany({
       where: { customerId, ...(year ? { referenceYear: year } : {}) },
@@ -203,6 +231,11 @@ export class ClosingsService {
   async generatePdf(id: string): Promise<Buffer> {
     const closing = await this.findOne(id);
     const contractLines = closing.details as unknown as ContractLine[];
+    const settings = await this.tenantPrisma.client.tenantClosingSettings.findFirst({});
+    // Só as chaves com dado real hoje têm efeito — ver o comentário do
+    // TenantClosingSettings no schema. O resto do que a UI de Configurações
+    // permite marcar fica guardado sem gerar coluna nenhuma aqui.
+    const columns = (settings?.closingReportColumns as Record<string, boolean> | undefined) ?? {};
 
     const doc = new PDFDocument({ margin: 50 });
     const chunks: Buffer[] = [];
@@ -210,10 +243,11 @@ export class ClosingsService {
     const done = new Promise<Buffer>((resolve) => doc.on('end', () => resolve(Buffer.concat(chunks))));
 
     const customerName = closing.customer.tradeName || closing.customer.legalName;
-    doc.fontSize(18).text('Fechamento mensal', { align: 'left' });
+    doc.fontSize(18).text(settings?.closingReportTitle || 'Relatório de Fechamento', { align: 'left' });
     doc.moveDown(0.5);
     doc.fontSize(11).text(`Cliente: ${customerName}`);
     doc.text(`Período: ${String(closing.referenceMonth).padStart(2, '0')}/${closing.referenceYear}`);
+    if (closing.documentNumber) doc.text(`Documento nº: ${closing.documentNumber}`);
     doc.text(`Status: ${closing.status === 'FROZEN' ? 'Congelado' : 'Pendente'}`);
     doc.text(`Gerado em: ${closing.generatedAt.toLocaleString('pt-BR')}`);
     doc.moveDown();
@@ -222,10 +256,22 @@ export class ClosingsService {
       doc.fontSize(12).text(`Contrato #${contract.contractNumber} — Mensalidade: R$ ${contract.monthlyFee.toFixed(2)}`, { underline: true });
       doc.moveDown(0.3);
       for (const p of contract.printers) {
+        const idBits: string[] = [];
+        if (columns.id_serial && p.printerSerial) idBits.push(`Série: ${p.printerSerial}`);
+        if (columns.id_ip && p.printerIp) idBits.push(`IP: ${p.printerIp}`);
+        if (columns.id_mac && p.printerMac) idBits.push(`MAC: ${p.printerMac}`);
+        if (columns.id_location && p.printerLocation) idBits.push(`Local: ${p.printerLocation}`);
+        if (columns.id_department && p.printerDepartment) idBits.push(`Depto: ${p.printerDepartment}`);
+
+        const counterBits: string[] = [];
+        if (columns.counter_bw !== false) counterBits.push(`P&B: ${p.pagesBw ?? 'Não disponível'}`);
+        if (columns.counter_color !== false) counterBits.push(`Colorida: ${p.pagesColor ?? 'Não disponível'}`);
+        if (columns.counter_scan !== false) counterBits.push(`Digitalização: ${p.pagesScan ?? 'Não disponível'}`);
+
         doc.fontSize(10).text(
-          `${p.printerModel ?? p.printerId}\n` +
-            `  P&B: ${p.pagesBw ?? 'Não disponível'} | Colorida: ${p.pagesColor ?? 'Não disponível'} | Digitalização: ${p.pagesScan ?? 'Não disponível'}\n` +
-            `  Custo fixo: R$ ${p.fixedCost.toFixed(2)}`,
+          `${p.printerModel ?? p.printerId}${idBits.length ? ` (${idBits.join(' | ')})` : ''}\n` +
+            `  ${counterBits.join(' | ')}` +
+            (columns.other_fixedCost !== false ? `\n  Custo fixo: R$ ${p.fixedCost.toFixed(2)}` : ''),
         );
         doc.moveDown(0.3);
       }
@@ -244,6 +290,12 @@ export class ClosingsService {
 
     doc.moveDown();
     doc.fontSize(14).text(`Total do fechamento: R$ ${Number(closing.totalAmount).toFixed(2)}`, { align: 'right' });
+
+    if (settings?.additionalText) {
+      doc.moveDown();
+      doc.fontSize(9).fillColor('gray').text(settings.additionalText);
+      doc.fillColor('black');
+    }
 
     doc.end();
     return done;

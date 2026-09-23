@@ -28,4 +28,9 @@ export class UpdatePrinterDto {
   @IsOptional()
   @IsString()
   snmpV3CredentialId?: string | null;
+
+  /** Configurações > Informações da empresa > Departamentos. Pass null to unassign. */
+  @IsOptional()
+  @IsString()
+  departmentId?: string | null;
 }

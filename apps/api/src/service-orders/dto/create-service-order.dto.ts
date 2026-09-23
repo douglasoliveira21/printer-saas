@@ -1,4 +1,5 @@
-import { IsArray, IsDateString, IsEnum, IsOptional, IsString, IsUUID } from 'class-validator';
+import { Type } from 'class-transformer';
+import { IsArray, IsDateString, IsEnum, IsNumber, IsOptional, IsString, IsUUID, Min } from 'class-validator';
 
 export enum ServiceOrderPriorityDto {
   LOW = 'LOW',
@@ -43,6 +44,11 @@ export class CreateServiceOrderDto {
   @IsEnum(ServiceOrderTypeDto)
   serviceType?: ServiceOrderTypeDto;
 
+  /** Tipo do catálogo gerenciável (Configurações > Chamados) — substitui serviceType na UI nova. */
+  @IsOptional()
+  @IsUUID()
+  serviceOrderTypeCatalogId?: string;
+
   @IsOptional()
   @IsEnum(ServiceOrderPriorityDto)
   priority?: ServiceOrderPriorityDto;
@@ -63,4 +69,11 @@ export class CreateServiceOrderDto {
   @IsOptional()
   @IsDateString()
   slaDueAt?: string;
+
+  /** Se omitido e serviceOrderTypeCatalogId tiver defaultPrice, é prefiládo automaticamente. */
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  laborCost?: number;
 }

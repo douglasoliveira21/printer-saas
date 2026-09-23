@@ -5,6 +5,7 @@ import { CHECK_OFFLINE_JOB, CHECK_SLA_JOB, CHECK_TONER_JOB, MONITORING_QUEUE } f
 import { BILLING_QUEUE, GENERATE_MONTHLY_CHARGES_JOB } from './jobs/billing.processor';
 import { NOTIFICATIONS_QUEUE, SEND_CLOSING_DIGEST_JOB } from './jobs/closing-digest.processor';
 import { REPORTS_QUEUE, SEND_REPORT_DELIVERIES_JOB } from './jobs/report-delivery.processor';
+import { PREVENTIVE_MAINTENANCE_QUEUE, RUN_PREVENTIVE_MAINTENANCE_JOB } from './jobs/preventive-maintenance.processor';
 
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -17,6 +18,7 @@ export class SchedulerService implements OnModuleInit {
     @InjectQueue(BILLING_QUEUE) private readonly billingQueue: Queue,
     @InjectQueue(NOTIFICATIONS_QUEUE) private readonly notificationsQueue: Queue,
     @InjectQueue(REPORTS_QUEUE) private readonly reportsQueue: Queue,
+    @InjectQueue(PREVENTIVE_MAINTENANCE_QUEUE) private readonly preventiveMaintenanceQueue: Queue,
   ) {}
 
   async onModuleInit() {
@@ -29,6 +31,11 @@ export class SchedulerService implements OnModuleInit {
     // need to run once every 24h from whenever the worker booted.
     await this.notificationsQueue.upsertJobScheduler(SEND_CLOSING_DIGEST_JOB, { pattern: '0 7 * * *' }, { name: SEND_CLOSING_DIGEST_JOB });
     await this.reportsQueue.upsertJobScheduler(SEND_REPORT_DELIVERIES_JOB, { pattern: '0 7 * * *' }, { name: SEND_REPORT_DELIVERIES_JOB });
-    this.logger.log('Monitoring/billing/notifications/reports job schedulers registered');
+    await this.preventiveMaintenanceQueue.upsertJobScheduler(
+      RUN_PREVENTIVE_MAINTENANCE_JOB,
+      { pattern: '0 6 * * *' },
+      { name: RUN_PREVENTIVE_MAINTENANCE_JOB },
+    );
+    this.logger.log('Monitoring/billing/notifications/reports/preventive-maintenance job schedulers registered');
   }
 }

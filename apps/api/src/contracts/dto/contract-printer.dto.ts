@@ -1,5 +1,5 @@
 import { Type } from 'class-transformer';
-import { IsNumber, IsOptional, IsUUID, Min } from 'class-validator';
+import { IsBoolean, IsNumber, IsOptional, IsUUID, Min } from 'class-validator';
 
 export class CreateContractPrinterDto {
   @IsUUID()
@@ -28,6 +28,10 @@ export class CreateContractPrinterDto {
   @IsNumber()
   @Min(0)
   fixedCost?: number;
+
+  @IsOptional()
+  @IsBoolean()
+  monitoringDisabled?: boolean;
 }
 
 export class UpdateContractPrinterDto {
@@ -54,4 +58,8 @@ export class UpdateContractPrinterDto {
   @IsNumber()
   @Min(0)
   fixedCost?: number;
+
+  @IsOptional()
+  @IsBoolean()
+  monitoringDisabled?: boolean;
 }

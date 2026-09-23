@@ -46,6 +46,11 @@ const TENANT_SCOPED_MODELS = new Set([
   'NotificationTypeCustomer',
   'ReportDelivery',
   'ReportDeliveryCustomer',
+  'PreventiveMaintenanceSchedule',
+  'PrinterErrorCodeCatalog',
+  'ServiceOrderTypeCatalog',
+  'Department',
+  'TenantClosingSettings',
 ]);
 
 const READ_OPS = new Set(['findFirst', 'findFirstOrThrow', 'findMany', 'count', 'aggregate', 'groupBy']);

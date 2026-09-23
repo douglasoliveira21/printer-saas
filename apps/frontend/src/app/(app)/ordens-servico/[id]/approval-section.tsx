@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -19,6 +20,7 @@ export function ApprovalSection({ order }: { order: ServiceOrder }) {
   const [signature, setSignature] = useState<string | null>(order.approvalSignature);
   const approve = useApproveServiceOrder();
   const [downloading, setDownloading] = useState(false);
+  const [showBlankLines, setShowBlankLines] = useState(false);
 
   async function handleApprove() {
     if (!approvalName.trim() || !signature) {
@@ -36,7 +38,7 @@ export function ApprovalSection({ order }: { order: ServiceOrder }) {
   async function handleDownloadPdf() {
     setDownloading(true);
     try {
-      await downloadServiceOrderPdf(order.id, `os-${order.number}.pdf`);
+      await downloadServiceOrderPdf(order.id, `os-${order.number}.pdf`, showBlankLines);
     } catch (error) {
       toast.error(getApiErrorMessage(error, "Erro ao gerar PDF"));
     } finally {
@@ -70,6 +72,11 @@ export function ApprovalSection({ order }: { order: ServiceOrder }) {
           <Label htmlFor="approvalNotes">Observação do cliente</Label>
           <Textarea id="approvalNotes" rows={2} value={approvalNotes} onChange={(e) => setApprovalNotes(e.target.value)} />
         </div>
+
+        <label className="flex items-center gap-2 text-sm text-muted-foreground">
+          <Checkbox checked={showBlankLines} onCheckedChange={(v) => setShowBlankLines(v === true)} />
+          Exibir linhas adicionais em branco nos itens do chamado
+        </label>
 
         <div className="flex flex-wrap justify-end gap-2">
           <Button variant="outline" onClick={handleDownloadPdf} disabled={downloading}>

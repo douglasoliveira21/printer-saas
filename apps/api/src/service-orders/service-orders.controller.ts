@@ -61,8 +61,8 @@ export class ServiceOrdersController {
 
   @Get(':id/pdf')
   @RequirePermissions('service_orders.view')
-  async pdf(@Param('id') id: string, @Res() res: Response) {
-    const buffer = await this.serviceOrdersService.generatePdf(id);
+  async pdf(@Param('id') id: string, @Res() res: Response, @Query('showBlankLines') showBlankLines?: string) {
+    const buffer = await this.serviceOrdersService.generatePdf(id, { showBlankLines: showBlankLines === 'true' });
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename="os-${id}.pdf"`);
     res.send(buffer);

@@ -131,6 +131,8 @@ export interface Printer {
   /** Per-printer SNMP v3 credential override — takes priority over the owning Agent's default. */
   snmpV3CredentialId: string | null;
   snmpV3Credential?: { id: string; name: string; userName: string; securityLevel: string } | null;
+  departmentId: string | null;
+  department?: { id: string; name: string } | null;
   createdAt: string;
   customer?: { id: string; legalName: string; tradeName?: string | null } | null;
   location?: { id: string; name: string; department?: string | null; address?: string | null } | null;
@@ -326,6 +328,7 @@ export interface ServiceOrder {
   priority: ServiceOrderPriority;
   type: string | null;
   serviceType: ServiceOrderType | null;
+  serviceOrderTypeCatalogId: string | null;
   description: string | null;
   symptoms: string[];
   counterAtOpening: number | null;
@@ -365,6 +368,7 @@ export interface ServiceOrder {
   printer?: { id: string; manufacturer: string | null; model: string | null; ip: string | null } | null;
   technician?: { id: string; name: string } | null;
   createdBy?: { id: string; name: string } | null;
+  serviceOrderTypeCatalog?: { id: string; name: string; blankLinesOnPrint: number } | null;
   parts?: ServiceOrderPart[];
   photos?: ServiceOrderPhoto[];
 }
@@ -378,6 +382,7 @@ export interface ContractPrinter {
   priceColor: string | null;
   priceScan: string | null;
   fixedCost: string;
+  monitoringDisabled: boolean;
   printer: { id: string; manufacturer: string | null; model: string | null; serial: string | null };
 }
 
@@ -508,6 +513,7 @@ export interface MonthlyClosing {
   details: ClosingContractLine[];
   status: ClosingStatus;
   frozenAt: string | null;
+  documentNumber: string | null;
   generatedAt: string;
   customer?: { id: string; legalName: string; tradeName: string | null };
 }

@@ -1,4 +1,4 @@
-import { Controller, Get, Param, Post, Query, Res, Body } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Query, Res } from '@nestjs/common';
 import type { Response } from 'express';
 import { ApiTags } from '@nestjs/swagger';
 import { ClosingsService } from './closings.service';
@@ -47,5 +47,11 @@ export class ClosingsController {
   @RequirePermissions('financial.create')
   unfreeze(@Param('id') id: string) {
     return this.closingsService.unfreeze(id);
+  }
+
+  @Patch(':id/document-number')
+  @RequirePermissions('financial.create')
+  updateDocumentNumber(@Param('id') id: string, @Body('documentNumber') documentNumber: string | null) {
+    return this.closingsService.updateDocumentNumber(id, documentNumber);
   }
 }

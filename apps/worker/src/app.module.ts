@@ -9,6 +9,7 @@ import { ClosingDigestProcessor, NOTIFICATIONS_QUEUE } from './jobs/closing-dige
 import { MailerService } from './mailer/mailer.service';
 import { SecretCryptoService } from './common/secret-crypto.service';
 import { ReportDeliveryProcessor, REPORTS_QUEUE } from './jobs/report-delivery.processor';
+import { PreventiveMaintenanceProcessor, PREVENTIVE_MAINTENANCE_QUEUE } from './jobs/preventive-maintenance.processor';
 import { SchedulerService } from './scheduler.service';
 import { HealthController } from './health.controller';
 
@@ -22,7 +23,13 @@ import { HealthController } from './health.controller';
         connection: new Redis(config.getOrThrow<string>('REDIS_URL'), { maxRetriesPerRequest: null }),
       }),
     }),
-    BullModule.registerQueue({ name: MONITORING_QUEUE }, { name: BILLING_QUEUE }, { name: NOTIFICATIONS_QUEUE }, { name: REPORTS_QUEUE }),
+    BullModule.registerQueue(
+      { name: MONITORING_QUEUE },
+      { name: BILLING_QUEUE },
+      { name: NOTIFICATIONS_QUEUE },
+      { name: REPORTS_QUEUE },
+      { name: PREVENTIVE_MAINTENANCE_QUEUE },
+    ),
   ],
   controllers: [HealthController],
   providers: [
@@ -31,6 +38,7 @@ import { HealthController } from './health.controller';
     BillingProcessor,
     ClosingDigestProcessor,
     ReportDeliveryProcessor,
+    PreventiveMaintenanceProcessor,
     MailerService,
     SecretCryptoService,
     SchedulerService,

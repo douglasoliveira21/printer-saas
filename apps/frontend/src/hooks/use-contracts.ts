@@ -96,6 +96,7 @@ export interface ContractPrinterInput {
   priceColor?: number;
   priceScan?: number;
   fixedCost?: number;
+  monitoringDisabled?: boolean;
 }
 
 function invalidateContract(queryClient: ReturnType<typeof useQueryClient>, contractId: string) {

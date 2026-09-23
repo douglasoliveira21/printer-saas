@@ -88,6 +88,14 @@ export class ServiceOrdersService {
       counterAtOpening = latestCounter?.total ?? undefined;
     }
 
+    // Prefila o preço do serviço a partir do catálogo (Configurações >
+    // Chamados) quando o chamador não informou laborCost explicitamente.
+    let laborCost = dto.laborCost;
+    if (laborCost === undefined && dto.serviceOrderTypeCatalogId) {
+      const catalogType = await this.tenantPrisma.client.serviceOrderTypeCatalog.findFirst({ where: { id: dto.serviceOrderTypeCatalogId } });
+      laborCost = catalogType?.defaultPrice ? Number(catalogType.defaultPrice) : undefined;
+    }
+
     const created = await this.tenantPrisma.client.serviceOrder.create({
       data: {
         number: (last?.number ?? 0) + 1,
@@ -98,12 +106,14 @@ export class ServiceOrdersService {
         createdByUserId,
         type: dto.type,
         serviceType: dto.serviceType,
+        serviceOrderTypeCatalogId: dto.serviceOrderTypeCatalogId,
         priority: dto.priority,
         description: dto.description,
         symptoms: dto.symptoms ?? [],
         counterAtOpening,
         scheduledAt: dto.scheduledAt ? new Date(dto.scheduledAt) : undefined,
         slaDueAt,
+        laborCost,
       } as any,
     });
 
@@ -185,6 +195,7 @@ export class ServiceOrdersService {
         createdBy: { select: { id: true, name: true } },
         parts: { orderBy: { createdAt: 'asc' } },
         photos: { orderBy: { createdAt: 'asc' } },
+        serviceOrderTypeCatalog: { select: { id: true, name: true, blankLinesOnPrint: true } },
       },
     });
     if (!serviceOrder) {
@@ -324,7 +335,7 @@ export class ServiceOrdersService {
     });
   }
 
-  async generatePdf(id: string): Promise<Buffer> {
+  async generatePdf(id: string, options?: { showBlankLines?: boolean }): Promise<Buffer> {
     const so = await this.findOne(id);
 
     const doc = new PDFDocument({ margin: 50 });
@@ -371,6 +382,14 @@ export class ServiceOrdersService {
       const lineTotal = part.quantity * Number(part.unitValue);
       materialsTotal += lineTotal;
       doc.text(`${part.name} — Qtd: ${part.quantity} — Unit: R$ ${Number(part.unitValue).toFixed(2)} — Total: R$ ${lineTotal.toFixed(2)}`);
+    }
+    // "Exibir linhas adicionais em branco nos itens do chamado" (Configurações
+    // > Chamados) — número de linhas configurado por tipo de chamado.
+    if (options?.showBlankLines) {
+      const blankLines = (so.serviceOrderTypeCatalog as any)?.blankLinesOnPrint ?? 0;
+      for (let i = 0; i < blankLines; i++) {
+        doc.text('_'.repeat(60));
+      }
     }
     const laborCost = Number(so.laborCost ?? 0);
     const travelCost = Number(so.travelCost ?? 0);

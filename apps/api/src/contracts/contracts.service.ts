@@ -161,6 +161,7 @@ export class ContractsService {
         priceColor: dto.priceColor,
         priceScan: dto.priceScan,
         fixedCost: dto.fixedCost ?? 0,
+        monitoringDisabled: dto.monitoringDisabled ?? false,
       } as any,
       include: { printer: { select: { id: true, manufacturer: true, model: true, serial: true } } },
     });

@@ -1,16 +1,25 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Download, FileStack, Lock, LockOpen, Printer, RefreshCw } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { EmptyState } from "@/components/shared/empty-state";
 import { useCustomers } from "@/hooks/use-customers";
-import { downloadClosingPdf, useClosings, useFreezeClosing, useGenerateClosing, useUnfreezeClosing } from "@/hooks/use-closings";
+import {
+  downloadClosingPdf,
+  useClosings,
+  useFreezeClosing,
+  useGenerateClosing,
+  useUnfreezeClosing,
+  useUpdateClosingDocumentNumber,
+} from "@/hooks/use-closings";
+import { useClosingSettings } from "@/hooks/use-tenant-settings";
 import { getApiErrorMessage } from "@/lib/api-client";
 
 const PAGE_COST_MODE_LABEL: Record<string, string> = {
@@ -39,9 +48,26 @@ export function ClosingMonthTab() {
   const generateClosing = useGenerateClosing();
   const freezeClosing = useFreezeClosing();
   const unfreezeClosing = useUnfreezeClosing();
+  const updateDocumentNumber = useUpdateClosingDocumentNumber();
+  const { data: closingSettings } = useClosingSettings();
+  const [documentNumber, setDocumentNumber] = useState("");
 
   const closing = closings?.find((c) => c.referenceMonth === month && c.referenceYear === year);
   const customerName = closing?.customer?.tradeName || closing?.customer?.legalName;
+
+  useEffect(() => {
+    setDocumentNumber(closing?.documentNumber ?? "");
+  }, [closing?.id, closing?.documentNumber]);
+
+  async function handleSaveDocumentNumber() {
+    if (!closing) return;
+    try {
+      await updateDocumentNumber.mutateAsync({ id: closing.id, customerId: closing.customerId, documentNumber: documentNumber || null });
+      toast.success("Número do documento salvo");
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, "Erro ao salvar número do documento"));
+    }
+  }
 
   async function handleGenerate() {
     if (!customerId) return;
@@ -147,6 +173,17 @@ export function ClosingMonthTab() {
               <Badge variant={closing.status === "FROZEN" ? "default" : "secondary"}>
                 {closing.status === "FROZEN" ? "Congelado" : "Pendente"}
               </Badge>
+              {closingSettings?.allowEditingClosingDocumentNumber && (
+                <div className="flex items-center gap-1">
+                  <span>Documento nº</span>
+                  <Input
+                    className="h-7 w-28"
+                    value={documentNumber}
+                    onChange={(e) => setDocumentNumber(e.target.value)}
+                    onBlur={() => documentNumber !== (closing.documentNumber ?? "") && handleSaveDocumentNumber()}
+                  />
+                </div>
+              )}
             </div>
             <div className="flex gap-2">
               {closing.status === "FROZEN" ? (

@@ -106,6 +106,7 @@ export function useUpdatePrinter() {
       slaHours?: number;
       collectionMethod?: "SNMP" | "MANUAL";
       snmpV3CredentialId?: string | null;
+      departmentId?: string | null;
     }) => {
       const { data } = await apiClient.patch<Printer>(`/printers/${id}`, input);
       return data;

@@ -9,7 +9,6 @@ import { PageHeader } from "@/components/shared/page-header";
 import { ResponsiveDataTable, type DataTableColumn } from "@/components/shared/responsive-data-table";
 import { useTenantUsers, type TenantUser } from "@/hooks/use-users";
 import { CreateUserDialog } from "./create-user-dialog";
-import { CompanyWorkingHoursCard } from "./company-working-hours-card";
 import { SnmpCredentialsTab } from "./snmp-credentials-tab";
 import { ReportEmailRecipientsTab } from "./report-email-recipients-tab";
 
@@ -57,7 +56,6 @@ export default function ConfiguracoesPage() {
       <Tabs defaultValue="usuarios">
         <TabsList>
           <TabsTrigger value="usuarios">Usuários</TabsTrigger>
-          <TabsTrigger value="empresa">Empresa</TabsTrigger>
           <TabsTrigger value="snmp">Credenciais SNMP v3</TabsTrigger>
           <TabsTrigger value="report-emails">Envio de relatórios por e-mail</TabsTrigger>
         </TabsList>
@@ -80,10 +78,6 @@ export default function ConfiguracoesPage() {
             )}
             cardMeta={(u) => <Badge variant={u.status === "ACTIVE" ? "default" : "secondary"}>{u.status === "ACTIVE" ? "Ativo" : "Inativo"}</Badge>}
           />
-        </TabsContent>
-
-        <TabsContent value="empresa" className="mt-4">
-          <CompanyWorkingHoursCard />
         </TabsContent>
 
         <TabsContent value="snmp" className="mt-4">

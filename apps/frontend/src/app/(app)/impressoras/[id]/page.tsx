@@ -18,6 +18,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useDecommissionPrinter, usePrinter } from "@/hooks/use-printers";
 import { useAlerts } from "@/hooks/use-alerts";
+import { useClosingSettings } from "@/hooks/use-tenant-settings";
 import { getApiErrorMessage } from "@/lib/api-client";
 import { EditPrinterDialog } from "./edit-printer-dialog";
 import { RegisterReplacementDialog } from "./register-replacement-dialog";
@@ -50,6 +51,7 @@ export default function PrinterDetailPage({ params }: { params: Promise<{ id: st
   const { id } = use(params);
   const { data: printer, isLoading } = usePrinter(id);
   const { data: alerts } = useAlerts(undefined, id);
+  const { data: closingSettings } = useClosingSettings();
   const [decommissioning, setDecommissioning] = useState(false);
   const decommissionPrinter = useDecommissionPrinter();
 
@@ -84,6 +86,15 @@ export default function PrinterDetailPage({ params }: { params: Promise<{ id: st
       latestConsumables.set(key, c);
     }
   }
+
+  // "Relatório de detalhes da impressora" (Configurações > Informações da
+  // empresa) — filtros opcionais aplicados só na exibição, os dados
+  // continuam salvos normalmente.
+  const visibleConsumables = Array.from(latestConsumables.values()).filter((c) => {
+    if (closingSettings?.hideUnknownLevelSupplies && (c.levelPercent === null || c.levelPercent === undefined)) return false;
+    if (closingSettings?.hideNonTonerSupplies && c.type !== "toner") return false;
+    return true;
+  });
 
   return (
     <div className="space-y-6">
@@ -165,11 +176,11 @@ export default function PrinterDetailPage({ params }: { params: Promise<{ id: st
               <Droplet className="h-5 w-5 text-neutral-400" />
               Toner / Consumíveis
             </h2>
-            {latestConsumables.size === 0 ? (
+            {visibleConsumables.length === 0 ? (
               <p className="text-sm text-neutral-400">Nenhum consumível reportado ainda.</p>
             ) : (
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                {Array.from(latestConsumables.values()).map((c) => {
+                {visibleConsumables.map((c) => {
                   const level = c.levelPercent;
                   const barColor = level === null ? "#9ca3af" : level <= 10 ? "#dc2626" : level <= 20 ? "#f59e0b" : "#16a34a";
                   const stats = c.stats;

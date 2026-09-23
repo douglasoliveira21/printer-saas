@@ -30,6 +30,11 @@ model Tenant {
   logoUrl   String?
   status    TenantStatus @default(ACTIVE)
   isDemo    Boolean      @default(false)
+  // Configurações > Alertas > "Alertas de falha na comunicação" — null usa o
+  // default global (AGENT_OFFLINE_THRESHOLD_SECONDS/PRINTER_OFFLINE_THRESHOLD_SECONDS
+  // no .env), mesmo comportamento de antes desta feature.
+  agentOfflineThresholdHours   Int?
+  printerOfflineThresholdHours Int?
   planId    String?
   plan      Plan?        @relation(fields: [planId], references: [id])
   createdAt DateTime     @default(now())
@@ -67,6 +72,11 @@ model Tenant {
   serviceOrderParts       ServiceOrderPart[]
   serviceOrderPhotos      ServiceOrderPhoto[]
   workingHours            TenantWorkingHours[]
+  preventiveMaintenanceSchedules PreventiveMaintenanceSchedule[]
+  printerErrorCodes       PrinterErrorCodeCatalog[]
+  serviceOrderTypes       ServiceOrderTypeCatalog[]
+  departments             Department[]
+  closingSettings         TenantClosingSettings?
 
   @@map("tenants")
 }
@@ -466,6 +476,24 @@ model Location {
   @@map("locations")
 }
 
+// Configurações > Informações da empresa > Departamentos — um catálogo
+// próprio do tenant (não o Location.department de texto livre acima, que é
+// por endereço de um cliente); usado pra classificar Printer.departmentId.
+model Department {
+  id        String   @id @default(uuid())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  printers Printer[]
+
+  @@unique([tenantId, name])
+  @@index([tenantId])
+  @@map("departments")
+}
+
 // ---------------------------------------------------------------------------
 // AGENTS
 // ---------------------------------------------------------------------------
@@ -649,17 +677,22 @@ model Printer {
   snmpV3CredentialId String?
   snmpV3Credential   SnmpV3Credential? @relation(fields: [snmpV3CredentialId], references: [id])
 
+  // Configurações > Informações da empresa > Departamentos.
+  departmentId String?
+  department   Department? @relation(fields: [departmentId], references: [id])
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  counters         CounterReading[]
-  consumables      ConsumableReading[]
-  alerts           Alert[]
-  serviceOrders    ServiceOrder[]
-  contracts        Contract[]
-  replacements     ConsumableReplacement[]
-  comments         PrinterComment[]
-  contractPrinters ContractPrinter[]
+  counters                       CounterReading[]
+  consumables                    ConsumableReading[]
+  alerts                         Alert[]
+  serviceOrders                  ServiceOrder[]
+  contracts                      Contract[]
+  replacements                   ConsumableReplacement[]
+  comments                       PrinterComment[]
+  contractPrinters               ContractPrinter[]
+  preventiveMaintenanceSchedules PreventiveMaintenanceSchedule[]
 
   @@unique([tenantId, fingerprint])
   @@index([tenantId])
@@ -800,6 +833,48 @@ model Alert {
   @@map("alerts")
 }
 
+// Configurações > Alertas > "Alertas de manutenção preventiva". Scanned daily
+// by apps/worker/src/jobs/preventive-maintenance.processor.ts — when
+// nextDueAt is reached, auto-creates a ServiceOrder (serviceType:
+// PREVENTIVE_MAINTENANCE, already an existing enum value, no migration
+// needed there) and advances nextDueAt by intervalDays.
+model PreventiveMaintenanceSchedule {
+  id              String    @id @default(uuid())
+  tenantId        String
+  tenant          Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  printerId       String
+  printer         Printer   @relation(fields: [printerId], references: [id], onDelete: Cascade)
+  intervalDays    Int
+  lastTriggeredAt DateTime?
+  nextDueAt       DateTime
+  active          Boolean   @default(true)
+  notes           String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([tenantId])
+  @@map("preventive_maintenance_schedules")
+}
+
+// Configurações > Alertas > catálogo de códigos de erro. Reference-only for
+// now (manual lookup by staff) — the Agent doesn't collect a raw
+// manufacturer error/status code yet, so nothing auto-matches against this
+// table yet; see the module's own doc comment for what's still pending.
+model PrinterErrorCodeCatalog {
+  id           String    @id @default(uuid())
+  tenantId     String
+  tenant       Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  manufacturer String
+  code         String
+  description  String
+  severity     AlertLevel @default(WARNING)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@index([tenantId])
+  @@map("printer_error_code_catalog")
+}
+
 // ---------------------------------------------------------------------------
 // SERVICE ORDERS
 // ---------------------------------------------------------------------------
@@ -863,6 +938,12 @@ model ServiceOrder {
 
   type             String? // legado, sem uso na UI nova — ver serviceType
   serviceType      ServiceOrderType?
+  // Catálogo gerenciável (Configurações > Chamados) que substitui o enum
+  // acima na UI nova — o enum fica só como valor legado/fallback pra
+  // registros antigos, nunca removido (migração aditiva, ver
+  // ServiceOrderTypeCatalog).
+  serviceOrderTypeCatalogId String?
+  serviceOrderTypeCatalog   ServiceOrderTypeCatalog? @relation(fields: [serviceOrderTypeCatalogId], references: [id])
   priority         ServiceOrderPriority @default(MEDIUM)
   status           ServiceOrderStatus   @default(OPEN)
   description      String?
@@ -911,6 +992,27 @@ model ServiceOrder {
   @@unique([tenantId, number])
   @@index([tenantId, status])
   @@map("service_orders")
+}
+
+// Configurações > Chamados — substitui a escolha fixa do enum
+// ServiceOrderType na tela de abertura de chamado por um catálogo que o
+// tenant gerencia (nome, preço padrão do serviço, linhas em branco na
+// impressão).
+model ServiceOrderTypeCatalog {
+  id                String        @id @default(uuid())
+  tenantId          String
+  tenant            Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name              String
+  defaultPrice      Decimal?      @db.Decimal(12, 2)
+  blankLinesOnPrint Int           @default(0)
+  active            Boolean       @default(true)
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  serviceOrders ServiceOrder[]
+
+  @@index([tenantId])
+  @@map("service_order_type_catalog")
 }
 
 model ServiceOrderPart {
@@ -1041,6 +1143,12 @@ model ContractPrinter {
   priceScan  Decimal? @db.Decimal(12, 4)
   fixedCost  Decimal  @default(0) @db.Decimal(12, 2)
 
+  // Configurações > Informações da empresa >
+  // "Desabilitar manualmente o monitoramento das impressoras nos contratos"
+  // — quando true, checkOffline() no worker pula esta impressora pra este
+  // contrato (não fica marcando OFFLINE/gerando alerta de comunicação).
+  monitoringDisabled Boolean @default(false)
+
   createdAt DateTime @default(now())
 
   @@unique([contractId, printerId])
@@ -1125,6 +1233,9 @@ model MonthlyClosing {
   status         ClosingStatus @default(PENDING)
   frozenAt       DateTime?
   generatedAt    DateTime      @default(now())
+  // Editável só quando TenantClosingSettings.allowEditingClosingDocumentNumber
+  // estiver ligado — null usa a identificação padrão (referenceMonth/Year).
+  documentNumber String?
 
   @@unique([tenantId, customerId, referenceYear, referenceMonth])
   @@index([tenantId, customerId])
@@ -1185,6 +1296,33 @@ model TenantEmailSettings {
   updatedAt DateTime @updatedAt
 
   @@map("tenant_email_settings")
+}
+
+// Configurações > Informações da empresa (aba Empresa + aba Configurações de
+// relatório) — singleton por tenant, mesmo padrão de TenantEmailSettings.
+// closingReportColumns/printUsageReportColumns guardam o estado de TODOS os
+// checkboxes pedidos (~60 colunas ao todo); só o subconjunto com dado real
+// hoje é de fato lido por ClosingsService.generatePdf — o resto fica
+// guardado sem efeito até existir coleta desse dado (ver doc do service).
+model TenantClosingSettings {
+  id       String @id @default(uuid())
+  tenantId String @unique
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  allowDisablingPrinterMonitoring   Boolean @default(false)
+  allowEditingClosingDocumentNumber Boolean @default(false)
+  hideUnknownLevelSupplies          Boolean @default(false)
+  hideNonTonerSupplies              Boolean @default(false)
+
+  closingReportTitle      String  @default("Relatório de Fechamento")
+  closingReportColumns    Json    @default("{}")
+  printUsageReportColumns Json    @default("{}")
+  additionalText          String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("tenant_closing_settings")
 }
 
 enum NotificationType {

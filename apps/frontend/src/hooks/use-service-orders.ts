@@ -39,10 +39,12 @@ export interface CreateServiceOrderInput {
   printerId?: string;
   technicianId?: string;
   serviceType?: ServiceOrderType;
+  serviceOrderTypeCatalogId?: string;
   priority?: ServiceOrderPriority;
   description?: string;
   symptoms?: string[];
   scheduledAt?: string;
+  laborCost?: number;
 }
 
 export function useCreateServiceOrder() {
@@ -72,6 +74,7 @@ export interface UpdateServiceOrderInput {
   description?: string;
   symptoms?: string[];
   serviceType?: ServiceOrderType;
+  serviceOrderTypeCatalogId?: string;
   technicianId?: string;
   priority?: ServiceOrderPriority;
   status?: ServiceOrderStatus;
@@ -186,8 +189,8 @@ export function useApproveServiceOrder() {
   });
 }
 
-export async function downloadServiceOrderPdf(id: string, filename: string) {
-  const { data } = await apiClient.get(`/service-orders/${id}/pdf`, { responseType: "blob" });
+export async function downloadServiceOrderPdf(id: string, filename: string, showBlankLines?: boolean) {
+  const { data } = await apiClient.get(`/service-orders/${id}/pdf`, { responseType: "blob", params: showBlankLines ? { showBlankLines: true } : undefined });
   const url = URL.createObjectURL(data);
   const link = document.createElement("a");
   link.href = url;

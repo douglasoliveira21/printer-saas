@@ -42,40 +42,66 @@ export class MonitoringProcessor extends WorkerHost {
   }
 
   private async checkOffline() {
-    // Agent staleness is based on heartbeat, which the Agent sends every ~30s
-    // regardless of its SNMP collection cadence, so a short threshold is safe.
-    const agentThresholdSeconds = this.config.get<number>('AGENT_OFFLINE_THRESHOLD_SECONDS', 120);
-    const agentCutoff = new Date(Date.now() - agentThresholdSeconds * 1000);
+    // Global defaults (seconds) — used for any tenant that hasn't set its
+    // own threshold in Configurações > Alertas > "Alertas de falha na
+    // comunicação" (Tenant.agentOfflineThresholdHours/printerOfflineThresholdHours).
+    const defaultAgentThresholdSeconds = this.config.get<number>('AGENT_OFFLINE_THRESHOLD_SECONDS', 120);
+    const defaultPrinterThresholdSeconds = this.config.get<number>('PRINTER_OFFLINE_THRESHOLD_SECONDS', 2400);
 
-    // Printer staleness is based on lastSeenAt, which only advances once per
-    // SNMP collection cycle (CollectionIntervalSeconds, default 900s/15min).
-    // Reusing the short agent threshold here false-flagged healthy printers
-    // as offline between collection cycles, so this needs its own, longer
-    // default that tolerates at least one missed cycle.
-    const printerThresholdSeconds = this.config.get<number>('PRINTER_OFFLINE_THRESHOLD_SECONDS', 2400);
-    const printerCutoff = new Date(Date.now() - printerThresholdSeconds * 1000);
+    const tenantThresholds = new Map(
+      (await this.prisma.tenant.findMany({ select: { id: true, agentOfflineThresholdHours: true, printerOfflineThresholdHours: true } })).map(
+        (t) => [t.id, t],
+      ),
+    );
 
-    const staleAgents = await this.prisma.agent.findMany({
-      where: { status: 'ONLINE', lastHeartbeatAt: { lt: agentCutoff } },
-    });
+    // SQL filter uses the (stricter, shorter) global default as the widest
+    // possible net, then each row is checked against its own tenant's actual
+    // threshold in JS below — a custom threshold can only be MORE tolerant
+    // than the default (Configurações > Alertas enforces a minimum of 1h,
+    // already well above either default), never stricter, so the default
+    // cutoff never excludes a row that could still qualify for some tenant.
+    // Per-tenant SQL cutoffs would need one query per tenant — not worth it
+    // at this scale.
+    const now = Date.now();
+    const agentWideCutoff = new Date(now - defaultAgentThresholdSeconds * 1000);
+    const printerWideCutoff = new Date(now - defaultPrinterThresholdSeconds * 1000);
 
-    for (const agent of staleAgents) {
+    const candidateAgents = await this.prisma.agent.findMany({ where: { status: 'ONLINE', lastHeartbeatAt: { lt: agentWideCutoff } } });
+    let agentsMarkedOffline = 0;
+    for (const agent of candidateAgents) {
+      const thresholdSeconds = tenantThresholds.get(agent.tenantId)?.agentOfflineThresholdHours
+        ? tenantThresholds.get(agent.tenantId)!.agentOfflineThresholdHours! * 3600
+        : defaultAgentThresholdSeconds;
+      if (now - agent.lastHeartbeatAt!.getTime() < thresholdSeconds * 1000) continue;
+
       await this.prisma.agent.update({ where: { id: agent.id }, data: { status: 'OFFLINE' } });
       await this.prisma.alert.create({
         data: {
           tenantId: agent.tenantId,
           type: 'AGENT_OFFLINE',
           level: 'WARNING',
-          message: `Agent "${agent.name}" está offline (sem heartbeat há mais de ${agentThresholdSeconds}s).`,
+          message: `Agent "${agent.name}" está offline (sem heartbeat há mais de ${thresholdSeconds}s).`,
         },
       });
+      agentsMarkedOffline++;
     }
 
-    const stalePrinters = await this.prisma.printer.findMany({
-      where: { status: 'MONITORED', onlineStatus: 'ONLINE', lastSeenAt: { lt: printerCutoff } },
+    const candidatePrinters = await this.prisma.printer.findMany({
+      where: { status: 'MONITORED', onlineStatus: 'ONLINE', lastSeenAt: { lt: printerWideCutoff } },
+      include: { contractPrinters: { select: { monitoringDisabled: true } } },
     });
+    let printersMarkedOffline = 0;
+    for (const printer of candidatePrinters) {
+      // "Desabilitar manualmente o monitoramento das impressoras nos
+      // contratos" (Configurações > Informações da empresa) — skip entirely
+      // if any contract line for this printer has it disabled.
+      if (printer.contractPrinters.some((cp) => cp.monitoringDisabled)) continue;
 
-    for (const printer of stalePrinters) {
+      const thresholdSeconds = tenantThresholds.get(printer.tenantId)?.printerOfflineThresholdHours
+        ? tenantThresholds.get(printer.tenantId)!.printerOfflineThresholdHours! * 3600
+        : defaultPrinterThresholdSeconds;
+      if (now - printer.lastSeenAt!.getTime() < thresholdSeconds * 1000) continue;
+
       await this.prisma.printer.update({ where: { id: printer.id }, data: { onlineStatus: 'OFFLINE' } });
       await this.prisma.alert.create({
         data: {
@@ -86,9 +112,10 @@ export class MonitoringProcessor extends WorkerHost {
           message: `Impressora ${printer.model ?? printer.ip ?? printer.id} está offline.`,
         },
       });
+      printersMarkedOffline++;
     }
 
-    this.logger.log(`Offline check: ${staleAgents.length} agents, ${stalePrinters.length} printers marked offline`);
+    this.logger.log(`Offline check: ${agentsMarkedOffline} agents, ${printersMarkedOffline} printers marked offline`);
   }
 
   private async checkToner() {

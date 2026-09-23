@@ -30,6 +30,10 @@ import { TenantSettingsModule } from './tenant-settings/tenant-settings.module';
 import { SnmpCredentialsModule } from './snmp-credentials/snmp-credentials.module';
 import { ReportEmailRecipientsModule } from './settings/report-email-recipients/report-email-recipients.module';
 import { EmailSettingsModule } from './settings/email/email-settings.module';
+import { DepartmentsModule } from './settings/departments/departments.module';
+import { PreventiveMaintenanceModule } from './settings/preventive-maintenance/preventive-maintenance.module';
+import { PrinterErrorCodesModule } from './settings/printer-error-codes/printer-error-codes.module';
+import { ServiceOrderTypesModule } from './settings/service-order-types/service-order-types.module';
 import { HealthController } from './health/health.controller';
 
 @Module({
@@ -76,6 +80,10 @@ import { HealthController } from './health/health.controller';
     SnmpCredentialsModule,
     ReportEmailRecipientsModule,
     EmailSettingsModule,
+    DepartmentsModule,
+    PreventiveMaintenanceModule,
+    PrinterErrorCodesModule,
+    ServiceOrderTypesModule,
   ],
   controllers: [HealthController],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],

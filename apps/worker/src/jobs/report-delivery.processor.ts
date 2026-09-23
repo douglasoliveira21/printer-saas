@@ -86,7 +86,9 @@ export class ReportDeliveryProcessor extends WorkerHost {
     if (reportType === 'CLOSING_DIGEST') {
       return this.buildClosingDigestHtml(tenantId, customerId);
     }
-    return this.buildPrinterUsageHtml(customerId, from, to, reportType === 'PRINTER_USAGE_WITH_COPIES');
+    const settings = await this.prisma.tenantClosingSettings.findUnique({ where: { tenantId } });
+    const columns = (settings?.printUsageReportColumns as Record<string, boolean> | undefined) ?? {};
+    return this.buildPrinterUsageHtml(customerId, from, to, reportType === 'PRINTER_USAGE_WITH_COPIES', columns);
   }
 
   private async buildClosingDigestHtml(tenantId: string, customerId: string): Promise<string | null> {
@@ -101,12 +103,29 @@ export class ReportDeliveryProcessor extends WorkerHost {
     return `<h2>Resumo diário de fechamentos</h2><p>Status: ${status}</p><p>Valor: ${amount}</p>`;
   }
 
-  private async buildPrinterUsageHtml(customerId: string, from: Date, to: Date, withCopies: boolean): Promise<string | null> {
+  private async buildPrinterUsageHtml(
+    customerId: string,
+    from: Date,
+    to: Date,
+    withCopies: boolean,
+    columns: Record<string, boolean>,
+  ): Promise<string | null> {
     const printers = await this.prisma.printer.findMany({
       where: { customerId, status: 'MONITORED' },
-      include: { counters: { where: { collectedAt: { gte: from, lte: to } }, orderBy: { collectedAt: 'asc' } } },
+      include: {
+        counters: { where: { collectedAt: { gte: from, lte: to } }, orderBy: { collectedAt: 'asc' } },
+        location: { select: { name: true } },
+        department: { select: { name: true } },
+      },
     });
     if (printers.length === 0) return null;
+
+    // Só as chaves com dado real hoje têm efeito — ver TenantClosingSettings no schema.
+    const showSerial = columns.printer_id_serial;
+    const showIp = columns.printer_id_ip;
+    const showMac = columns.printer_id_mac;
+    const showLocation = columns.printer_id_location;
+    const showDepartment = columns.printer_id_department;
 
     const rows = printers
       .map((printer) => {
@@ -115,14 +134,27 @@ export class ReportDeliveryProcessor extends WorkerHost {
         const color = calculatePeriodUsage(printer.counters, 'color', from, to);
         const copies = withCopies ? calculatePeriodUsage(printer.counters, 'copies', from, to) : null;
         const label = `${printer.manufacturer ?? ''} ${printer.model ?? ''}`.trim() || printer.id;
-        return `<tr><td>${label}</td><td>${total.pagesUsed ?? '—'}</td><td>${bw.pagesUsed ?? '—'}</td><td>${color.pagesUsed ?? '—'}</td>${withCopies ? `<td>${copies!.pagesUsed ?? '—'}</td>` : ''}</tr>`;
+        const idCells =
+          (showSerial ? `<td>${printer.serial ?? '—'}</td>` : '') +
+          (showIp ? `<td>${printer.ip ?? '—'}</td>` : '') +
+          (showMac ? `<td>${printer.mac ?? '—'}</td>` : '') +
+          (showLocation ? `<td>${printer.location?.name ?? '—'}</td>` : '') +
+          (showDepartment ? `<td>${printer.department?.name ?? '—'}</td>` : '');
+        return `<tr><td>${label}</td>${idCells}<td>${total.pagesUsed ?? '—'}</td><td>${bw.pagesUsed ?? '—'}</td><td>${color.pagesUsed ?? '—'}</td>${withCopies ? `<td>${copies!.pagesUsed ?? '—'}</td>` : ''}</tr>`;
       })
       .join('');
+
+    const idHeaders =
+      (showSerial ? '<th>Série</th>' : '') +
+      (showIp ? '<th>IP</th>' : '') +
+      (showMac ? '<th>MAC</th>' : '') +
+      (showLocation ? '<th>Local</th>' : '') +
+      (showDepartment ? '<th>Depto</th>' : '');
 
     return `
       <h2>${withCopies ? 'Digitação e cópias por impressora' : 'Digitação por impressora'}</h2>
       <table border="1" cellpadding="6" cellspacing="0">
-        <thead><tr><th>Impressora</th><th>Total</th><th>P&B</th><th>Colorida</th>${withCopies ? '<th>Cópias</th>' : ''}</tr></thead>
+        <thead><tr><th>Impressora</th>${idHeaders}<th>Total</th><th>P&B</th><th>Colorida</th>${withCopies ? '<th>Cópias</th>' : ''}</tr></thead>
         <tbody>${rows}</tbody>
       </table>
     `;
