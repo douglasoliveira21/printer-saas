@@ -25,13 +25,21 @@ src/
                            API + token, instala/atualiza/inicia/para/remove o
                            Windows Service, e mostra status + logs recentes
                            em tempo real.
+  PrinterAgent.Updater/    Processo separado (`PrinterAgentUpdater.exe`) que o
+                           Service invoca pra se auto-atualizar — existe à
+                           parte porque o Service não pode substituir seus
+                           próprios arquivos enquanto está rodando (ver "Sobre
+                           o auto-update" abaixo).
 installer/
-  build-package.ps1        Publica os dois projetos e monta o pacote
+  build-package.ps1        Publica os projetos e monta o pacote
                            distribuível PrinterAgentSetup.exe (ver "Como
                            distribuir" abaixo).
-  build-msi.ps1            Publica os dois projetos e gera o instalador
+  build-msi.ps1            Publica os projetos e gera o instalador MSI.
   wix/                     MSI de verdade via WiX Toolset v5 (ver "Sobre o
                            instalador" abaixo).
+  codesign/                Como configurar o certificado de assinatura de
+                           código real do auto-update (ver "Sobre o
+                           auto-update" abaixo).
   install-agent.ps1        Alternativa por linha de comando/silenciosa (útil
   uninstall-agent.ps1      para instalação em massa via GPO/RMM), sem tela.
 ```
@@ -92,6 +100,7 @@ reiniciando o serviço (ou clicando **Parar**/**Iniciar** na tela):
 | `SnmpCommunity`, `SnmpTimeoutMs`, `SnmpRetries`, `DiscoveryConcurrency` | Ajustes de varredura — concorrência limitada por padrão (spec §15) |
 | `SnmpV3` | Configuração SNMP v3 (opcional) — se configurado, v3 é tentado antes de fallback para v2c/v1 |
 | `OfflineQueueMaxEntries` | Tamanho máximo da fila local antes de descartar os lotes mais antigos (spec §39) |
+| `UpdateCheckIntervalHours` | Padrão 24h — de quanto em quanto tempo checa `GET /agent-api/v1/latest-release`. `0` desliga o auto-update |
 
 Depois do primeiro `enroll` bem-sucedido, o Agent nunca mais usa o
 `EnrollmentToken` — a credencial permanente (`AgentId` + secret) fica
@@ -175,13 +184,49 @@ propósito — a v7+ do WiX exige aceitar uma taxa de manutenção paga (Open
 Source Maintenance Fee) só para rodar o CLI; a v5 é a última versão major
 totalmente livre e é contra o que este projeto foi escrito.
 
+## Sobre o auto-update
+
+O Service confere `GET /agent-api/v1/latest-release` a cada
+`UpdateCheckIntervalHours` (padrão 24h) e, se achar uma versão mais nova,
+só instala se **duas** checagens passarem:
+
+1. **Integridade**: o hash SHA-256 do `.msi` baixado bate com o publicado.
+2. **Autenticidade**: o `.msi` tem assinatura Authenticode válida (cadeia de
+   confiança real, verificada via `WinVerifyTrust` — a mesma API que o
+   próprio Windows usa) **e** o certificado que assinou bate com um
+   thumbprint fixo dentro do binário do Agent
+   (`AuthenticodeVerifier.ExpectedThumbprint`) — nunca com um thumbprint que
+   o servidor informou, porque um servidor de download comprometido
+   poderia simplesmente mentir sobre isso também.
+
+Passando nas duas, o Service invoca `PrinterAgentUpdater.exe` (processo à
+parte — instalado pelo MSI, não baixado sob demanda) e sai do ar; é esse
+processo separado que efetivamente para o serviço, roda o `msiexec`,
+reinicia, confirma que subiu, e **reverte pra versão anterior automaticamente
+se o serviço não voltar a rodar** dentro de um tempo limite (guarda uma
+cópia de `ServiceFiles` antes de qualquer coisa).
+
+Publicar uma release nova é feito em Plataforma → Releases do Agent (versão,
+URL de download, hash SHA-256, notas).
+
+**Pendência real, não uma limitação de design**: `ExpectedThumbprint` hoje é
+um placeholder — nenhum certificado de verdade bate com ele, então todo
+download é corretamente rejeitado até você configurar um certificado de
+assinatura de código de verdade. Ver `installer/codesign/README.md` para o
+passo a passo (envolve comprar um certificado de uma autoridade
+certificadora — isso não dá pra automatizar).
+
 ## Limitações conhecidas (MVP)
 
 - SNMP v1/v2c/v3 suportados (v3 com authPriv, authNoPriv, noAuthNoPriv).
 - OIDs padronizados (MIB-II / Printer-MIB RFC 3805); nenhum OID
   específico de fabricante ainda (spec §18 — arquitetura já é extensível
   para isso via `PrinterMibOids`/`SnmpDeviceReader`).
-- Sem auto-update assinado (spec §42) — atualização é manual (reinstalar).
+- Auto-update assinado (spec §42) implementado (`AgentUpdateChecker` +
+  `AuthenticodeVerifier` + `PrinterAgent.Updater`), mas roda com um
+  certificado placeholder até você configurar um certificado de assinatura
+  de código de verdade — ver `installer/codesign/README.md`. Até lá, toda
+  release é corretamente rejeitada (comportamento esperado, não um bug).
 - Fila offline é um arquivo JSON simples, não um banco embarcado — suficiente
   para o volume esperado de um Agent (uma rede local), não para milhares de
   itens.

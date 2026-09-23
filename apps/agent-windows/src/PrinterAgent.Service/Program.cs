@@ -7,6 +7,7 @@ using PrinterAgent.Core.Discovery.Dns;
 using PrinterAgent.Core.Discovery.Ipp;
 using PrinterAgent.Core.Queue;
 using PrinterAgent.Core.Snmp;
+using PrinterAgent.Core.Update;
 using PrinterAgent.Service;
 using Serilog;
 
@@ -91,6 +92,7 @@ try
     builder.Services.AddSingleton<MdnsProbe>();
     builder.Services.AddSingleton<DeviceProbeOrchestrator>();
     builder.Services.AddSingleton<PrinterDiscoveryService>();
+    builder.Services.AddSingleton<AgentUpdateChecker>();
 
     // Own short-timeout HttpClient — IPP probes must never share the
     // 30s-timeout, proxy-routed client used for talking to the SaaS API.

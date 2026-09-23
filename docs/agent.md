@@ -162,9 +162,16 @@ etc.) vive no backend.
   tamanho máximo de fila — implementado (`OfflineQueue`).
 - Logs rotativos em `C:\ProgramData\PrinterSaaS\Agent\Logs`, nunca logando segredos —
   implementado (Serilog, 14 dias de retenção).
-- Auto-update assinado (spec §42): **não implementado** — atualização é manual por ora
-  (a aba "Ferramentas → Status do cliente" do ConfigTool mostra isso honestamente em vez
-  de fabricar um status de serviço que não existe).
+- Auto-update assinado (spec §42): implementado — `AgentUpdateChecker` (PrinterAgent.Core)
+  consulta `GET /agent-api/v1/latest-release` periodicamente (`UpdateCheckIntervalHours`,
+  padrão 24h, 0 desliga), baixa o `.msi`, exige hash SHA-256 batendo E assinatura
+  Authenticode válida com certificado de thumbprint fixo no próprio binário
+  (`AuthenticodeVerifier`, via `WinVerifyTrust` — nunca confia no thumbprint que o
+  servidor informa), e entrega pro `PrinterAgent.Updater` (processo separado, instalado
+  pelo MSI) fazer parar→instalar→reiniciar→verificar→reverter se a nova versão não subir.
+  **Pendência real**: `ExpectedThumbprint` ainda é um placeholder — precisa de um
+  certificado de assinatura de código de verdade (comprado de uma CA) antes de publicar
+  qualquer release de produção; ver `apps/agent-windows/installer/codesign/README.md`.
 
 ## ConfigTool (`PrinterAgentSetup.exe`) — telas de gestão
 

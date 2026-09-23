@@ -119,6 +119,33 @@ model PrinterCatalogModel {
   @@map("printer_catalog_models")
 }
 
+// Global (not tenant-scoped) — same category as PrinterCatalogModel/Plan,
+// platform-wide release metadata, not tenant data. The Agent polls
+// GET /agent-api/v1/latest-release and compares `version` (SemVer) against
+// its own AgentVersion.Current; `isActive` lets the Super Admin publish a
+// release without every Agent picking it up yet (staged rollout) or pull a
+// bad release without deleting its history. The MSI binary itself is NOT
+// hosted here — downloadUrl just points wherever it's actually hosted
+// (GitHub Release, S3, ...); this table only carries the metadata needed to
+// find it and trust it (sha256 for integrity, signingCertThumbprint as the
+// Agent's second, locally-pinned check — see AuthenticodeVerifier.cs in
+// PrinterAgent.Core, which never trusts a thumbprint the server supplies on
+// its own, only compares against one compiled into the Agent itself).
+model AgentRelease {
+  id                     String   @id @default(uuid())
+  version                String // SemVer, e.g. "1.1.0"
+  downloadUrl            String
+  sha256                 String // hex digest of the .msi, checked before the Agent trusts the signature at all
+  signingCertThumbprint  String? // informational only — the Agent's real trust check is its own compiled-in constant, not this field
+  releaseNotes           String?
+  isActive               Boolean  @default(true)
+  publishedAt            DateTime @default(now())
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+
+  @@map("agent_releases")
+}
+
 enum UserStatus {
   ACTIVE
   INACTIVE

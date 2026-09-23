@@ -42,6 +42,9 @@ public class AgentOptions
 
     /// <summary>SNMP v3 configuration - when enabled, v3 is tried before v2c/v1 fallback.</summary>
     public SnmpV3Options? SnmpV3 { get; set; }
+
+    /// <summary>How often to poll GET /agent-api/v1/latest-release. Set to 0 to disable auto-update entirely.</summary>
+    public int UpdateCheckIntervalHours { get; set; } = 24;
 }
 
 /// <summary>

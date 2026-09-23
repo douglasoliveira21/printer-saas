@@ -5,6 +5,7 @@ using PrinterAgent.Core.Discovery;
 using PrinterAgent.Core.Models;
 using PrinterAgent.Core.Queue;
 using PrinterAgent.Core.Snmp;
+using PrinterAgent.Core.Update;
 
 namespace PrinterAgent.Service;
 
@@ -21,11 +22,13 @@ public class AgentWorker : BackgroundService
     private readonly PrinterDiscoveryService _discovery;
     private readonly OfflineQueue _offlineQueue;
     private readonly SnmpV3CredentialStore _snmpV3CredentialStore;
+    private readonly AgentUpdateChecker _updateChecker;
     private readonly IOptionsMonitor<AgentOptions> _options;
     private readonly ILogger<AgentWorker> _logger;
 
     private DateTime _lastDiscovery = DateTime.MinValue;
     private DateTime _lastCollection = DateTime.MinValue;
+    private DateTime _lastUpdateCheck = DateTime.MinValue;
 
     public AgentWorker(
         AgentEnrollmentService enrollment,
@@ -33,6 +36,7 @@ public class AgentWorker : BackgroundService
         PrinterDiscoveryService discovery,
         OfflineQueue offlineQueue,
         SnmpV3CredentialStore snmpV3CredentialStore,
+        AgentUpdateChecker updateChecker,
         IOptionsMonitor<AgentOptions> options,
         ILogger<AgentWorker> logger)
     {
@@ -41,6 +45,7 @@ public class AgentWorker : BackgroundService
         _discovery = discovery;
         _offlineQueue = offlineQueue;
         _snmpV3CredentialStore = snmpV3CredentialStore;
+        _updateChecker = updateChecker;
         _options = options;
         _logger = logger;
     }
@@ -70,6 +75,17 @@ public class AgentWorker : BackgroundService
                     // network sweep — cheaper, runs far more often than discovery.
                     _lastCollection = now;
                     await RunDiscoveryAndCollectionAsync(options, stoppingToken);
+                }
+
+                // Checked last, after everything else in this cycle has
+                // already run — if an update is applied, PrinterAgentUpdater
+                // stops this service shortly after this call returns, so
+                // there's nothing useful left to do in the current loop
+                // iteration anyway.
+                if (options.UpdateCheckIntervalHours > 0 && now - _lastUpdateCheck >= TimeSpan.FromHours(options.UpdateCheckIntervalHours))
+                {
+                    _lastUpdateCheck = now;
+                    await _updateChecker.CheckAndApplyAsync(stoppingToken);
                 }
             }
             catch (Exception ex)

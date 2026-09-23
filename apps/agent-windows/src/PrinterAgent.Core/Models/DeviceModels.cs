@@ -125,6 +125,16 @@ public class AgentDiscoveryConfig
     public string? SnmpCommunity { get; set; }
 }
 
+/// <summary>Mirrors AgentReleasesService.findLatestActive() — the Agent compares Version against AgentVersion.Current, and never trusts SigningCertThumbprint for anything security-relevant (that's informational only; the real pin lives in AuthenticodeVerifier, compiled into the Agent itself).</summary>
+public class AgentReleaseResponse
+{
+    public required string Version { get; set; }
+    public required string DownloadUrl { get; set; }
+    public required string Sha256 { get; set; }
+    public string? SigningCertThumbprint { get; set; }
+    public string? ReleaseNotes { get; set; }
+}
+
 /// <summary>
 /// SNMP v3 credentials resolved server-side (spec: per-printer SNMP v3, not
 /// just one community string per Agent) and delivered decrypted over HTTPS —

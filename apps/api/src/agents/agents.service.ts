@@ -9,6 +9,7 @@ import type { CreateAgentDto } from './dto/create-agent.dto';
 import type { UpdateAgentDto } from './dto/update-agent.dto';
 import type { EnrollAgentDto, HeartbeatDto, SubmitDevicesDto } from './dto/agent-payloads.dto';
 import { SecretCryptoService } from '../common/crypto/secret-crypto.service';
+import { AgentReleasesService } from '../platform/agent-releases/agent-releases.service';
 
 const ENROLLMENT_TOKEN_TTL_MS = 24 * 60 * 60 * 1000;
 // A level jump this large between consecutive readings can't be explained by
@@ -24,7 +25,12 @@ export class AgentsService {
     private readonly tenantPrisma: TenantPrismaService,
     private readonly config: ConfigService,
     private readonly secretCrypto: SecretCryptoService,
+    private readonly agentReleases: AgentReleasesService,
   ) {}
+
+  getLatestRelease() {
+    return this.agentReleases.findLatestActive();
+  }
 
   /** Tenant-admin action: pre-register an Agent slot and hand out a one-time enrollment token. */
   async createEnrollment(dto: CreateAgentDto) {

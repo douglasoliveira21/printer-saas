@@ -3,11 +3,11 @@
   Builds PrinterAgentSetup.msi - the real Windows Installer package.
 
 .DESCRIPTION
-  Publishes both apps self-contained win-x64 into two sibling folders
-  (wix\msi-publish\ConfigTool and wix\msi-publish\ServiceFiles - deliberately
-  NOT nested the way build-package.ps1's ..\publish\ServiceFiles is, so the
-  MSI's file-harvesting globs for the two apps can never overlap), then
-  invokes `wix build`.
+  Publishes all three apps self-contained win-x64 into sibling folders
+  (wix\msi-publish\ConfigTool, \Updater, \ServiceFiles - deliberately NOT
+  nested the way build-package.ps1's ..\publish\ServiceFiles is, so the
+  MSI's file-harvesting globs can never structurally overlap), then invokes
+  `wix build`.
 
   Requires the WiX Toolset v5 CLI as a local/global dotnet tool:
     dotnet tool install --global wix --version 5.0.2
@@ -47,6 +47,11 @@ Write-Host "Publishing PrinterAgent.ConfigTool..." -ForegroundColor Cyan
 dotnet publish (Join-Path $root "src\PrinterAgent.ConfigTool") `
     -c Release -r $Runtime --self-contained `
     -o (Join-Path $publishDir "ConfigTool")
+
+Write-Host "Publishing PrinterAgent.Updater..." -ForegroundColor Cyan
+dotnet publish (Join-Path $root "src\PrinterAgent.Updater") `
+    -c Release -r $Runtime --self-contained `
+    -o (Join-Path $publishDir "Updater")
 
 Write-Host "Publishing PrinterAgent.Service..." -ForegroundColor Cyan
 dotnet publish (Join-Path $root "src\PrinterAgent.Service") `

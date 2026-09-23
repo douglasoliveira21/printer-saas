@@ -27,7 +27,7 @@ apps/agent-windows/**/obj/
 apps/agent-windows/**/*.user
 apps/agent-windows/publish/
 apps/agent-windows/installer/wix/msi-publish/
-apps/agent-windows/.wix/
+apps/agent-windows/**/.wix/
 
 # Local service-order photo uploads (production uses a persistent volume, see docs/easypanel.md)
 apps/api/uploads/

@@ -4,9 +4,10 @@ import { AgentsService } from './agents.service';
 import { AgentAuthGuard } from './agent-auth.guard';
 import { AgentPresenceScheduler } from './agent-presence.scheduler';
 import { SnmpCredentialsModule } from '../snmp-credentials/snmp-credentials.module';
+import { PlatformModule } from '../platform/platform.module';
 
 @Module({
-  imports: [SnmpCredentialsModule],
+  imports: [SnmpCredentialsModule, PlatformModule],
   controllers: [AgentsController, AgentApiController],
   providers: [AgentsService, AgentAuthGuard, AgentPresenceScheduler],
   exports: [AgentsService],

@@ -13,6 +13,7 @@ import { useAuth } from "@/lib/auth-context";
 import { getApiErrorMessage } from "@/lib/api-client";
 import { usePlatformStats, usePlatformTenants, useUpdateTenantStatus, type PlatformTenant } from "@/hooks/use-platform";
 import { PrinterCatalogTab } from "./printer-catalog-tab";
+import { AgentReleasesTab } from "./agent-releases-tab";
 
 const STATUS_LABEL: Record<PlatformTenant["status"], string> = { ACTIVE: "Ativo", SUSPENDED: "Suspenso", CANCELLED: "Cancelado" };
 
@@ -88,6 +89,7 @@ export default function PlataformaPage() {
         <TabsList>
           <TabsTrigger value="tenants">Tenants</TabsTrigger>
           <TabsTrigger value="printer-catalog">Catálogo de impressoras</TabsTrigger>
+          <TabsTrigger value="agent-releases">Releases do Agent</TabsTrigger>
         </TabsList>
 
         <TabsContent value="tenants" className="mt-4 space-y-6">
@@ -141,6 +143,10 @@ export default function PlataformaPage() {
 
         <TabsContent value="printer-catalog" className="mt-4">
           <PrinterCatalogTab />
+        </TabsContent>
+
+        <TabsContent value="agent-releases" className="mt-4">
+          <AgentReleasesTab />
         </TabsContent>
       </Tabs>
     </div>

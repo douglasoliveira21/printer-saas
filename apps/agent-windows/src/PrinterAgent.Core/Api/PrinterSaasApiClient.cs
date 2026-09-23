@@ -93,6 +93,26 @@ public class PrinterSaasApiClient
         }
     }
 
+    /// <summary>Null on any failure (network, 404, no active release) or when the endpoint body is literally "null" (no release published yet) — all treated the same by the caller: nothing to update to right now.</summary>
+    public async Task<AgentReleaseResponse?> GetLatestReleaseAsync(CancellationToken ct)
+    {
+        try
+        {
+            ApplyStoredCredentials();
+            var response = await _http.GetAsync("api/v1/agent-api/v1/latest-release", ct);
+            if (!response.IsSuccessStatusCode)
+            {
+                return null;
+            }
+            return await response.Content.ReadFromJsonAsync<AgentReleaseResponse>(JsonOptions, ct);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to check for Agent updates (will retry next cycle)");
+            return null;
+        }
+    }
+
     /// <returns>True if the SaaS accepted the batch; false means the caller should keep it queued.</returns>
     public async Task<bool> SubmitDevicesAsync(SubmitDevicesRequest request, CancellationToken ct)
     {

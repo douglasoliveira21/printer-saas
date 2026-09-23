@@ -65,5 +65,8 @@ ver `PortalGuard`).
 ## Pendências de segurança (não implementadas na Fase 1)
 
 - Auditoria (`AuditLog` já existe no schema, mas ainda não é escrita pelos services).
-- Assinatura de pacotes de auto-update do Agent.
+- Assinatura de pacotes de auto-update do Agent: mecanismo implementado (verificação real
+  via `WinVerifyTrust` + thumbprint fixo no binário — ver `docs/agent.md`), mas ainda
+  rodando com certificado placeholder até haver um certificado de assinatura de código
+  de verdade (comprado de uma CA — ver `apps/agent-windows/installer/codesign/README.md`).
 - Rotação de secrets da plataforma, 2FA.

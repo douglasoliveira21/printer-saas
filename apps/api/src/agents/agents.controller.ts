@@ -81,6 +81,14 @@ export class AgentApiController {
     return this.agentsService.getConfig(agent);
   }
 
+  /** Auto-update check (spec: signed, verified auto-update of the Agent). Same auth as every other agent-api route — an Agent only ever asks about updates for itself, no tenant-scoping concern since release metadata is platform-wide. */
+  @Public()
+  @UseGuards(AgentAuthGuard)
+  @Get('latest-release')
+  getLatestRelease() {
+    return this.agentsService.getLatestRelease();
+  }
+
   @Public()
   @UseGuards(AgentAuthGuard)
   @HttpCode(HttpStatus.OK)

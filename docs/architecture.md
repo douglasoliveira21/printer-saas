@@ -45,8 +45,8 @@ Frontend (Next.js) ────────▶ API (NestJS) ◀─────�
 | `platform` | Super Admin da plataforma — cross-tenant, sempre atrás de `SuperAdminGuard` (spec §79) |
 
 Módulos ainda não implementados: emissão fiscal (NF-e), `notifications` (e-mail/WhatsApp
-de verdade — hoje os alertas só existem dentro do SaaS), auto-update assinado
-do Agent, cobrança automática dos planos do SaaS (o schema já suporta via `Plan`).
+de verdade — hoje os alertas só existem dentro do SaaS), cobrança automática dos planos
+do SaaS (o schema já suporta via `Plan`).
 
 ## Worker
 
@@ -85,5 +85,11 @@ reinstalar Agents.
    máquina real: instalação limpa, upgrade de versão, reparo, desinstalação — validado
    até aqui só por `wix build` (0 erros, todas as ICEs passando), nunca por um
    `msiexec /i` de verdade.
-4. Emissão fiscal, notificações por e-mail/WhatsApp, auto-update assinado do Agent,
-   cobrança automática dos planos do SaaS.
+4. Obter um certificado de assinatura de código de verdade (comprado de uma CA) e trocar
+   o placeholder em `AuthenticodeVerifier.ExpectedThumbprint` — sem isso o auto-update
+   (implementado, ver `docs/agent.md`) rejeita qualquer release, por design. Depois,
+   testar o ciclo completo de auto-update numa máquina real: publicar uma release
+   assinada, confirmar que o Agent baixa/verifica/aplica, e testar o rollback derrubando
+   o serviço de propósito no meio do processo.
+5. Emissão fiscal, notificações por e-mail/WhatsApp, cobrança automática dos planos
+   do SaaS.

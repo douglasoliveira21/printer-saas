@@ -32,6 +32,7 @@
 
     <Feature Id="Main" Title="Printer SaaS Agent" Level="1">
       <ComponentGroupRef Id="ConfigToolFiles" />
+      <ComponentGroupRef Id="UpdaterFiles" />
       <ComponentGroupRef Id="ServiceFilesGroup" />
       <ComponentRef Id="AppSettingsComponent" />
       <ComponentRef Id="StartMenuShortcutComponent" />
@@ -93,6 +94,16 @@
               <File Id="AppSettingsJson" Source="$(var.PublishDir)ServiceFiles\appsettings.json" />
             </Component>
           </Directory>
+
+          <!-- Own subfolder, not AGENTFOLDER's root: harvesting both the
+               ConfigTool's and the Updater's self-contained publishes into
+               the SAME directory hits WIX0091 (duplicate File/Component
+               id) — both bundle the same-named shared framework DLLs, and
+               unlike ConfigToolFiles-vs-ServiceFilesGroup (different
+               directories, so a same-name collision is just a harmless
+               WIX8602 skip), two globs targeting the *same* Directory must
+               not produce the same generated ids at all. -->
+          <Directory Id="UPDATERFOLDER" Name="Updater" />
         </Directory>
       </Directory>
     </StandardDirectory>
@@ -106,6 +117,16 @@
          overlap — see the PublishDir comment in the .wixproj. -->
     <ComponentGroup Id="ConfigToolFiles" Directory="AGENTFOLDER">
       <Files Include="$(var.PublishDir)ConfigTool\**" />
+    </ComponentGroup>
+
+    <!-- PrinterAgentUpdater.exe (auto-update helper — see
+         PrinterAgent.Updater's own doc comment for why it has to be a
+         separate installed executable, not something downloaded on demand:
+         it's what runs *after* this service has been told to stop, so it
+         can't be the thing that gets replaced mid-update). Its own
+         subfolder — see UPDATERFOLDER's comment above for why. -->
+    <ComponentGroup Id="UpdaterFiles" Directory="UPDATERFOLDER">
+      <Files Include="$(var.PublishDir)Updater\**" />
     </ComponentGroup>
 
     <ComponentGroup Id="ServiceFilesGroup" Directory="SERVICEFILESFOLDER">
