@@ -10,6 +10,7 @@ interface AuthContextValue {
   isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
   logout: () => void;
+  updateUser: (patch: Partial<StoredUser>) => void;
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -35,6 +36,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }
 
+  function updateUser(patch: Partial<StoredUser>) {
+    const current = authStorage.getUser();
+    if (!current) return;
+    const next = { ...current, ...patch };
+    authStorage.setUser(next);
+    setUser(next);
+  }
+
   function logout() {
     const refreshToken = authStorage.getRefreshToken();
     if (refreshToken) {
@@ -45,7 +54,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     router.push("/login");
   }
 
-  return <AuthContext.Provider value={{ user, isLoading, login, logout }}>{children}</AuthContext.Provider>;
+  return <AuthContext.Provider value={{ user, isLoading, login, logout, updateUser }}>{children}</AuthContext.Provider>;
 }
 
 export function useAuth(): AuthContextValue {

@@ -28,6 +28,14 @@ export class AgentsController {
     return this.agentsService.findAll();
   }
 
+  // No permission gate — any logged-in user (staff or portal) can download
+  // the installer from their profile menu; declared before ':id' so
+  // "latest-release" isn't swallowed as a literal id.
+  @Get('latest-release')
+  getLatestRelease() {
+    return this.agentsService.getLatestRelease();
+  }
+
   @Patch(':id')
   @RequirePermissions('agents.create')
   rename(@Param('id') id: string, @Body() dto: UpdateAgentDto) {

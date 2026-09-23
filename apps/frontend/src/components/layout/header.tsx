@@ -1,6 +1,9 @@
 "use client";
 
-import { Menu, LogOut, User as UserIcon } from "lucide-react";
+import { useState } from "react";
+import Link from "next/link";
+import { toast } from "sonner";
+import { Download, FileText, KeyRound, LogOut, Menu, Shield, User as UserIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import {
@@ -13,10 +16,29 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet";
 import { useAuth } from "@/lib/auth-context";
+import { fetchLatestAgentRelease } from "@/hooks/use-my-account";
+import { getApiErrorMessage } from "@/lib/api-client";
 import { Sidebar } from "./sidebar";
+import { MyProfileDialog } from "./my-profile-dialog";
+import { ChangePasswordDialog } from "./change-password-dialog";
 
 export function Header({ title, className }: { title?: string; className?: string }) {
   const { user, logout } = useAuth();
+  const [profileOpen, setProfileOpen] = useState(false);
+  const [passwordOpen, setPasswordOpen] = useState(false);
+
+  async function handleDownloadAgent() {
+    try {
+      const release = await fetchLatestAgentRelease();
+      if (!release) {
+        toast.error("Nenhuma versão do Agent publicada ainda");
+        return;
+      }
+      window.open(release.downloadUrl, "_blank");
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, "Erro ao buscar o instalador do Agent"));
+    }
+  }
 
   return (
     <header className={cn("flex h-16 items-center justify-between border-b border-border bg-card px-4 md:px-6", className)}>
@@ -41,12 +63,37 @@ export function Header({ title, className }: { title?: string; className?: strin
         <DropdownMenuContent align="end">
           <DropdownMenuLabel>{user?.email}</DropdownMenuLabel>
           <DropdownMenuSeparator />
+          <DropdownMenuItem onClick={() => setProfileOpen(true)}>
+            <UserIcon className="mr-2 h-4 w-4" />
+            Meu perfil
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => setPasswordOpen(true)}>
+            <KeyRound className="mr-2 h-4 w-4" />
+            Alterar senha
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={handleDownloadAgent}>
+            <Download className="mr-2 h-4 w-4" />
+            Baixar Agent (MSI)
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem render={<Link href="/termos" target="_blank" />}>
+            <FileText className="mr-2 h-4 w-4" />
+            Termos de uso
+          </DropdownMenuItem>
+          <DropdownMenuItem render={<Link href="/privacidade" target="_blank" />}>
+            <Shield className="mr-2 h-4 w-4" />
+            Política de privacidade
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
           <DropdownMenuItem onClick={logout} className="text-destructive focus:text-destructive">
             <LogOut className="mr-2 h-4 w-4" />
             Sair
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
+
+      <MyProfileDialog open={profileOpen} onOpenChange={setProfileOpen} />
+      <ChangePasswordDialog open={passwordOpen} onOpenChange={setPasswordOpen} />
     </header>
   );
 }

@@ -3,6 +3,8 @@ import { ApiTags } from '@nestjs/swagger';
 import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { UpdateMyProfileDto } from './dto/update-my-profile.dto';
+import { ChangeMyPasswordDto } from './dto/change-my-password.dto';
 import { RequirePermissions } from '../common/decorators/permissions.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import type { AuthenticatedUser } from '../auth/types';
@@ -27,6 +29,18 @@ export class UsersController {
   @Get('me')
   me(@CurrentUser() user: AuthenticatedUser) {
     return user;
+  }
+
+  // Self-service — no settings.manage, just needs to be the logged-in user.
+  // Declared before the generic ':id' routes so "me" isn't swallowed as a literal id.
+  @Patch('me')
+  updateMyProfile(@Body() dto: UpdateMyProfileDto, @CurrentUser() user: AuthenticatedUser) {
+    return this.usersService.updateMyProfile(user.id, dto);
+  }
+
+  @Patch('me/password')
+  changeMyPassword(@Body() dto: ChangeMyPasswordDto, @CurrentUser() user: AuthenticatedUser) {
+    return this.usersService.changeMyPassword(user.id, dto);
   }
 
   @Get(':id')

@@ -1,8 +1,10 @@
-import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import * as argon2 from 'argon2';
 import { TenantPrismaService } from '../prisma/tenant-prisma.service';
 import type { CreateUserDto } from './dto/create-user.dto';
 import type { UpdateUserDto } from './dto/update-user.dto';
+import type { UpdateMyProfileDto } from './dto/update-my-profile.dto';
+import type { ChangeMyPasswordDto } from './dto/change-my-password.dto';
 
 const USER_INCLUDE = {
   role: true,
@@ -154,6 +156,27 @@ export class UsersService {
     await this.assertExists(id);
     await this.tenantPrisma.client.user.update({ where: { id }, data: { deletedAt: new Date(), status: 'INACTIVE' } });
     return { removed: true };
+  }
+
+  /** Self-service — no settings.manage needed, any authenticated user can edit their own display name. Never touches email/permissions/status. */
+  async updateMyProfile(id: string, dto: UpdateMyProfileDto) {
+    await this.tenantPrisma.client.user.update({ where: { id }, data: { name: dto.name } });
+    return this.findOne(id);
+  }
+
+  /** Self-service password change — requires the current password, unlike the admin reset flow in update(). */
+  async changeMyPassword(id: string, dto: ChangeMyPasswordDto) {
+    const user = await this.tenantPrisma.client.user.findFirst({ where: { id, deletedAt: null } });
+    if (!user) {
+      throw new NotFoundException('Usuário não encontrado');
+    }
+    const valid = await argon2.verify(user.passwordHash, dto.currentPassword);
+    if (!valid) {
+      throw new UnauthorizedException('Senha atual incorreta');
+    }
+    const passwordHash = await argon2.hash(dto.newPassword);
+    await this.tenantPrisma.client.user.update({ where: { id }, data: { passwordHash } });
+    return { changed: true };
   }
 
   private async resolvePermissionIds(keys: string[] | undefined): Promise<string[]> {
