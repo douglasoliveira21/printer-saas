@@ -135,8 +135,35 @@
       </Files>
     </ComponentGroup>
 
-    <ui:WixUI xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui" Id="WixUI_Minimal" />
+    <!-- Launch PrinterAgentSetup.exe from the Finish screen's checkbox —
+         without this the MSI just copies files and exits silently, and
+         whoever installed it has no idea they still need to go open the
+         Start Menu shortcut themselves to actually configure anything. The
+         old exe-based "installer" never had this problem because the
+         installer WAS the app (one process, stayed open the whole time);
+         a real MSI needs this wired up explicitly. Checked by default,
+         Return="asyncNoWait" so the install doesn't hang waiting for the
+         user to close the app. Requires elevation same as the MSI itself
+         (see PrinterAgent.ConfigTool's app.manifest) — inherits it from
+         running inside the elevated install. -->
+    <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOXTEXT" Value="Abrir o Printer SaaS Agent agora" />
+    <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOX" Value="1" />
+    <CustomAction Id="LaunchApplication"
+                  Directory="AGENTFOLDER"
+                  ExeCommand="PrinterAgentSetup.exe"
+                  Return="asyncNoWait" />
+
     <WixVariable Id="WixUILicenseRtf" Value="License.rtf" />
+
+    <UI>
+      <ui:WixUI xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui" Id="WixUI_Minimal" />
+      <Publish Dialog="ExitDialog"
+               Control="Finish"
+               Event="DoAction"
+               Value="LaunchApplication"
+               Order="1"
+               Condition="WIXUI_EXITDIALOGOPTIONALCHECKBOX = 1 AND NOT Installed" />
+    </UI>
 
   </Package>
 
