@@ -7,7 +7,6 @@ import {
   Boxes,
   Droplet,
   BarChart3,
-  Bell,
   Cpu,
   Settings,
   type LucideIcon,
@@ -51,9 +50,16 @@ export const NAV_ITEMS: NavItem[] = [
     ],
   },
   { label: "Estoque", href: "/estoque", icon: Boxes },
-  { label: "Suprimentos", href: "/suprimentos", icon: Droplet },
+  {
+    label: "Suprimentos",
+    href: "/suprimentos",
+    icon: Droplet,
+    children: [
+      { label: "Reposição e Trocas", href: "/suprimentos" },
+      { label: "Níveis dos Suprimentos", href: "/suprimentos/niveis" },
+    ],
+  },
   { label: "Relatórios", href: "/relatorios", icon: BarChart3 },
-  { label: "Alertas", href: "/alertas", icon: Bell },
   { label: "Agents", href: "/agents", icon: Cpu },
   {
     label: "Configurações",

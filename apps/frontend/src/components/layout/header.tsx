@@ -2,7 +2,9 @@
 
 import { useState } from "react";
 import { toast } from "sonner";
-import { Download, FileText, KeyRound, LogOut, Menu, Shield, User as UserIcon } from "lucide-react";
+import Link from "next/link";
+import { Bell, Download, FileText, KeyRound, LogOut, Menu, Shield, User as UserIcon } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import {
@@ -17,6 +19,7 @@ import {
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet";
 import { useAuth } from "@/lib/auth-context";
 import { fetchLatestAgentRelease } from "@/hooks/use-my-account";
+import { useAlerts } from "@/hooks/use-alerts";
 import { getApiErrorMessage } from "@/lib/api-client";
 import { Sidebar } from "./sidebar";
 import { MyProfileDialog } from "./my-profile-dialog";
@@ -26,6 +29,8 @@ export function Header({ title, className }: { title?: string; className?: strin
   const { user, logout } = useAuth();
   const [profileOpen, setProfileOpen] = useState(false);
   const [passwordOpen, setPasswordOpen] = useState(false);
+  const { data: openAlerts } = useAlerts("OPEN");
+  const openAlertsCount = openAlerts?.length ?? 0;
 
   async function handleDownloadAgent() {
     try {
@@ -54,6 +59,16 @@ export function Header({ title, className }: { title?: string; className?: strin
         </Sheet>
         {title && <h1 className="text-lg font-semibold">{title}</h1>}
       </div>
+
+      <div className="flex items-center gap-1">
+      <Button variant="ghost" size="icon" className="relative" render={<Link href="/alertas" aria-label="Alertas" />}>
+        <Bell className="h-5 w-5" />
+        {openAlertsCount > 0 && (
+          <Badge variant="destructive" className="absolute -right-1 -top-1 h-4 min-w-4 justify-center rounded-full p-0 text-[10px]">
+            {openAlertsCount > 99 ? "99+" : openAlertsCount}
+          </Badge>
+        )}
+      </Button>
 
       <DropdownMenu>
         <DropdownMenuTrigger render={<Button variant="ghost" className="gap-2" />}>
@@ -93,6 +108,7 @@ export function Header({ title, className }: { title?: string; className?: strin
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
+      </div>
 
       <MyProfileDialog open={profileOpen} onOpenChange={setProfileOpen} />
       <ChangePasswordDialog open={passwordOpen} onOpenChange={setPasswordOpen} />
