@@ -75,7 +75,12 @@ function NavLink({ item, active }: { item: NavItem; active: boolean }) {
 
 function NavGroup({ item, pathname }: { item: NavItem; pathname: string }) {
   const Icon = item.icon;
-  const groupActive = isActive(pathname, item.href);
+  // Checked against every child, not just item.href — a child like
+  // "Contratos" under "Financeiro" lives at /contratos, not nested under
+  // /financeiro/*, so matching only the parent's own href would leave the
+  // group collapsed/unlit while the user is actually inside it.
+  const groupActive =
+    isActive(pathname, item.href) || (item.children?.some((child) => isActive(pathname, child.href, child.href === item.href)) ?? false);
   const [open, setOpen] = useState(groupActive);
 
   return (

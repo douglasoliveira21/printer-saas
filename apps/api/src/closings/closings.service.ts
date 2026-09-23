@@ -1,6 +1,6 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import PDFDocument from 'pdfkit';
-import { calculatePeriodUsage } from '@printer-saas/shared';
+import { calculatePeriodUsage, computeContractPageCost, type TieredBillingBreakdownItem } from '@printer-saas/shared';
 import { TenantPrismaService } from '../prisma/tenant-prisma.service';
 
 interface PrinterLine {
@@ -13,6 +13,7 @@ interface PrinterLine {
   priceColor: number;
   priceScan: number;
   fixedCost: number;
+  /** Only meaningful when the contract's pageCost.mode is 'FLAT' — otherwise page cost is billed at the contract level (see ContractLine.pageCost). */
   lineTotal: number;
   dataAvailable: boolean;
 }
@@ -23,7 +24,9 @@ interface ContractLine {
   monthlyFee: number;
   fixedCosts: { label: string; amount: number }[];
   printers: PrinterLine[];
+  pageCost: { mode: 'TIERED' | 'FRANCHISE' | 'FLAT'; amount: number; breakdown: TieredBillingBreakdownItem[] };
   contractTotal: number;
+  notes: string | null;
 }
 
 @Injectable()
@@ -32,15 +35,25 @@ export class ClosingsService {
 
   /**
    * Generates (or regenerates) a customer's monthly closing from their
-   * active contracts, using each contract's per-printer cost-per-page
-   * pricing (ContractPrinter, falling back to the contract's default*
-   * price when a printer has no override) — the franchise/overage model
-   * (Contract.franchisePages/overagePrice*) is no longer used for billing.
+   * active contracts. Each contract picks its page-cost model in priority
+   * order — tiered pricing (ContractPricingTier) > franchise+overage
+   * (franchisePages) > flat per-page cost (ContractPrinter/default price) —
+   * see computeContractPageCost in packages/shared/src/billing.ts.
+   *
+   * Refuses to overwrite a FROZEN closing — call unfreeze() first if the
+   * numbers genuinely need correcting.
    */
   async generate(customerId: string, year: number, month: number) {
     const customer = await this.tenantPrisma.client.customer.findFirst({ where: { id: customerId } });
     if (!customer) {
       throw new NotFoundException('Cliente não encontrado');
+    }
+
+    const existing = await this.tenantPrisma.client.monthlyClosing.findFirst({
+      where: { customerId, referenceYear: year, referenceMonth: month },
+    });
+    if (existing?.status === 'FROZEN') {
+      throw new ConflictException('Este fechamento está congelado — descongele antes de gerar novamente.');
     }
 
     const from = new Date(year, month - 1, 1);
@@ -50,6 +63,7 @@ export class ClosingsService {
       where: { customerId, status: 'ACTIVE' },
       include: {
         fixedCosts: true,
+        pricingTiers: true,
         contractPrinters: { include: { printer: { select: { id: true, model: true, ip: true } } } },
       },
     });
@@ -58,8 +72,16 @@ export class ClosingsService {
     for (const contract of contracts) {
       const monthlyFee = Number(contract.monthlyFee);
       const fixedCosts = contract.fixedCosts.map((c) => ({ label: c.label, amount: Number(c.amount) }));
+      const pricingTiers = contract.pricingTiers.map((t) => ({
+        fromPage: t.fromPage,
+        toPage: t.toPage,
+        pricePerPage: Number(t.pricePerPage),
+      }));
 
       const printerLines: PrinterLine[] = [];
+      let totalPagesUsed: number | null = pricingTiers.length > 0 || contract.franchisePages > 0 ? 0 : null;
+      let anyUsageData = false;
+
       for (const cp of contract.contractPrinters) {
         const readings = await this.tenantPrisma.client.counterReading.findMany({
           where: { printerId: cp.printerId, collectedAt: { gte: from, lte: to } },
@@ -76,8 +98,14 @@ export class ClosingsService {
         const fixedCost = Number(cp.fixedCost);
 
         const dataAvailable = bw.pagesUsed !== null || color.pagesUsed !== null || scan.pagesUsed !== null;
-        const lineTotal =
-          (bw.pagesUsed ?? 0) * priceBw + (color.pagesUsed ?? 0) * priceColor + (scan.pagesUsed ?? 0) * priceScan + fixedCost;
+        if (dataAvailable) {
+          anyUsageData = true;
+          if (totalPagesUsed !== null) {
+            totalPagesUsed += (bw.pagesUsed ?? 0) + (color.pagesUsed ?? 0) + (scan.pagesUsed ?? 0);
+          }
+        }
+
+        const lineTotal = fixedCost + (bw.pagesUsed ?? 0) * priceBw + (color.pagesUsed ?? 0) * priceColor + (scan.pagesUsed ?? 0) * priceScan;
 
         printerLines.push({
           printerId: cp.printerId,
@@ -94,8 +122,25 @@ export class ClosingsService {
         });
       }
 
+      const pageCostResult = computeContractPageCost({
+        totalPagesUsed: anyUsageData ? totalPagesUsed : null,
+        pricingTiers,
+        franchisePages: contract.franchisePages,
+        overagePricePerPage: Number(contract.overagePriceBw),
+      });
+
+      const pageCost = {
+        mode: pageCostResult.mode,
+        amount: pageCostResult.mode === 'FLAT' ? printerLines.reduce((s, p) => s + (p.lineTotal - p.fixedCost), 0) : pageCostResult.amount ?? 0,
+        breakdown: pageCostResult.breakdown,
+      };
+
+      const printersFixedCostSum = printerLines.reduce((s, p) => s + p.fixedCost, 0);
       const contractTotal =
-        monthlyFee + fixedCosts.reduce((s, c) => s + c.amount, 0) + printerLines.reduce((s, p) => s + p.lineTotal, 0);
+        monthlyFee +
+        fixedCosts.reduce((s, c) => s + c.amount, 0) +
+        printersFixedCostSum +
+        (pageCostResult.mode === 'FLAT' ? printerLines.reduce((s, p) => s + (p.lineTotal - p.fixedCost), 0) : pageCost.amount);
 
       contractLines.push({
         contractId: contract.id,
@@ -103,7 +148,9 @@ export class ClosingsService {
         monthlyFee,
         fixedCosts,
         printers: printerLines,
+        pageCost,
         contractTotal: Math.round(contractTotal * 100) / 100,
+        notes: contract.printNotesOnClosing ? contract.notes : null,
       });
     }
 
@@ -111,8 +158,27 @@ export class ClosingsService {
 
     return this.tenantPrisma.client.monthlyClosing.upsert({
       where: { tenantId_customerId_referenceYear_referenceMonth: { tenantId: this.tenantPrisma.tenantId, customerId, referenceYear: year, referenceMonth: month } },
-      update: { totalAmount, details: contractLines as any, generatedAt: new Date() },
+      update: { totalAmount, details: contractLines as any, generatedAt: new Date(), status: 'PENDING', frozenAt: null },
       create: { customerId, referenceYear: year, referenceMonth: month, totalAmount, details: contractLines as any } as any,
+    });
+  }
+
+  async freeze(id: string) {
+    const closing = await this.findOne(id);
+    if (closing.status === 'FROZEN') {
+      return closing;
+    }
+    return this.tenantPrisma.client.monthlyClosing.update({
+      where: { id },
+      data: { status: 'FROZEN', frozenAt: new Date() },
+    });
+  }
+
+  async unfreeze(id: string) {
+    await this.findOne(id);
+    return this.tenantPrisma.client.monthlyClosing.update({
+      where: { id },
+      data: { status: 'PENDING', frozenAt: null },
     });
   }
 
@@ -148,6 +214,7 @@ export class ClosingsService {
     doc.moveDown(0.5);
     doc.fontSize(11).text(`Cliente: ${customerName}`);
     doc.text(`Período: ${String(closing.referenceMonth).padStart(2, '0')}/${closing.referenceYear}`);
+    doc.text(`Status: ${closing.status === 'FROZEN' ? 'Congelado' : 'Pendente'}`);
     doc.text(`Gerado em: ${closing.generatedAt.toLocaleString('pt-BR')}`);
     doc.moveDown();
 
@@ -157,13 +224,19 @@ export class ClosingsService {
       for (const p of contract.printers) {
         doc.fontSize(10).text(
           `${p.printerModel ?? p.printerId}\n` +
-            `  P&B: ${p.pagesBw ?? 'Não disponível'} × R$ ${p.priceBw.toFixed(4)} | Colorida: ${p.pagesColor ?? 'Não disponível'} × R$ ${p.priceColor.toFixed(4)} | Digitalização: ${p.pagesScan ?? 'Não disponível'} × R$ ${p.priceScan.toFixed(4)}\n` +
-            `  Custo fixo: R$ ${p.fixedCost.toFixed(2)} | Total da impressora: R$ ${p.lineTotal.toFixed(2)}`,
+            `  P&B: ${p.pagesBw ?? 'Não disponível'} | Colorida: ${p.pagesColor ?? 'Não disponível'} | Digitalização: ${p.pagesScan ?? 'Não disponível'}\n` +
+            `  Custo fixo: R$ ${p.fixedCost.toFixed(2)}`,
         );
         doc.moveDown(0.3);
       }
+      const pageCostLabel = { TIERED: 'Faixas de páginas', FRANCHISE: 'Franquia + excedente', FLAT: 'Custo por página' }[contract.pageCost.mode];
+      doc.fontSize(10).text(`Custo de páginas (${pageCostLabel}): R$ ${contract.pageCost.amount.toFixed(2)}`);
       for (const fc of contract.fixedCosts) {
         doc.fontSize(10).text(`Custo adicional — ${fc.label}: R$ ${fc.amount.toFixed(2)}`);
+      }
+      if (contract.notes) {
+        doc.moveDown(0.3);
+        doc.fontSize(10).text(`Observação: ${contract.notes}`);
       }
       doc.fontSize(11).text(`Total do contrato: R$ ${contract.contractTotal.toFixed(2)}`, { align: 'right' });
       doc.moveDown();

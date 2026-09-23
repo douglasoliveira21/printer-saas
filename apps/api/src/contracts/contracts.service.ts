@@ -7,6 +7,7 @@ import type { UpdateContractDto } from './dto/update-contract.dto';
 import type { ListContractsQueryDto } from './dto/list-contracts-query.dto';
 import type { CreateContractPrinterDto, UpdateContractPrinterDto } from './dto/contract-printer.dto';
 import type { CreateContractFixedCostDto } from './dto/contract-fixed-cost.dto';
+import type { CreateContractPricingTierDto } from './dto/contract-pricing-tier.dto';
 import type { CreateContractEmailDto } from './dto/contract-email.dto';
 import type { CreateContractReadjustmentDto } from './dto/contract-readjustment.dto';
 
@@ -89,6 +90,7 @@ export class ContractsService {
           orderBy: { createdAt: 'asc' },
         },
         fixedCosts: { orderBy: { createdAt: 'asc' } },
+        pricingTiers: { orderBy: { fromPage: 'asc' } },
         emailRecipients: { orderBy: { createdAt: 'asc' } },
         readjustments: { orderBy: { createdAt: 'desc' } },
       },
@@ -103,7 +105,8 @@ export class ContractsService {
     await this.findOne(id);
     const data: Record<string, unknown> = { ...dto };
     if (dto.startDate) data.startDate = new Date(dto.startDate);
-    if (dto.endDate) data.endDate = new Date(dto.endDate);
+    // endDate: undefined (key omitted) = leave as-is; null = clear it (contrato por tempo indeterminado).
+    if (dto.endDate !== undefined) data.endDate = dto.endDate ? new Date(dto.endDate) : null;
     return this.tenantPrisma.client.contract.update({ where: { id }, data: data as any });
   }
 
@@ -192,6 +195,23 @@ export class ContractsService {
       throw new NotFoundException('Custo fixo não encontrado');
     }
     await this.tenantPrisma.client.contractFixedCost.delete({ where: { id: costId } });
+  }
+
+  // ---------------------------------------------------------------------
+  // Pricing tiers (faixas de páginas)
+  // ---------------------------------------------------------------------
+
+  async addPricingTier(contractId: string, dto: CreateContractPricingTierDto) {
+    await this.findOne(contractId);
+    return this.tenantPrisma.client.contractPricingTier.create({ data: { contractId, ...dto } as any });
+  }
+
+  async removePricingTier(contractId: string, tierId: string) {
+    const tier = await this.tenantPrisma.client.contractPricingTier.findFirst({ where: { id: tierId, contractId } });
+    if (!tier) {
+      throw new NotFoundException('Faixa de página não encontrada');
+    }
+    await this.tenantPrisma.client.contractPricingTier.delete({ where: { id: tierId } });
   }
 
   // ---------------------------------------------------------------------

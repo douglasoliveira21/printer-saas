@@ -14,8 +14,6 @@ import { getApiErrorMessage } from "@/lib/api-client";
 import type { FinancialEntry, FinancialEntryStatus } from "@/lib/types";
 import { CreateEntryDialog } from "./create-entry-dialog";
 import { EntryActionsMenu } from "./entry-actions-menu";
-import { ClosingMonthTab } from "./closing-month-tab";
-import { ClosingHistoryTab } from "./closing-history-tab";
 
 function currency(value: number | string) {
   return Number(value).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -133,27 +131,12 @@ export default function FinanceiroPage() {
         <TabsList className="print:hidden">
           <TabsTrigger value="receber">Contas a receber</TabsTrigger>
           <TabsTrigger value="pagar">Contas a pagar</TabsTrigger>
-          <TabsTrigger value="fechamentos">Fechamentos</TabsTrigger>
         </TabsList>
         <TabsContent value="receber" className="mt-4">
           <EntriesTable type="RECEIVABLE" />
         </TabsContent>
         <TabsContent value="pagar" className="mt-4">
           <EntriesTable type="PAYABLE" />
-        </TabsContent>
-        <TabsContent value="fechamentos" className="mt-4">
-          <Tabs defaultValue="mes">
-            <TabsList className="print:hidden">
-              <TabsTrigger value="mes">Fechamento do mês</TabsTrigger>
-              <TabsTrigger value="historico">Histórico</TabsTrigger>
-            </TabsList>
-            <TabsContent value="mes" className="mt-4">
-              <ClosingMonthTab />
-            </TabsContent>
-            <TabsContent value="historico" className="mt-4 print:hidden">
-              <ClosingHistoryTab />
-            </TabsContent>
-          </Tabs>
         </TabsContent>
       </Tabs>
     </div>

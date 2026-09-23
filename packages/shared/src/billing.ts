@@ -97,3 +97,93 @@ export function calculateFranchiseBilling(params: {
     dataAvailable: true,
   };
 }
+
+export interface PricingTier {
+  fromPage: number;
+  /** null = no upper bound (last bracket). */
+  toPage: number | null;
+  pricePerPage: number;
+}
+
+export interface TieredBillingBreakdownItem {
+  fromPage: number;
+  toPage: number | null;
+  pagesInTier: number;
+  pricePerPage: number;
+  amount: number;
+}
+
+export interface TieredBilling {
+  pagesUsed: number | null;
+  totalAmount: number | null;
+  breakdown: TieredBillingBreakdownItem[];
+  dataAvailable: boolean;
+}
+
+export interface ContractPageCostInput {
+  /** Aggregate pages used across all of the contract's printers in the period (bw+color+scan). */
+  totalPagesUsed: number | null;
+  pricingTiers: PricingTier[];
+  franchisePages: number;
+  overagePricePerPage: number;
+}
+
+export interface ContractPageCostResult {
+  mode: 'TIERED' | 'FRANCHISE' | 'FLAT';
+  amount: number | null;
+  breakdown: TieredBillingBreakdownItem[];
+}
+
+/**
+ * Decides which of the 3 always-visible cost blocks (tiers / franquia /
+ * custo por página) actually drives a contract's page-cost billing this
+ * period, in priority order: tiered pricing wins if any tier row exists,
+ * then franchise+overage if franchisePages > 0, otherwise the caller falls
+ * back to its own flat per-page × per-printer calculation (mode: 'FLAT',
+ * amount: null signals "compute it yourself").
+ */
+export function computeContractPageCost(input: ContractPageCostInput): ContractPageCostResult {
+  if (input.pricingTiers.length > 0) {
+    const tiered = calculateTieredBilling(input.totalPagesUsed, input.pricingTiers);
+    return { mode: 'TIERED', amount: tiered.totalAmount, breakdown: tiered.breakdown };
+  }
+  if (input.franchisePages > 0) {
+    const franchise = calculateFranchiseBilling({
+      franchisePages: input.franchisePages,
+      monthlyFee: 0,
+      overagePricePerPage: input.overagePricePerPage,
+      usage: { pagesUsed: input.totalPagesUsed, counterWasReset: false, startReading: null, endReading: null },
+    });
+    return { mode: 'FRANCHISE', amount: franchise.overageAmount, breakdown: [] };
+  }
+  return { mode: 'FLAT', amount: null, breakdown: [] };
+}
+
+/**
+ * Progressive/bracket pricing (spec: "tabela de faixas de páginas") — like a
+ * tax bracket. Pages fall into whichever tiers they overlap: the first
+ * `tier.toPage - tier.fromPage + 1` pages go in the first tier's price, the
+ * next bracket's pages at its price, and so on. Tiers are sorted by
+ * fromPage before applying, so caller order doesn't matter.
+ */
+export function calculateTieredBilling(pagesUsed: number | null, tiers: PricingTier[]): TieredBilling {
+  if (pagesUsed === null) {
+    return { pagesUsed: null, totalAmount: null, breakdown: [], dataAvailable: false };
+  }
+
+  const sortedTiers = [...tiers].sort((a, b) => a.fromPage - b.fromPage);
+  const breakdown: TieredBillingBreakdownItem[] = [];
+  let totalAmount = 0;
+
+  for (const tier of sortedTiers) {
+    if (pagesUsed < tier.fromPage) continue;
+    const tierEnd = tier.toPage ?? pagesUsed;
+    const pagesInTier = Math.max(0, Math.min(pagesUsed, tierEnd) - tier.fromPage + 1);
+    if (pagesInTier <= 0) continue;
+    const amount = Math.round(pagesInTier * tier.pricePerPage * 100) / 100;
+    totalAmount = Math.round((totalAmount + amount) * 100) / 100;
+    breakdown.push({ fromPage: tier.fromPage, toPage: tier.toPage, pagesInTier, pricePerPage: tier.pricePerPage, amount });
+  }
+
+  return { pagesUsed, totalAmount, breakdown, dataAvailable: true };
+}

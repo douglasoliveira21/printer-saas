@@ -31,10 +31,12 @@ const TENANT_SCOPED_MODELS = new Set([
   'ContractFixedCost',
   'ContractEmailRecipient',
   'ContractReadjustment',
+  'ContractPricingTier',
   'InventoryItem',
   'InventoryMovement',
   'FinancialEntry',
   'MonthlyClosing',
+  'ReportEmailRecipient',
   'CustomerWorkingHours',
   'TenantWorkingHours',
 ]);

@@ -4,6 +4,7 @@ import type {
   Contract,
   ContractEmailRecipient,
   ContractFixedCost,
+  ContractPricingTier,
   ContractPrinter,
   ContractReadjustment,
   PaginatedResponse,
@@ -34,6 +35,8 @@ export interface CreateContractInput {
   customerId: string;
   printerId?: string;
   startDate: string;
+  endDate?: string | null;
+  billingDay?: number;
   monthlyFee: number;
   franchisePages?: number;
   overagePriceBw?: number;
@@ -41,6 +44,8 @@ export interface CreateContractInput {
   defaultPriceBw?: number;
   defaultPriceColor?: number;
   defaultPriceScan?: number;
+  notes?: string;
+  printNotesOnClosing?: boolean;
 }
 
 export function useCreateContract() {
@@ -153,6 +158,31 @@ export function useRemoveContractFixedCost() {
   return useMutation({
     mutationFn: async ({ contractId, costId }: { contractId: string; costId: string }) => {
       await apiClient.delete(`/contracts/${contractId}/fixed-costs/${costId}`);
+    },
+    onSuccess: (_data, variables) => invalidateContract(queryClient, variables.contractId),
+  });
+}
+
+// ---------------------------------------------------------------------
+// Pricing tiers (faixas de páginas)
+// ---------------------------------------------------------------------
+
+export function useAddContractPricingTier() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ contractId, fromPage, toPage, pricePerPage }: { contractId: string; fromPage: number; toPage?: number; pricePerPage: number }) => {
+      const { data } = await apiClient.post<ContractPricingTier>(`/contracts/${contractId}/pricing-tiers`, { fromPage, toPage, pricePerPage });
+      return data;
+    },
+    onSuccess: (_data, variables) => invalidateContract(queryClient, variables.contractId),
+  });
+}
+
+export function useRemoveContractPricingTier() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ contractId, tierId }: { contractId: string; tierId: string }) => {
+      await apiClient.delete(`/contracts/${contractId}/pricing-tiers/${tierId}`);
     },
     onSuccess: (_data, variables) => invalidateContract(queryClient, variables.contractId),
   });

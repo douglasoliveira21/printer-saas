@@ -9,6 +9,7 @@ import { useContract } from "@/hooks/use-contracts";
 import type { ContractStatus } from "@/lib/types";
 import { OverviewTab } from "./overview-tab";
 import { EmailsTab } from "./emails-tab";
+import { NotesTab } from "./notes-tab";
 import { ReadjustmentsTab } from "./readjustments-tab";
 
 const STATUS_CONFIG: Record<ContractStatus, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
@@ -50,6 +51,7 @@ export default function ContractDetailPage({ params }: { params: Promise<{ id: s
         <TabsList>
           <TabsTrigger value="overview">Visão geral</TabsTrigger>
           <TabsTrigger value="emails">E-mail</TabsTrigger>
+          <TabsTrigger value="notes">Observação</TabsTrigger>
           <TabsTrigger value="readjustments">Reajuste</TabsTrigger>
         </TabsList>
 
@@ -57,7 +59,10 @@ export default function ContractDetailPage({ params }: { params: Promise<{ id: s
           <OverviewTab contract={contract} />
         </TabsContent>
         <TabsContent value="emails" className="mt-4">
-          <EmailsTab contractId={contract.id} />
+          <EmailsTab />
+        </TabsContent>
+        <TabsContent value="notes" className="mt-4">
+          <NotesTab contract={contract} />
         </TabsContent>
         <TabsContent value="readjustments" className="mt-4">
           <ReadjustmentsTab contractId={contract.id} />

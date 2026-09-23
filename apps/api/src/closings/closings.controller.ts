@@ -36,4 +36,16 @@ export class ClosingsController {
     res.setHeader('Content-Disposition', `attachment; filename="fechamento-${id}.pdf"`);
     res.send(buffer);
   }
+
+  @Post(':id/freeze')
+  @RequirePermissions('financial.create')
+  freeze(@Param('id') id: string) {
+    return this.closingsService.freeze(id);
+  }
+
+  @Post(':id/unfreeze')
+  @RequirePermissions('financial.create')
+  unfreeze(@Param('id') id: string) {
+    return this.closingsService.unfreeze(id);
+  }
 }

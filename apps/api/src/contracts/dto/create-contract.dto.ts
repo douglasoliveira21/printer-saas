@@ -1,5 +1,5 @@
 import { Type } from 'class-transformer';
-import { IsDateString, IsInt, IsNumber, IsOptional, IsString, IsUUID, Min } from 'class-validator';
+import { IsBoolean, IsDateString, IsInt, IsNumber, IsOptional, IsString, IsUUID, Min } from 'class-validator';
 
 export class CreateContractDto {
   @IsUUID()
@@ -12,9 +12,11 @@ export class CreateContractDto {
   @IsDateString()
   startDate!: string;
 
+  // null explicitly clears the end date (contrato por tempo indeterminado);
+  // undefined/omitted means "leave it as-is" on update.
   @IsOptional()
   @IsDateString()
-  endDate?: string;
+  endDate?: string | null;
 
   @Type(() => Number)
   @IsNumber()
@@ -58,6 +60,10 @@ export class CreateContractDto {
   @IsOptional()
   @IsString()
   notes?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  printNotesOnClosing?: boolean;
 
   @IsOptional()
   @Type(() => Number)

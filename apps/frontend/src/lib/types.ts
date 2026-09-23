@@ -392,6 +392,19 @@ export interface ContractEmailRecipient {
   email: string;
 }
 
+export interface ContractPricingTier {
+  id: string;
+  fromPage: number;
+  toPage: number | null;
+  pricePerPage: string;
+}
+
+export interface ReportEmailRecipient {
+  id: string;
+  email: string;
+  createdAt: string;
+}
+
 export type ContractReadjustmentStatus = "SCHEDULED" | "APPLIED" | "CANCELLED";
 
 export interface ContractReadjustment {
@@ -421,10 +434,13 @@ export interface Contract {
   defaultPriceBw: string | null;
   defaultPriceColor: string | null;
   defaultPriceScan: string | null;
+  notes: string | null;
+  printNotesOnClosing: boolean;
   customer?: { id: string; legalName: string; tradeName: string | null } | null;
   printer?: { id: string; model: string | null; ip: string | null } | null;
   contractPrinters?: ContractPrinter[];
   fixedCosts?: ContractFixedCost[];
+  pricingTiers?: ContractPricingTier[];
   emailRecipients?: ContractEmailRecipient[];
   readjustments?: ContractReadjustment[];
   _count?: { contractPrinters: number };
@@ -476,8 +492,12 @@ export interface ClosingContractLine {
   monthlyFee: number;
   fixedCosts: { label: string; amount: number }[];
   printers: ClosingPrinterLine[];
+  pageCost: { mode: "TIERED" | "FRANCHISE" | "FLAT"; amount: number; breakdown: { fromPage: number; toPage: number | null; pagesInTier: number; pricePerPage: number; amount: number }[] };
   contractTotal: number;
+  notes: string | null;
 }
+
+export type ClosingStatus = "PENDING" | "FROZEN";
 
 export interface MonthlyClosing {
   id: string;
@@ -486,6 +506,8 @@ export interface MonthlyClosing {
   referenceMonth: number;
   totalAmount: string;
   details: ClosingContractLine[];
+  status: ClosingStatus;
+  frozenAt: string | null;
   generatedAt: string;
   customer?: { id: string; legalName: string; tradeName: string | null };
 }

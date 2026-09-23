@@ -6,6 +6,7 @@ import { UpdateContractDto } from './dto/update-contract.dto';
 import { ListContractsQueryDto } from './dto/list-contracts-query.dto';
 import { CreateContractPrinterDto, UpdateContractPrinterDto } from './dto/contract-printer.dto';
 import { CreateContractFixedCostDto } from './dto/contract-fixed-cost.dto';
+import { CreateContractPricingTierDto } from './dto/contract-pricing-tier.dto';
 import { CreateContractEmailDto } from './dto/contract-email.dto';
 import { CreateContractReadjustmentDto } from './dto/contract-readjustment.dto';
 import { RequirePermissions } from '../common/decorators/permissions.decorator';
@@ -76,6 +77,18 @@ export class ContractsController {
   @RequirePermissions('contracts.edit')
   removeFixedCost(@Param('id') id: string, @Param('costId') costId: string) {
     return this.contractsService.removeFixedCost(id, costId);
+  }
+
+  @Post(':id/pricing-tiers')
+  @RequirePermissions('contracts.edit')
+  addPricingTier(@Param('id') id: string, @Body() dto: CreateContractPricingTierDto) {
+    return this.contractsService.addPricingTier(id, dto);
+  }
+
+  @Delete(':id/pricing-tiers/:tierId')
+  @RequirePermissions('contracts.edit')
+  removePricingTier(@Param('id') id: string, @Param('tierId') tierId: string) {
+    return this.contractsService.removePricingTier(id, tierId);
   }
 
   @Get(':id/emails')

@@ -2,15 +2,22 @@
 
 import { useState } from "react";
 import { toast } from "sonner";
-import { Download, FileStack, Printer, RefreshCw } from "lucide-react";
+import { Download, FileStack, Lock, LockOpen, Printer, RefreshCw } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { EmptyState } from "@/components/shared/empty-state";
 import { useCustomers } from "@/hooks/use-customers";
-import { downloadClosingPdf, useClosings, useGenerateClosing } from "@/hooks/use-closings";
+import { downloadClosingPdf, useClosings, useFreezeClosing, useGenerateClosing, useUnfreezeClosing } from "@/hooks/use-closings";
 import { getApiErrorMessage } from "@/lib/api-client";
+
+const PAGE_COST_MODE_LABEL: Record<string, string> = {
+  TIERED: "Faixas de páginas",
+  FRANCHISE: "Franquia + excedente",
+  FLAT: "Custo por página",
+};
 
 const MONTH_NAMES = [
   "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
@@ -30,6 +37,8 @@ export function ClosingMonthTab() {
   const { data: customers } = useCustomers();
   const { data: closings, isLoading } = useClosings(customerId || undefined, year);
   const generateClosing = useGenerateClosing();
+  const freezeClosing = useFreezeClosing();
+  const unfreezeClosing = useUnfreezeClosing();
 
   const closing = closings?.find((c) => c.referenceMonth === month && c.referenceYear === year);
   const customerName = closing?.customer?.tradeName || closing?.customer?.legalName;
@@ -41,6 +50,26 @@ export function ClosingMonthTab() {
       toast.success("Fechamento gerado");
     } catch (error) {
       toast.error(getApiErrorMessage(error, "Erro ao gerar fechamento"));
+    }
+  }
+
+  async function handleFreeze() {
+    if (!closing) return;
+    try {
+      await freezeClosing.mutateAsync({ id: closing.id, customerId: closing.customerId });
+      toast.success("Fechamento congelado");
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, "Erro ao congelar fechamento"));
+    }
+  }
+
+  async function handleUnfreeze() {
+    if (!closing) return;
+    try {
+      await unfreezeClosing.mutateAsync({ id: closing.id, customerId: closing.customerId });
+      toast.success("Fechamento descongelado");
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, "Erro ao descongelar fechamento"));
     }
   }
 
@@ -92,7 +121,7 @@ export function ClosingMonthTab() {
             ))}
           </SelectContent>
         </Select>
-        <Button onClick={handleGenerate} disabled={!customerId || generateClosing.isPending}>
+        <Button onClick={handleGenerate} disabled={!customerId || generateClosing.isPending || closing?.status === "FROZEN"}>
           <RefreshCw className="mr-2 h-4 w-4" />
           {generateClosing.isPending ? "Gerando..." : closing ? "Atualizar fechamento" : "Gerar fechamento"}
         </Button>
@@ -113,10 +142,24 @@ export function ClosingMonthTab() {
       {closing && (
         <div className="space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-2 print:hidden">
-            <p className="text-sm text-muted-foreground">
-              Gerado em {new Date(closing.generatedAt).toLocaleString("pt-BR")}
-            </p>
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <span>Gerado em {new Date(closing.generatedAt).toLocaleString("pt-BR")}</span>
+              <Badge variant={closing.status === "FROZEN" ? "default" : "secondary"}>
+                {closing.status === "FROZEN" ? "Congelado" : "Pendente"}
+              </Badge>
+            </div>
             <div className="flex gap-2">
+              {closing.status === "FROZEN" ? (
+                <Button variant="outline" size="sm" onClick={handleUnfreeze} disabled={unfreezeClosing.isPending}>
+                  <LockOpen className="mr-2 h-4 w-4" />
+                  Descongelar
+                </Button>
+              ) : (
+                <Button variant="outline" size="sm" onClick={handleFreeze} disabled={freezeClosing.isPending}>
+                  <Lock className="mr-2 h-4 w-4" />
+                  Congelar
+                </Button>
+              )}
               <Button variant="outline" size="sm" onClick={() => window.print()}>
                 <Printer className="mr-2 h-4 w-4" />
                 Imprimir
@@ -171,6 +214,12 @@ export function ClosingMonthTab() {
                       <TableCell className="font-medium">{currency(p.lineTotal)}</TableCell>
                     </TableRow>
                   ))}
+                  <TableRow>
+                    <TableCell colSpan={5} className="text-muted-foreground">
+                      Custo de páginas ({PAGE_COST_MODE_LABEL[contractLine.pageCost.mode]})
+                    </TableCell>
+                    <TableCell className="font-medium">{currency(contractLine.pageCost.amount)}</TableCell>
+                  </TableRow>
                   {contractLine.fixedCosts.map((fc, i) => (
                     <TableRow key={i}>
                       <TableCell colSpan={5} className="text-muted-foreground">
@@ -181,6 +230,12 @@ export function ClosingMonthTab() {
                   ))}
                 </TableBody>
               </Table>
+              {contractLine.notes && (
+                <div className="border-t border-border px-4 py-3 text-sm text-muted-foreground">
+                  <span className="font-medium text-foreground">Observação: </span>
+                  {contractLine.notes}
+                </div>
+              )}
             </Card>
           ))}
 

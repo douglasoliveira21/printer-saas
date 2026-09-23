@@ -55,6 +55,8 @@ model Tenant {
   contractFixedCosts      ContractFixedCost[]
   contractEmailRecipients ContractEmailRecipient[]
   contractReadjustments   ContractReadjustment[]
+  contractPricingTiers    ContractPricingTier[]
+  reportEmailRecipients   ReportEmailRecipient[]
   serviceOrderParts       ServiceOrderPart[]
   serviceOrderPhotos      ServiceOrderPhoto[]
   workingHours            TenantWorkingHours[]
@@ -896,6 +898,7 @@ model Contract {
   readjustmentIndex String?
   status            ContractStatus @default(DRAFT)
   notes             String?
+  printNotesOnClosing Boolean @default(false)
 
   // Default per-page cost, used as a fallback for any linked ContractPrinter
   // that doesn't have its own override (spec: "custo padrão"). Supersedes
@@ -914,10 +917,32 @@ model Contract {
   fixedCosts       ContractFixedCost[]
   emailRecipients  ContractEmailRecipient[]
   readjustments    ContractReadjustment[]
+  pricingTiers     ContractPricingTier[]
 
   @@unique([tenantId, number])
   @@index([tenantId])
   @@map("contracts")
+}
+
+// One row per page-range bracket of a contract's progressive/tiered pricing
+// (spec: "tabela de faixas de páginas"). Pages consumed within [fromPage,
+// toPage] in a period are billed at pricePerPage for that bracket, like a
+// tax bracket — see calculateTieredBilling in packages/shared/src/billing.ts
+// for the exact math. toPage: null means "no upper bound" (last bracket).
+model ContractPricingTier {
+  id           String   @id @default(uuid())
+  tenantId     String
+  tenant       Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  contractId   String
+  contract     Contract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  fromPage     Int
+  toPage       Int?
+  pricePerPage Decimal  @db.Decimal(12, 4)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([tenantId, contractId])
+  @@map("contract_pricing_tiers")
 }
 
 // One row per printer billed under a contract (a contract can now cover many
@@ -997,24 +1022,49 @@ model ContractReadjustment {
   @@map("contract_readjustments")
 }
 
-// Immutable snapshot of a customer's monthly billing closing — generated on
-// demand from Contract/CounterReading data (reusing the same franchise/
-// overage math as Contract.billingPreview), not recomputed live once saved.
+enum ClosingStatus {
+  PENDING
+  FROZEN
+}
+
+// Snapshot of a customer's monthly billing closing — generated on demand
+// from Contract/CounterReading data. PENDING can be regenerated/overwritten
+// freely (e.g. re-run after a late counter reading comes in); once FROZEN,
+// ClosingsService.generate() refuses to overwrite it silently — it has to be
+// explicitly unfrozen first. This is what "congelado"/"pendente" in the
+// daily digest email refers to.
 model MonthlyClosing {
-  id             String   @id @default(uuid())
+  id             String        @id @default(uuid())
   tenantId       String
-  tenant         Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant         Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   customerId     String
-  customer       Customer @relation(fields: [customerId], references: [id])
+  customer       Customer      @relation(fields: [customerId], references: [id])
   referenceYear  Int
   referenceMonth Int // 1-12
-  totalAmount    Decimal  @db.Decimal(12, 2)
+  totalAmount    Decimal       @db.Decimal(12, 2)
   details        Json // per-contract breakdown snapshot at generation time
-  generatedAt    DateTime @default(now())
+  status         ClosingStatus @default(PENDING)
+  frozenAt       DateTime?
+  generatedAt    DateTime      @default(now())
 
   @@unique([tenantId, customerId, referenceYear, referenceMonth])
   @@index([tenantId, customerId])
   @@map("monthly_closings")
+}
+
+// Tenant-wide (not per-contract) list of who receives the daily closing
+// digest email — replaces the old per-contract ContractEmailRecipient for
+// this purpose; see Configurações > "Envio de relatórios por e-mail".
+model ReportEmailRecipient {
+  id        String   @id @default(uuid())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  email     String
+  createdAt DateTime @default(now())
+
+  @@unique([tenantId, email])
+  @@index([tenantId])
+  @@map("report_email_recipients")
 }
 
 // ---------------------------------------------------------------------------

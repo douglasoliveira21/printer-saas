@@ -26,6 +26,28 @@ export function useGenerateClosing() {
   });
 }
 
+export function useFreezeClosing() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id }: { id: string; customerId: string }) => {
+      const { data } = await apiClient.post<MonthlyClosing>(`/closings/${id}/freeze`);
+      return data;
+    },
+    onSuccess: (_data, variables) => queryClient.invalidateQueries({ queryKey: ["closings", variables.customerId] }),
+  });
+}
+
+export function useUnfreezeClosing() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id }: { id: string; customerId: string }) => {
+      const { data } = await apiClient.post<MonthlyClosing>(`/closings/${id}/unfreeze`);
+      return data;
+    },
+    onSuccess: (_data, variables) => queryClient.invalidateQueries({ queryKey: ["closings", variables.customerId] }),
+  });
+}
+
 export async function downloadClosingPdf(id: string, filename: string) {
   const { data } = await apiClient.get(`/closings/${id}/pdf`, { responseType: "blob" });
   const url = URL.createObjectURL(data);

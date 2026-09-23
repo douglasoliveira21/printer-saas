@@ -10,6 +10,7 @@ import { CreateUserDialog } from "./create-user-dialog";
 import { UserActionsMenu } from "./user-actions-menu";
 import { CompanyWorkingHoursCard } from "./company-working-hours-card";
 import { SnmpCredentialsTab } from "./snmp-credentials-tab";
+import { ReportEmailRecipientsTab } from "./report-email-recipients-tab";
 
 export default function ConfiguracoesPage() {
   const { data: users, isLoading } = useTenantUsers();
@@ -41,6 +42,7 @@ export default function ConfiguracoesPage() {
           <TabsTrigger value="usuarios">Usuários</TabsTrigger>
           <TabsTrigger value="empresa">Empresa</TabsTrigger>
           <TabsTrigger value="snmp">Credenciais SNMP v3</TabsTrigger>
+          <TabsTrigger value="report-emails">Envio de relatórios por e-mail</TabsTrigger>
         </TabsList>
 
         <TabsContent value="usuarios" className="mt-4 space-y-4">
@@ -66,6 +68,10 @@ export default function ConfiguracoesPage() {
 
         <TabsContent value="snmp" className="mt-4">
           <SnmpCredentialsTab />
+        </TabsContent>
+
+        <TabsContent value="report-emails" className="mt-4">
+          <ReportEmailRecipientsTab />
         </TabsContent>
       </Tabs>
     </div>
