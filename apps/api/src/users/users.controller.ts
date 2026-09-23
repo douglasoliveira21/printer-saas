@@ -31,6 +31,14 @@ export class UsersController {
     return user;
   }
 
+  // Full profile (role, permissões diretas, cliente vinculado, datas) pra
+  // tela "Meu perfil" — GET /users/me só devolve o payload enxuto do JWT.
+  // Sem settings.manage: qualquer usuário pode ver os próprios dados.
+  @Get('me/full')
+  meFull(@CurrentUser() user: AuthenticatedUser) {
+    return this.usersService.findOne(user.id);
+  }
+
   // Self-service — no settings.manage, just needs to be the logged-in user.
   // Declared before the generic ':id' routes so "me" isn't swallowed as a literal id.
   @Patch('me')

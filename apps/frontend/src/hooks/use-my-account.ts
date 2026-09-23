@@ -1,12 +1,25 @@
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiClient } from "@/lib/api-client";
+import type { TenantUser } from "./use-users";
+
+export function useMyFullProfile() {
+  return useQuery({
+    queryKey: ["users", "me", "full"],
+    queryFn: async () => {
+      const { data } = await apiClient.get<TenantUser>("/users/me/full");
+      return data;
+    },
+  });
+}
 
 export function useUpdateMyProfile() {
+  const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (input: { name: string }) => {
       const { data } = await apiClient.patch("/users/me", input);
       return data;
     },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["users", "me", "full"] }),
   });
 }
 
