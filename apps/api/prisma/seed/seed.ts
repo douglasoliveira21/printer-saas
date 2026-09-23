@@ -322,6 +322,37 @@ async function seedPlatformSuperAdmin() {
   console.log('Platform super admin seeded: login with superadmin@platform.local / SuperAdmin@1234');
 }
 
+/**
+ * Permissions are added incrementally over time (new features), but a
+ * tenant's "Admin" role is only granted the full permission set once, at
+ * tenant-creation time (`registerTenant`/`seedDemoTenant`). Any permission
+ * added after a given tenant already existed never reaches that tenant's
+ * Admin role, silently locking admins out of new screens. This heals every
+ * `isSystem` Admin role on every run by granting whatever permissions it's
+ * still missing — safe to re-run, never removes anything.
+ */
+async function syncSystemAdminRolePermissions() {
+  const allPermissions = await prisma.permission.findMany();
+  const adminRoles = await prisma.role.findMany({
+    where: { isSystem: true, name: 'Admin' },
+    include: { permissions: true },
+  });
+
+  let grantedCount = 0;
+  for (const role of adminRoles) {
+    const existingIds = new Set(role.permissions.map((p) => p.permissionId));
+    const missing = allPermissions.filter((p) => !existingIds.has(p.id));
+    if (missing.length === 0) continue;
+
+    await prisma.rolePermission.createMany({
+      data: missing.map((p) => ({ roleId: role.id, permissionId: p.id })),
+    });
+    grantedCount += missing.length;
+  }
+
+  console.log(`Synced Admin roles: granted ${grantedCount} missing permission(s) across ${adminRoles.length} role(s)`);
+}
+
 async function seedPlans() {
   const plans = [
     { name: 'Starter', maxUsers: 3, maxCustomers: 10, maxPrinters: 25, maxAgents: 5, priceMonthly: 199 },
@@ -339,6 +370,7 @@ async function main() {
   await seedPlans();
   await seedDemoTenant();
   await seedPlatformSuperAdmin();
+  await syncSystemAdminRolePermissions();
 }
 
 main()
