@@ -224,6 +224,7 @@ model User {
   updatedAt DateTime @updatedAt
 
   refreshTokens           RefreshToken[]
+  passwordResetTokens     PasswordResetToken[]
   auditLogs               AuditLog[]
   technicianServiceOrders ServiceOrder[]        @relation("technician")
   createdServiceOrders    ServiceOrder[]        @relation("createdServiceOrders")
@@ -283,6 +284,24 @@ model RefreshToken {
 
   @@index([userId])
   @@map("refresh_tokens")
+}
+
+// "Esqueci minha senha" — mesmo padrão do RefreshToken (só o hash do token
+// é guardado, nunca o valor em si; usedAt marca consumo em vez de apagar,
+// preservando o histórico). Não é tenant-scoped pelo mesmo motivo do
+// RefreshToken: é resolvido pelo hash do token, nunca por tenantId.
+model PasswordResetToken {
+  id        String    @id @default(uuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+  @@index([tokenHash])
+  @@map("password_reset_tokens")
 }
 
 model Role {

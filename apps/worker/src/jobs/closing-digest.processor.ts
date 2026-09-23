@@ -13,6 +13,7 @@ export const NOTIFICATIONS_QUEUE = 'notifications';
 export const SEND_CLOSING_DIGEST_JOB = 'send-closing-digest';
 export const TICKET_ASSIGNED_JOB = 'ticket-assigned';
 export const TICKET_CLOSED_JOB = 'ticket-closed';
+export const PASSWORD_RESET_JOB = 'password-reset';
 
 /**
  * Handles every job on the shared NOTIFICATIONS_QUEUE:
@@ -46,6 +47,8 @@ export class ClosingDigestProcessor extends WorkerHost {
         return this.sendTicketAssigned(job.data);
       case TICKET_CLOSED_JOB:
         return this.sendTicketClosed(job.data);
+      case PASSWORD_RESET_JOB:
+        return this.sendPasswordReset(job.data);
       default:
         return;
     }
@@ -81,6 +84,15 @@ export class ClosingDigestProcessor extends WorkerHost {
       to: [creator.email],
       subject: `Chamado #${data.serviceOrderNumber} encerrado`,
       html: `<p>Olá ${creator.name},</p><p>O chamado <strong>#${data.serviceOrderNumber}</strong> que você abriu foi encerrado.</p>`,
+    });
+  }
+
+  private async sendPasswordReset(data: { tenantId: string; email: string; name: string; resetUrl: string }) {
+    await this.mailer.send({
+      tenantId: data.tenantId,
+      to: [data.email],
+      subject: 'Redefinição de senha',
+      html: `<p>Olá ${data.name},</p><p>Recebemos uma solicitação para redefinir sua senha. Clique no link abaixo para criar uma nova senha:</p><p><a href="${data.resetUrl}">${data.resetUrl}</a></p><p>Este link expira em 1 hora. Se você não solicitou isso, ignore este e-mail.</p>`,
     });
   }
 

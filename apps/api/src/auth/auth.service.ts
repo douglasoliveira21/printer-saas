@@ -1,6 +1,8 @@
-import { ConflictException, Injectable, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { InjectQueue } from '@nestjs/bullmq';
 import { JwtService } from '@nestjs/jwt';
+import type { Queue } from 'bullmq';
 import * as argon2 from 'argon2';
 import { createHash, randomBytes } from 'node:crypto';
 import ms from './ms';
@@ -14,12 +16,20 @@ export interface TokenPair {
   refreshToken: string;
 }
 
+// Same queue apps/worker/src/jobs/closing-digest.processor.ts listens on —
+// redeclared here rather than imported across the api/worker boundary,
+// same convention as NOTIFICATIONS_QUEUE in service-orders.service.ts.
+const NOTIFICATIONS_QUEUE = 'notifications';
+const PASSWORD_RESET_JOB = 'password-reset';
+const PASSWORD_RESET_TOKEN_TTL_MS = 60 * 60 * 1000; // 1h
+
 @Injectable()
 export class AuthService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwt: JwtService,
     private readonly config: ConfigService,
+    @InjectQueue(NOTIFICATIONS_QUEUE) private readonly notificationsQueue: Queue,
   ) {}
 
   async registerTenant(dto: RegisterTenantDto) {
@@ -122,6 +132,61 @@ export class AuthService {
       where: { tokenHash, revokedAt: null },
       data: { revokedAt: new Date() },
     });
+  }
+
+  /**
+   * Always resolves the same way regardless of whether the e-mail matches a
+   * real account — never reveals account existence to the caller (spec:
+   * avoid e-mail enumeration). When it does match, enqueues the reset e-mail
+   * on the same NOTIFICATIONS_QUEUE the ticket-assigned/closed e-mails use,
+   * sent through that user's own tenant mail provider (MailerService).
+   */
+  async forgotPassword(email: string) {
+    const user = await this.prisma.user.findFirst({
+      where: { email, deletedAt: null, status: 'ACTIVE' },
+    });
+
+    if (user) {
+      const token = randomBytes(32).toString('hex');
+      await this.prisma.passwordResetToken.create({
+        data: {
+          userId: user.id,
+          tokenHash: this.hashToken(token),
+          expiresAt: new Date(Date.now() + PASSWORD_RESET_TOKEN_TTL_MS),
+        },
+      });
+
+      const frontendUrl = this.config.get<string>('FRONTEND_URL', 'http://localhost:3000');
+      void this.notificationsQueue.add(PASSWORD_RESET_JOB, {
+        tenantId: user.tenantId,
+        email: user.email,
+        name: user.name,
+        resetUrl: `${frontendUrl}/redefinir-senha?token=${token}`,
+      });
+    }
+
+    return { message: 'Se o e-mail existir, enviamos instruções para redefinir a senha.' };
+  }
+
+  async resetPassword(token: string, newPassword: string) {
+    const tokenHash = this.hashToken(token);
+    const stored = await this.prisma.passwordResetToken.findFirst({ where: { tokenHash } });
+
+    if (!stored || stored.usedAt || stored.expiresAt < new Date()) {
+      throw new BadRequestException('Link inválido ou expirado — solicite uma nova redefinição de senha.');
+    }
+
+    const passwordHash = await argon2.hash(newPassword);
+    await this.prisma.$transaction([
+      this.prisma.user.update({ where: { id: stored.userId }, data: { passwordHash } }),
+      this.prisma.passwordResetToken.update({ where: { id: stored.id }, data: { usedAt: new Date() } }),
+      // A senha trocada invalida todas as sessões já abertas — mesmo raciocínio
+      // de qualquer fluxo de "esqueci a senha": se a conta foi comprometida, os
+      // refresh tokens antigos não devem continuar valendo.
+      this.prisma.refreshToken.updateMany({ where: { userId: stored.userId, revokedAt: null }, data: { revokedAt: new Date() } }),
+    ]);
+
+    return { message: 'Senha redefinida com sucesso.' };
   }
 
   private async issueTokenPair(userId: string, tenantId: string, isSuperAdmin: boolean): Promise<TokenPair> {

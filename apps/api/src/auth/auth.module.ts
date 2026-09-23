@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { BullModule } from '@nestjs/bullmq';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
@@ -12,6 +13,7 @@ import { PermissionsGuard } from './guards/permissions.guard';
 @Module({
   imports: [
     PassportModule,
+    BullModule.registerQueue({ name: 'notifications' }),
     JwtModule.registerAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
