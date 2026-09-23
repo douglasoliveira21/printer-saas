@@ -24,7 +24,10 @@ ENV NODE_ENV=production
 # (connects via the container's internal IP, not localhost).
 ENV HOSTNAME=0.0.0.0
 ENV PORT=3000
-COPY --from=build /repo/apps/frontend/public apps/frontend/public
+# Monorepo standalone output nests server.js at apps/frontend/apps/frontend/server.js
+# (mirrors the workspace-relative path) — public/ has to sit right next to it,
+# not one level up, or static assets like /logo.png 404 at runtime.
+COPY --from=build /repo/apps/frontend/public apps/frontend/apps/frontend/public
 COPY --from=build /repo/apps/frontend/.next/standalone apps/frontend
 COPY --from=build /repo/apps/frontend/.next/static apps/frontend/apps/frontend/.next/static
 
