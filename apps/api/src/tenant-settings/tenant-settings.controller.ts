@@ -16,7 +16,7 @@ export class TenantSettingsController {
   }
 
   @Put('working-hours')
-  @RequirePermissions('settings.manage')
+  @RequirePermissions('company_settings.edit')
   setWorkingHours(@Body() dto: SetWorkingHoursDto) {
     return this.tenantSettingsService.setWorkingHours(dto);
   }

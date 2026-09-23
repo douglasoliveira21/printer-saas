@@ -1,4 +1,4 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Param, Patch, Post } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Patch, Post } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
@@ -53,5 +53,11 @@ export class UsersController {
   @RequirePermissions('settings.manage')
   activate(@Param('id') id: string) {
     return this.usersService.activate(id);
+  }
+
+  @Delete(':id')
+  @RequirePermissions('settings.manage')
+  remove(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
+    return this.usersService.remove(id, user.id);
   }
 }

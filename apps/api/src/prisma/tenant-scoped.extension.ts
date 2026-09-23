@@ -39,6 +39,8 @@ const TENANT_SCOPED_MODELS = new Set([
   'ReportEmailRecipient',
   'CustomerWorkingHours',
   'TenantWorkingHours',
+  'UserPermission',
+  'UserVisibleCustomer',
 ]);
 
 const READ_OPS = new Set(['findFirst', 'findFirstOrThrow', 'findMany', 'count', 'aggregate', 'groupBy']);

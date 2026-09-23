@@ -26,8 +26,11 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     // don't yet have a trusted tenant context — the token's own claims ARE
     // the source of truth we are validating.
     const user = await this.prisma.user.findFirst({
-      where: { id: payload.sub, tenantId: payload.tenantId, status: 'ACTIVE' },
-      include: { role: { include: { permissions: { include: { permission: true } } } } },
+      where: { id: payload.sub, tenantId: payload.tenantId, status: 'ACTIVE', deletedAt: null },
+      include: {
+        role: { include: { permissions: { include: { permission: true } } } },
+        directPermissions: { include: { permission: true } },
+      },
     });
 
     if (!user) {
@@ -38,6 +41,13 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     this.cls.set('userId', user.id);
     this.cls.set('isSuperAdmin', user.isSuperAdmin);
 
+    // Effective permissions are the UNION of the Role's permissions (legacy
+    // accounts) and direct UserPermission grants (accounts created via the
+    // account-type checklist don't use a Role at all) — see UsersService.create.
+    const rolePermissionKeys = user.role?.permissions.map((rp) => rp.permission.key) ?? [];
+    const directPermissionKeys = user.directPermissions.map((up) => up.permission.key);
+    const permissions = [...new Set([...rolePermissionKeys, ...directPermissionKeys])];
+
     return {
       id: user.id,
       tenantId: user.tenantId,
@@ -45,8 +55,9 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       name: user.name,
       isSuperAdmin: user.isSuperAdmin,
       roleId: user.roleId,
-      permissions: user.role?.permissions.map((rp) => rp.permission.key) ?? [],
+      permissions,
       customerId: user.customerId,
+      viewAllCustomers: user.viewAllCustomers,
     };
   }
 }

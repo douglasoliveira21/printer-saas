@@ -3,6 +3,7 @@ import { Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { Job } from 'bullmq';
 import { PrismaService } from '../prisma/prisma.service';
+import { MailerService } from '../mailer/mailer.service';
 
 export const MONITORING_QUEUE = 'monitoring';
 export const CHECK_OFFLINE_JOB = 'check-offline';
@@ -21,6 +22,7 @@ export class MonitoringProcessor extends WorkerHost {
   constructor(
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
+    private readonly mailer: MailerService,
   ) {
     super();
   }
@@ -167,7 +169,7 @@ export class MonitoringProcessor extends WorkerHost {
     const now = Date.now();
     const orders = await this.prisma.serviceOrder.findMany({
       where: { slaDueAt: { not: null }, status: { in: [...OPEN_SERVICE_ORDER_STATUSES] } },
-      select: { id: true, tenantId: true, number: true, slaDueAt: true },
+      select: { id: true, tenantId: true, number: true, slaDueAt: true, technicianId: true },
     });
 
     let alertsCreated = 0;
@@ -195,8 +197,32 @@ export class MonitoringProcessor extends WorkerHost {
         },
       });
       alertsCreated++;
+
+      // Same dedup as the Alert above (one per order/type while it stays
+      // OPEN) — otherwise this job (runs every 5min) would re-send the
+      // e-mail every run for the same still-breaching ticket.
+      if (order.technicianId) {
+        await this.notifyTechnicianSla(order.technicianId, order.number, isLate);
+      }
     }
 
     this.logger.log(`SLA check: ${alertsCreated} alerts created`);
+  }
+
+  private async notifyTechnicianSla(technicianId: string, orderNumber: number, isLate: boolean) {
+    const prefField = isLate ? 'notifyTicketSlaBreached' : 'notifyTicketSlaExpiring';
+    const technician = await this.prisma.user.findFirst({
+      where: { id: technicianId, deletedAt: null, [prefField]: true },
+      select: { email: true, name: true },
+    });
+    if (!technician) return;
+
+    await this.mailer.send({
+      to: [technician.email],
+      subject: isLate ? `Chamado #${orderNumber} com SLA vencido` : `Chamado #${orderNumber} perto do prazo de SLA`,
+      html: isLate
+        ? `<p>Olá ${technician.name},</p><p>O chamado <strong>#${orderNumber}</strong>, do qual você é responsável, está com o SLA vencido.</p>`
+        : `<p>Olá ${technician.name},</p><p>O chamado <strong>#${orderNumber}</strong>, do qual você é responsável, vence o SLA em menos de 2 horas.</p>`,
+    });
   }
 }

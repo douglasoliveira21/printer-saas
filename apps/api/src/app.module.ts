@@ -1,9 +1,11 @@
 import { Module } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ScheduleModule } from '@nestjs/schedule';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { APP_GUARD } from '@nestjs/core';
 import { ClsModule } from 'nestjs-cls';
+import { BullModule } from '@nestjs/bullmq';
+import Redis from 'ioredis';
 import { validateEnv } from './config/env.validation';
 import { PrismaModule } from './prisma/prisma.module';
 import { AuthModule } from './auth/auth.module';
@@ -39,6 +41,16 @@ import { HealthController } from './health/health.controller';
     }),
     ThrottlerModule.forRoot({
       throttlers: [{ ttl: 60_000, limit: 300 }],
+    }),
+    // Producer-only here — the same Redis-backed queues the worker already
+    // consumes (apps/worker/src/app.module.ts); the API just enqueues jobs
+    // (e.g. ticket-assigned/ticket-closed notifications), never processes them.
+    BullModule.forRootAsync({
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) => ({
+        connection: new Redis(config.getOrThrow<string>('REDIS_URL'), { maxRetriesPerRequest: null }),
+      }),
     }),
     PrismaModule,
     AuthModule,

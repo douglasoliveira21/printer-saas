@@ -6,6 +6,8 @@ import { UpdateCustomerDto } from './dto/update-customer.dto';
 import { SetWorkingHoursDto } from './dto/set-working-hours.dto';
 import { PaginationDto } from '../common/dto/pagination.dto';
 import { RequirePermissions } from '../common/decorators/permissions.decorator';
+import { CurrentUser } from '../common/decorators/current-user.decorator';
+import type { AuthenticatedUser } from '../auth/types';
 
 @ApiTags('customers')
 @Controller('customers')
@@ -20,8 +22,8 @@ export class CustomersController {
 
   @Get()
   @RequirePermissions('customers.view')
-  findAll(@Query() pagination: PaginationDto) {
-    return this.customersService.findAll(pagination);
+  findAll(@Query() pagination: PaginationDto, @CurrentUser() user: AuthenticatedUser) {
+    return this.customersService.findAll(pagination, user);
   }
 
   @Get(':id')

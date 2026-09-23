@@ -10,15 +10,21 @@ import { MailerService } from '../mailer/mailer.service';
 // not just log-and-skip like the intra-class switch pattern used elsewhere.
 export const NOTIFICATIONS_QUEUE = 'notifications';
 export const SEND_CLOSING_DIGEST_JOB = 'send-closing-digest';
+export const TICKET_ASSIGNED_JOB = 'ticket-assigned';
+export const TICKET_CLOSED_JOB = 'ticket-closed';
 
 /**
- * Once a day, e-mails each tenant's report recipients (ReportEmailRecipient)
- * a summary of the fechamentos (MonthlyClosing) belonging to contracts whose
- * billing cycle closed yesterday (billingDay === ontem) — spec: "os
- * fechamentos que encerraram no dia anterior, e foram congelados ou se
- * tornaram pendentes". Purely a status report: it does NOT auto-generate a
- * MonthlyClosing that doesn't exist yet — fechamentos are still generated
- * from the Financeiro UI; this job only reports on ones that already exist.
+ * Handles every job on the shared NOTIFICATIONS_QUEUE:
+ * - `send-closing-digest` (scheduled, see SchedulerService): once a day,
+ *   e-mails each tenant's report recipients (ReportEmailRecipient) a summary
+ *   of the fechamentos (MonthlyClosing) belonging to contracts whose billing
+ *   cycle closed yesterday. Purely a status report — it does NOT
+ *   auto-generate a MonthlyClosing that doesn't exist yet, fechamentos are
+ *   still generated from the Financeiro UI.
+ * - `ticket-assigned` / `ticket-closed` (enqueued by
+ *   apps/api/src/service-orders/service-orders.service.ts on the same
+ *   queue): per-user opt-in notification e-mails, gated by the target
+ *   user's own notifyTicketAssigned/notifyTicketClosed preference.
  */
 @Processor(NOTIFICATIONS_QUEUE)
 export class ClosingDigestProcessor extends WorkerHost {
@@ -32,10 +38,45 @@ export class ClosingDigestProcessor extends WorkerHost {
   }
 
   async process(job: Job): Promise<void> {
-    if (job.name !== SEND_CLOSING_DIGEST_JOB) {
-      return;
+    switch (job.name) {
+      case SEND_CLOSING_DIGEST_JOB:
+        return this.sendDigest();
+      case TICKET_ASSIGNED_JOB:
+        return this.sendTicketAssigned(job.data);
+      case TICKET_CLOSED_JOB:
+        return this.sendTicketClosed(job.data);
+      default:
+        return;
     }
-    return this.sendDigest();
+  }
+
+  private async sendTicketAssigned(data: { serviceOrderId: string; serviceOrderNumber: number; technicianId: string }) {
+    const technician = await this.prisma.user.findFirst({
+      where: { id: data.technicianId, deletedAt: null, notifyTicketAssigned: true },
+      select: { email: true, name: true },
+    });
+    if (!technician) return;
+
+    await this.mailer.send({
+      to: [technician.email],
+      subject: `Chamado #${data.serviceOrderNumber} atribuído a você`,
+      html: `<p>Olá ${technician.name},</p><p>O chamado <strong>#${data.serviceOrderNumber}</strong> foi atribuído a você.</p>`,
+    });
+  }
+
+  private async sendTicketClosed(data: { serviceOrderId: string; serviceOrderNumber: number; createdByUserId: string | null }) {
+    if (!data.createdByUserId) return;
+    const creator = await this.prisma.user.findFirst({
+      where: { id: data.createdByUserId, deletedAt: null, notifyTicketClosed: true },
+      select: { email: true, name: true },
+    });
+    if (!creator) return;
+
+    await this.mailer.send({
+      to: [creator.email],
+      subject: `Chamado #${data.serviceOrderNumber} encerrado`,
+      html: `<p>Olá ${creator.name},</p><p>O chamado <strong>#${data.serviceOrderNumber}</strong> que você abriu foi encerrado.</p>`,
+    });
   }
 
   private async sendDigest() {

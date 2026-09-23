@@ -23,7 +23,7 @@ export class AuthService {
   ) {}
 
   async registerTenant(dto: RegisterTenantDto) {
-    const existing = await this.prisma.user.findFirst({ where: { email: dto.adminEmail } });
+    const existing = await this.prisma.user.findFirst({ where: { email: dto.adminEmail, deletedAt: null } });
     if (existing) {
       throw new ConflictException('E-mail já está em uso');
     }
@@ -65,7 +65,7 @@ export class AuthService {
 
   async login(dto: LoginDto, expectedTenantId?: string) {
     const user = await this.prisma.user.findFirst({
-      where: { email: dto.email, ...(expectedTenantId ? { tenantId: expectedTenantId } : {}) },
+      where: { email: dto.email, deletedAt: null, ...(expectedTenantId ? { tenantId: expectedTenantId } : {}) },
     });
 
     if (!user || user.status !== 'ACTIVE') {

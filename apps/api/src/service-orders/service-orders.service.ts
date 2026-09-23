@@ -1,4 +1,6 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { InjectQueue } from '@nestjs/bullmq';
+import type { Queue } from 'bullmq';
 import { unlink } from 'node:fs/promises';
 import { join } from 'node:path';
 import { existsSync } from 'node:fs';
@@ -14,6 +16,9 @@ import type { ListServiceOrdersQueryDto } from './dto/list-service-orders-query.
 import type { AddPartDto } from './dto/add-part.dto';
 import type { ApproveServiceOrderDto } from './dto/approve-service-order.dto';
 import type { ServiceOrderPhotoPhaseDto } from './dto/upload-photo.dto';
+import type { AuthenticatedUser } from '../auth/types';
+
+export const NOTIFICATIONS_QUEUE = 'notifications';
 
 const STATUS_LABEL: Record<string, string> = {
   OPEN: 'Aberta',
@@ -51,6 +56,7 @@ export class ServiceOrdersService {
   constructor(
     private readonly tenantPrisma: TenantPrismaService,
     private readonly inventoryService: InventoryService,
+    @InjectQueue(NOTIFICATIONS_QUEUE) private readonly notificationsQueue: Queue,
   ) {}
 
   async create(dto: CreateServiceOrderDto, createdByUserId: string | undefined) {
@@ -82,7 +88,7 @@ export class ServiceOrdersService {
       counterAtOpening = latestCounter?.total ?? undefined;
     }
 
-    return this.tenantPrisma.client.serviceOrder.create({
+    const created = await this.tenantPrisma.client.serviceOrder.create({
       data: {
         number: (last?.number ?? 0) + 1,
         customerId: dto.customerId,
@@ -100,6 +106,17 @@ export class ServiceOrdersService {
         slaDueAt,
       } as any,
     });
+
+    if (dto.technicianId) {
+      void this.notificationsQueue.add('ticket-assigned', {
+        tenantId: this.tenantPrisma.tenantId,
+        serviceOrderId: created.id,
+        serviceOrderNumber: created.number,
+        technicianId: dto.technicianId,
+      });
+    }
+
+    return created;
   }
 
   /** Resolves the applicable SLA (printer > location > customer > contract) and turns it into a due date, or null if none applies. */
@@ -175,9 +192,14 @@ export class ServiceOrdersService {
     return serviceOrder;
   }
 
-  async update(id: string, dto: UpdateServiceOrderDto) {
-    await this.findOne(id);
+  async update(id: string, dto: UpdateServiceOrderDto, user?: AuthenticatedUser) {
+    const before = await this.findOne(id);
     if (dto.technicianId) await this.assertBelongsToTenant('user', dto.technicianId);
+
+    const isClosing = dto.status === 'DONE' && before.status !== 'DONE';
+    if (isClosing && user && !user.isSuperAdmin && !user.permissions.includes('service_orders.close')) {
+      throw new ForbiddenException('Missing permission: service_orders.close');
+    }
 
     const data: Record<string, unknown> = { ...dto };
     if (dto.scheduledAt) data.scheduledAt = new Date(dto.scheduledAt);
@@ -192,7 +214,32 @@ export class ServiceOrdersService {
     if (dto.status === 'IN_PROGRESS' && !dto.startedAt) data.startedAt = new Date();
     if (dto.status === 'DONE' && !dto.completedAt) data.completedAt = new Date();
 
-    return this.tenantPrisma.client.serviceOrder.update({ where: { id }, data: data as any });
+    const updated = await this.tenantPrisma.client.serviceOrder.update({ where: { id }, data: data as any });
+
+    // Fire-and-forget notifications — enqueued on the same BullMQ queue the
+    // worker already consumes for the closings digest (see
+    // apps/worker/src/jobs/closing-digest.processor.ts). A queue failure
+    // must never fail the actual OS update, so this is deliberately not
+    // awaited-and-thrown; BullMQ's own retry handles transient Redis blips.
+    const wasAssigned = dto.technicianId && dto.technicianId !== before.technicianId;
+    if (wasAssigned) {
+      void this.notificationsQueue.add('ticket-assigned', {
+        tenantId: this.tenantPrisma.tenantId,
+        serviceOrderId: id,
+        serviceOrderNumber: updated.number,
+        technicianId: dto.technicianId,
+      });
+    }
+    if (isClosing) {
+      void this.notificationsQueue.add('ticket-closed', {
+        tenantId: this.tenantPrisma.tenantId,
+        serviceOrderId: id,
+        serviceOrderNumber: updated.number,
+        createdByUserId: before.createdByUserId,
+      });
+    }
+
+    return updated;
   }
 
   // ---------------------------------------------------------------------

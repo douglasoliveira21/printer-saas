@@ -57,6 +57,8 @@ model Tenant {
   contractReadjustments   ContractReadjustment[]
   contractPricingTiers    ContractPricingTier[]
   reportEmailRecipients   ReportEmailRecipient[]
+  userPermissions         UserPermission[]
+  userVisibleCustomers    UserVisibleCustomer[]
   serviceOrderParts       ServiceOrderPart[]
   serviceOrderPhotos      ServiceOrderPhoto[]
   workingHours            TenantWorkingHours[]
@@ -154,35 +156,103 @@ enum UserStatus {
   INVITED
 }
 
+// STAFF = colaborador (equipe interna); CUSTOMER = conta de portal do
+// cliente (o que customerId != null já significava — explícito aqui porque
+// a tela de criação precisa saber o tipo ANTES do resto do formulário, pra
+// decidir qual checklist de permissões mostrar).
+enum AccountType {
+  STAFF
+  CUSTOMER
+}
+
 model User {
-  id           String     @id @default(uuid())
+  id           String      @id @default(uuid())
   tenantId     String
-  tenant       Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant       Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   name         String
   email        String
   passwordHash String
-  status       UserStatus @default(ACTIVE)
+  status       UserStatus  @default(ACTIVE)
   lastLoginAt  DateTime?
   roleId       String?
-  role         Role?      @relation(fields: [roleId], references: [id])
-  isSuperAdmin Boolean    @default(false)
+  role         Role?       @relation(fields: [roleId], references: [id])
+  isSuperAdmin Boolean     @default(false)
+  accountType  AccountType @default(STAFF)
   // Set only for customer-portal users (spec §34): scopes every portal
   // query to this single customer, on top of the normal tenant scoping.
   // NULL for regular tenant staff (admin/technician/finance/...).
   customerId   String?
-  customer     Customer?  @relation(fields: [customerId], references: [id], onDelete: Cascade)
-  createdAt    DateTime   @default(now())
-  updatedAt    DateTime   @updatedAt
+  customer     Customer?   @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  // Only meaningful for accountType=STAFF: true (default) sees every
+  // customer in the tenant; false restricts to UserVisibleCustomer rows.
+  viewAllCustomers Boolean @default(true)
+
+  // E-mail notification preferences — some only make sense for one account
+  // type (e.g. notifyTicketAssigned for STAFF, notifyTicketClosed for
+  // CUSTOMER) but all live on User since an account is exactly one type.
+  notifyTicketAssigned    Boolean @default(false)
+  notifyTicketSlaExpiring Boolean @default(false)
+  notifyTicketSlaBreached Boolean @default(false)
+  notifyTicketClosed      Boolean @default(false)
+  // No trigger wired yet — there is no service-order comment feature at
+  // all today, so this is stored for when that feature exists.
+  notifyTicketCommented   Boolean @default(false)
+
+  // Soft delete — same rationale as deactivate (see status): preserves
+  // audit trail and any ServiceOrder/PrinterComment/AuditLog history a
+  // deleted account is attached to. Every user query filters this out.
+  deletedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   refreshTokens           RefreshToken[]
   auditLogs               AuditLog[]
-  technicianServiceOrders ServiceOrder[]   @relation("technician")
-  createdServiceOrders    ServiceOrder[]   @relation("createdServiceOrders")
+  technicianServiceOrders ServiceOrder[]        @relation("technician")
+  createdServiceOrders    ServiceOrder[]        @relation("createdServiceOrders")
   printerComments         PrinterComment[]
+  directPermissions       UserPermission[]
+  visibleCustomers        UserVisibleCustomer[]
 
   @@unique([tenantId, email])
   @@index([tenantId])
   @@map("users")
+}
+
+// Direct permission grants (no Role in between) — how the new
+// account-creation checklist assigns permissions. Reuses the same
+// Permission table RolePermission already uses, so @RequirePermissions
+// checks work identically regardless of whether a permission came from a
+// Role or a direct grant (see PermissionsGuard/jwt.strategy.ts).
+model UserPermission {
+  tenantId     String
+  tenant       Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  userId       String
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  permissionId String
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([userId, permissionId])
+  @@index([tenantId])
+  @@map("user_permissions")
+}
+
+// Which customers a STAFF user with viewAllCustomers=false may see. Only
+// enforced today in the Clientes list (CustomersService.findAll) — not yet
+// propagated to printers/contracts/OS/financeiro, documented as a larger
+// follow-up.
+model UserVisibleCustomer {
+  tenantId   String
+  tenant     Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  customerId String
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@id([userId, customerId])
+  @@index([tenantId])
+  @@map("user_visible_customers")
 }
 
 model RefreshToken {
@@ -221,6 +291,7 @@ model Permission {
   description String?
 
   roles RolePermission[]
+  users UserPermission[]
 
   @@map("permissions")
 }
@@ -315,6 +386,7 @@ model Customer {
   monthlyClosings  MonthlyClosing[]
   workingHours     CustomerWorkingHours[]
   agents           Agent[]
+  visibleToUsers   UserVisibleCustomer[]
 
   @@index([tenantId])
   @@map("customers")

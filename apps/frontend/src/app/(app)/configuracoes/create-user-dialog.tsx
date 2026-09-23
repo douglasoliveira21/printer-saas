@@ -1,99 +1,39 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useState } from "react";
 import { toast } from "sonner";
 import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useCreateUser, useRoles } from "@/hooks/use-users";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { useCreateUser } from "@/hooks/use-users";
 import { getApiErrorMessage } from "@/lib/api-client";
+import { AccountForm, type AccountFormValue } from "./usuarios/account-form";
 
 export function CreateUserDialog() {
   const [open, setOpen] = useState(false);
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [roleId, setRoleId] = useState("");
-  const { data: roles } = useRoles();
   const createUser = useCreateUser();
 
-  function reset() {
-    setName("");
-    setEmail("");
-    setPassword("");
-    setRoleId("");
-  }
-
-  async function handleSubmit(event: FormEvent) {
-    event.preventDefault();
+  async function handleSubmit(value: AccountFormValue) {
     try {
-      await createUser.mutateAsync({ name, email, password, roleId: roleId || undefined });
-      toast.success("Usuário criado");
-      reset();
+      await createUser.mutateAsync({ ...value, password: value.password ?? "" });
+      toast.success("Conta criada");
       setOpen(false);
     } catch (error) {
-      toast.error(getApiErrorMessage(error, "Erro ao criar usuário"));
+      toast.error(getApiErrorMessage(error, "Erro ao criar conta"));
     }
   }
 
   return (
-    <Dialog open={open} onOpenChange={(next) => { setOpen(next); if (!next) reset(); }}>
+    <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger render={<Button />}>
         <Plus className="mr-2 h-4 w-4" />
-        Novo usuário
+        Nova conta
       </DialogTrigger>
-      <DialogContent>
-        <form onSubmit={handleSubmit}>
-          <DialogHeader>
-            <DialogTitle>Novo usuário</DialogTitle>
-            <DialogDescription>Cria um acesso de equipe para este tenant.</DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="name">Nome *</Label>
-              <Input id="name" required value={name} onChange={(e) => setName(e.target.value)} />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="email">E-mail *</Label>
-              <Input id="email" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="password">Senha *</Label>
-              <Input id="password" type="password" minLength={8} required value={password} onChange={(e) => setPassword(e.target.value)} />
-            </div>
-            <div className="space-y-2">
-              <Label>Perfil</Label>
-              <Select value={roleId} onValueChange={(v) => setRoleId(v ?? "")}>
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Selecione (opcional)" />
-                </SelectTrigger>
-                <SelectContent>
-                  {roles?.map((role) => (
-                    <SelectItem key={role.id} value={role.id}>
-                      {role.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button type="submit" disabled={!name || !email || password.length < 8 || createUser.isPending}>
-              {createUser.isPending ? "Salvando..." : "Salvar"}
-            </Button>
-          </DialogFooter>
-        </form>
+      <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>Nova conta</DialogTitle>
+        </DialogHeader>
+        <AccountForm mode="create" onSubmit={handleSubmit} submitting={createUser.isPending} submitLabel="Criar conta" />
       </DialogContent>
     </Dialog>
   );

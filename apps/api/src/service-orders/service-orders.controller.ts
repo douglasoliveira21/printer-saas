@@ -55,8 +55,8 @@ export class ServiceOrdersController {
 
   @Patch(':id')
   @RequirePermissions('service_orders.edit')
-  update(@Param('id') id: string, @Body() dto: UpdateServiceOrderDto) {
-    return this.serviceOrdersService.update(id, dto);
+  update(@Param('id') id: string, @Body() dto: UpdateServiceOrderDto, @CurrentUser() user: AuthenticatedUser) {
+    return this.serviceOrdersService.update(id, dto, user);
   }
 
   @Get(':id/pdf')

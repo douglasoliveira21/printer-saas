@@ -4,6 +4,7 @@ import { PaginationDto, paginated } from '../common/dto/pagination.dto';
 import type { CreateCustomerDto } from './dto/create-customer.dto';
 import type { UpdateCustomerDto } from './dto/update-customer.dto';
 import type { SetWorkingHoursDto } from './dto/set-working-hours.dto';
+import type { AuthenticatedUser } from '../auth/types';
 
 @Injectable()
 export class CustomersService {
@@ -14,8 +15,8 @@ export class CustomersService {
     return this.tenantPrisma.client.customer.create({ data: dto as any });
   }
 
-  async findAll(pagination: PaginationDto) {
-    const where = pagination.search
+  async findAll(pagination: PaginationDto, user?: AuthenticatedUser) {
+    const searchFilter = pagination.search
       ? {
           OR: [
             { legalName: { contains: pagination.search, mode: 'insensitive' as const } },
@@ -24,6 +25,16 @@ export class CustomersService {
           ],
         }
       : {};
+
+    // Portal (CUSTOMER) accounts are already scoped elsewhere via PortalGuard,
+    // not through this endpoint — the filter here only applies to STAFF
+    // accounts with viewAllCustomers=false (see UserVisibleCustomer).
+    const visibilityFilter =
+      user && !user.isSuperAdmin && !user.customerId && !user.viewAllCustomers
+        ? { visibleToUsers: { some: { userId: user.id } } }
+        : {};
+
+    const where = { ...searchFilter, ...visibilityFilter };
 
     const [data, total] = await Promise.all([
       this.tenantPrisma.client.customer.findMany({

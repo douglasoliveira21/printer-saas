@@ -8,6 +8,8 @@ export interface AuthenticatedUser {
   permissions: string[];
   /** Set only for customer-portal users (spec §34) — see AppClsStore/PortalGuard. */
   customerId: string | null;
+  /** STAFF only — false means the account is restricted to UserVisibleCustomer rows (see CustomersService.findAll). */
+  viewAllCustomers: boolean;
 }
 
 export interface JwtAccessPayload {
