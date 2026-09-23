@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
@@ -60,7 +61,9 @@ export function Header({ title, className }: { title?: string; className?: strin
           <span className="hidden sm:inline">{user?.name ?? "Usuário"}</span>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
-          <DropdownMenuLabel>{user?.email}</DropdownMenuLabel>
+          <DropdownMenuGroup>
+            <DropdownMenuLabel>{user?.email}</DropdownMenuLabel>
+          </DropdownMenuGroup>
           <DropdownMenuSeparator />
           <DropdownMenuItem onClick={() => setProfileOpen(true)}>
             <UserIcon className="mr-2 h-4 w-4" />
