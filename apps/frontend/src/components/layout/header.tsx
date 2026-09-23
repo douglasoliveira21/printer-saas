@@ -60,7 +60,7 @@ export function Header({ title, className }: { title?: string; className?: strin
           <UserIcon className="h-4 w-4" />
           <span className="hidden sm:inline">{user?.name ?? "Usuário"}</span>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
+        <DropdownMenuContent align="end" className="w-64">
           <DropdownMenuGroup>
             <DropdownMenuLabel>{user?.email}</DropdownMenuLabel>
           </DropdownMenuGroup>
