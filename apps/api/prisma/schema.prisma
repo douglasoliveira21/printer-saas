@@ -59,6 +59,11 @@ model Tenant {
   reportEmailRecipients   ReportEmailRecipient[]
   userPermissions         UserPermission[]
   userVisibleCustomers    UserVisibleCustomer[]
+  emailSettings           TenantEmailSettings?
+  notificationTypeSettings NotificationTypeSetting[]
+  notificationTypeCustomers NotificationTypeCustomer[]
+  reportDeliveries        ReportDelivery[]
+  reportDeliveryCustomers ReportDeliveryCustomer[]
   serviceOrderParts       ServiceOrderPart[]
   serviceOrderPhotos      ServiceOrderPhoto[]
   workingHours            TenantWorkingHours[]
@@ -387,6 +392,8 @@ model Customer {
   workingHours     CustomerWorkingHours[]
   agents           Agent[]
   visibleToUsers   UserVisibleCustomer[]
+  notificationTypeSettings NotificationTypeCustomer[]
+  reportDeliveries         ReportDeliveryCustomer[]
 
   @@index([tenantId])
   @@map("customers")
@@ -1137,6 +1144,128 @@ model ReportEmailRecipient {
   @@unique([tenantId, email])
   @@index([tenantId])
   @@map("report_email_recipients")
+}
+
+// ---------------------------------------------------------------------------
+// EMAIL SETTINGS (Configurações > E-mail): provedor de envio por tenant,
+// filtro de notificações por cliente, e roteamento de relatórios por cliente.
+// ---------------------------------------------------------------------------
+
+enum EmailProvider {
+  SMTP
+  MICROSOFT365
+}
+
+// Uma linha por tenant. Quando não existe (ou o provedor escolhido não tem
+// as credenciais preenchidas), o worker cai pro SMTP global do .env — mesmo
+// comportamento de antes desta feature, sem regressão pra quem não configurar.
+model TenantEmailSettings {
+  id       String @id @default(uuid())
+  tenantId String @unique
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  provider EmailProvider @default(SMTP)
+
+  smtpHost              String?
+  smtpPort              Int?
+  smtpUser              String?
+  smtpPasswordEncrypted String? // AES-256-GCM via SecretCryptoService, nunca em texto puro
+  smtpFrom              String?
+
+  // Microsoft 365 — Microsoft Graph, client-credentials (app-only). Requer um
+  // App Registration no Azure AD do próprio tenant final com a permissão
+  // Mail.Send (aplicativo) consentida por um admin — não algo que dá pra
+  // gerar por aqui, só armazenar/usar o que o usuário colar.
+  m365TenantId              String?
+  m365ClientId              String?
+  m365ClientSecretEncrypted String?
+  m365SenderUpn             String? // caixa de e-mail usada como remetente (users/{upn}/sendMail)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("tenant_email_settings")
+}
+
+enum NotificationType {
+  TICKET_ASSIGNED
+  TICKET_SLA_EXPIRING
+  TICKET_SLA_BREACHED
+  TICKET_CLOSED
+  TICKET_COMMENTED
+}
+
+// Filtro por cliente em cima do que o usuário já marcou no perfil dele
+// (User.notifyTicket*) — as duas coisas precisam permitir pro e-mail sair.
+// Sem linha configurada pra um tipo = habilitado pra todos os clientes.
+model NotificationTypeSetting {
+  id           String            @id @default(uuid())
+  tenantId     String
+  tenant       Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  type         NotificationType
+  allCustomers Boolean           @default(true)
+  customers    NotificationTypeCustomer[]
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+
+  @@unique([tenantId, type])
+  @@map("notification_type_settings")
+}
+
+model NotificationTypeCustomer {
+  tenantId   String
+  tenant     Tenant                  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  settingId  String
+  setting    NotificationTypeSetting @relation(fields: [settingId], references: [id], onDelete: Cascade)
+  customerId String
+  customer   Customer                @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@id([settingId, customerId])
+  @@index([tenantId])
+  @@map("notification_type_customers")
+}
+
+enum ReportType {
+  PRINTER_USAGE // Digitação por impressora
+  CLOSING_DIGEST // Resumo diário de fechamentos
+  PRINTER_USAGE_WITH_COPIES // Digitação e cópias por impressora
+}
+
+enum CustomerEmailField {
+  EMAIL
+  FINANCIAL_EMAIL
+  SUPPORT_EMAIL
+}
+
+// Pra quem cada tipo de relatório é enviado — todos os clientes ou uma lista
+// específica, usando um e-mail já cadastrado no próprio Customer (nunca um
+// e-mail digitado à mão aqui).
+model ReportDelivery {
+  id           String              @id @default(uuid())
+  tenantId     String
+  tenant       Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  reportType   ReportType
+  allCustomers Boolean             @default(true)
+  emailField   CustomerEmailField  @default(EMAIL)
+  customers    ReportDeliveryCustomer[]
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
+
+  @@unique([tenantId, reportType])
+  @@map("report_deliveries")
+}
+
+model ReportDeliveryCustomer {
+  tenantId   String
+  tenant     Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  deliveryId String
+  delivery   ReportDelivery @relation(fields: [deliveryId], references: [id], onDelete: Cascade)
+  customerId String
+  customer   Customer       @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@id([deliveryId, customerId])
+  @@index([tenantId])
+  @@map("report_delivery_customers")
 }
 
 // ---------------------------------------------------------------------------

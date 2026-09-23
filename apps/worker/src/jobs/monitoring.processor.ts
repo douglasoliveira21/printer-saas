@@ -4,6 +4,7 @@ import { ConfigService } from '@nestjs/config';
 import type { Job } from 'bullmq';
 import { PrismaService } from '../prisma/prisma.service';
 import { MailerService } from '../mailer/mailer.service';
+import { isNotificationEnabledForCustomer } from '../notifications/notification-gate';
 
 export const MONITORING_QUEUE = 'monitoring';
 export const CHECK_OFFLINE_JOB = 'check-offline';
@@ -169,7 +170,7 @@ export class MonitoringProcessor extends WorkerHost {
     const now = Date.now();
     const orders = await this.prisma.serviceOrder.findMany({
       where: { slaDueAt: { not: null }, status: { in: [...OPEN_SERVICE_ORDER_STATUSES] } },
-      select: { id: true, tenantId: true, number: true, slaDueAt: true, technicianId: true },
+      select: { id: true, tenantId: true, number: true, slaDueAt: true, technicianId: true, customerId: true },
     });
 
     let alertsCreated = 0;
@@ -202,14 +203,17 @@ export class MonitoringProcessor extends WorkerHost {
       // OPEN) — otherwise this job (runs every 5min) would re-send the
       // e-mail every run for the same still-breaching ticket.
       if (order.technicianId) {
-        await this.notifyTechnicianSla(order.technicianId, order.number, isLate);
+        await this.notifyTechnicianSla(order.tenantId, order.customerId, order.technicianId, order.number, isLate);
       }
     }
 
     this.logger.log(`SLA check: ${alertsCreated} alerts created`);
   }
 
-  private async notifyTechnicianSla(technicianId: string, orderNumber: number, isLate: boolean) {
+  private async notifyTechnicianSla(tenantId: string, customerId: string | null, technicianId: string, orderNumber: number, isLate: boolean) {
+    const type = isLate ? 'TICKET_SLA_BREACHED' : 'TICKET_SLA_EXPIRING';
+    if (!(await isNotificationEnabledForCustomer(this.prisma, tenantId, type, customerId))) return;
+
     const prefField = isLate ? 'notifyTicketSlaBreached' : 'notifyTicketSlaExpiring';
     const technician = await this.prisma.user.findFirst({
       where: { id: technicianId, deletedAt: null, [prefField]: true },
@@ -218,6 +222,7 @@ export class MonitoringProcessor extends WorkerHost {
     if (!technician) return;
 
     await this.mailer.send({
+      tenantId,
       to: [technician.email],
       subject: isLate ? `Chamado #${orderNumber} com SLA vencido` : `Chamado #${orderNumber} perto do prazo de SLA`,
       html: isLate

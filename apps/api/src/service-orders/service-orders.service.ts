@@ -113,6 +113,7 @@ export class ServiceOrdersService {
         serviceOrderId: created.id,
         serviceOrderNumber: created.number,
         technicianId: dto.technicianId,
+        customerId: dto.customerId,
       });
     }
 
@@ -228,6 +229,7 @@ export class ServiceOrdersService {
         serviceOrderId: id,
         serviceOrderNumber: updated.number,
         technicianId: dto.technicianId,
+        customerId: before.customerId,
       });
     }
     if (isClosing) {
@@ -236,6 +238,7 @@ export class ServiceOrdersService {
         serviceOrderId: id,
         serviceOrderNumber: updated.number,
         createdByUserId: before.createdByUserId,
+        customerId: before.customerId,
       });
     }
 

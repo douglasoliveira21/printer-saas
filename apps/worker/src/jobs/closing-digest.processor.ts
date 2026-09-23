@@ -3,6 +3,7 @@ import { Logger } from '@nestjs/common';
 import type { Job } from 'bullmq';
 import { PrismaService } from '../prisma/prisma.service';
 import { MailerService } from '../mailer/mailer.service';
+import { isNotificationEnabledForCustomer } from '../notifications/notification-gate';
 
 // Own queue, not BILLING_QUEUE — two @Processor classes both bound to the
 // same queue name would run as competing BullMQ workers that can pull each
@@ -50,7 +51,8 @@ export class ClosingDigestProcessor extends WorkerHost {
     }
   }
 
-  private async sendTicketAssigned(data: { serviceOrderId: string; serviceOrderNumber: number; technicianId: string }) {
+  private async sendTicketAssigned(data: { tenantId: string; serviceOrderId: string; serviceOrderNumber: number; technicianId: string; customerId: string | null }) {
+    if (!(await isNotificationEnabledForCustomer(this.prisma, data.tenantId, 'TICKET_ASSIGNED', data.customerId))) return;
     const technician = await this.prisma.user.findFirst({
       where: { id: data.technicianId, deletedAt: null, notifyTicketAssigned: true },
       select: { email: true, name: true },
@@ -58,14 +60,16 @@ export class ClosingDigestProcessor extends WorkerHost {
     if (!technician) return;
 
     await this.mailer.send({
+      tenantId: data.tenantId,
       to: [technician.email],
       subject: `Chamado #${data.serviceOrderNumber} atribuído a você`,
       html: `<p>Olá ${technician.name},</p><p>O chamado <strong>#${data.serviceOrderNumber}</strong> foi atribuído a você.</p>`,
     });
   }
 
-  private async sendTicketClosed(data: { serviceOrderId: string; serviceOrderNumber: number; createdByUserId: string | null }) {
+  private async sendTicketClosed(data: { tenantId: string; serviceOrderId: string; serviceOrderNumber: number; createdByUserId: string | null; customerId: string | null }) {
     if (!data.createdByUserId) return;
+    if (!(await isNotificationEnabledForCustomer(this.prisma, data.tenantId, 'TICKET_CLOSED', data.customerId))) return;
     const creator = await this.prisma.user.findFirst({
       where: { id: data.createdByUserId, deletedAt: null, notifyTicketClosed: true },
       select: { email: true, name: true },
@@ -73,6 +77,7 @@ export class ClosingDigestProcessor extends WorkerHost {
     if (!creator) return;
 
     await this.mailer.send({
+      tenantId: data.tenantId,
       to: [creator.email],
       subject: `Chamado #${data.serviceOrderNumber} encerrado`,
       html: `<p>Olá ${creator.name},</p><p>O chamado <strong>#${data.serviceOrderNumber}</strong> que você abriu foi encerrado.</p>`,
@@ -138,6 +143,7 @@ export class ClosingDigestProcessor extends WorkerHost {
       `;
 
       const ok = await this.mailer.send({
+        tenantId,
         to: recipients.map((r) => r.email),
         subject: 'Resumo diário de fechamentos',
         html,

@@ -4,6 +4,7 @@ import type { Queue } from 'bullmq';
 import { CHECK_OFFLINE_JOB, CHECK_SLA_JOB, CHECK_TONER_JOB, MONITORING_QUEUE } from './jobs/monitoring.processor';
 import { BILLING_QUEUE, GENERATE_MONTHLY_CHARGES_JOB } from './jobs/billing.processor';
 import { NOTIFICATIONS_QUEUE, SEND_CLOSING_DIGEST_JOB } from './jobs/closing-digest.processor';
+import { REPORTS_QUEUE, SEND_REPORT_DELIVERIES_JOB } from './jobs/report-delivery.processor';
 
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -15,6 +16,7 @@ export class SchedulerService implements OnModuleInit {
     @InjectQueue(MONITORING_QUEUE) private readonly monitoringQueue: Queue,
     @InjectQueue(BILLING_QUEUE) private readonly billingQueue: Queue,
     @InjectQueue(NOTIFICATIONS_QUEUE) private readonly notificationsQueue: Queue,
+    @InjectQueue(REPORTS_QUEUE) private readonly reportsQueue: Queue,
   ) {}
 
   async onModuleInit() {
@@ -26,6 +28,7 @@ export class SchedulerService implements OnModuleInit {
     // digest e-mail — 7am server time, unlike the other jobs here which just
     // need to run once every 24h from whenever the worker booted.
     await this.notificationsQueue.upsertJobScheduler(SEND_CLOSING_DIGEST_JOB, { pattern: '0 7 * * *' }, { name: SEND_CLOSING_DIGEST_JOB });
-    this.logger.log('Monitoring/billing/notifications job schedulers registered');
+    await this.reportsQueue.upsertJobScheduler(SEND_REPORT_DELIVERIES_JOB, { pattern: '0 7 * * *' }, { name: SEND_REPORT_DELIVERIES_JOB });
+    this.logger.log('Monitoring/billing/notifications/reports job schedulers registered');
   }
 }

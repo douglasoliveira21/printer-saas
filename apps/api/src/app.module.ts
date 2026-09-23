@@ -29,6 +29,7 @@ import { RolesModule } from './roles/roles.module';
 import { TenantSettingsModule } from './tenant-settings/tenant-settings.module';
 import { SnmpCredentialsModule } from './snmp-credentials/snmp-credentials.module';
 import { ReportEmailRecipientsModule } from './settings/report-email-recipients/report-email-recipients.module';
+import { EmailSettingsModule } from './settings/email/email-settings.module';
 import { HealthController } from './health/health.controller';
 
 @Module({
@@ -74,6 +75,7 @@ import { HealthController } from './health/health.controller';
     TenantSettingsModule,
     SnmpCredentialsModule,
     ReportEmailRecipientsModule,
+    EmailSettingsModule,
   ],
   controllers: [HealthController],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],

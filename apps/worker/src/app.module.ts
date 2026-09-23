@@ -7,6 +7,8 @@ import { MonitoringProcessor, MONITORING_QUEUE } from './jobs/monitoring.process
 import { BillingProcessor, BILLING_QUEUE } from './jobs/billing.processor';
 import { ClosingDigestProcessor, NOTIFICATIONS_QUEUE } from './jobs/closing-digest.processor';
 import { MailerService } from './mailer/mailer.service';
+import { SecretCryptoService } from './common/secret-crypto.service';
+import { ReportDeliveryProcessor, REPORTS_QUEUE } from './jobs/report-delivery.processor';
 import { SchedulerService } from './scheduler.service';
 import { HealthController } from './health.controller';
 
@@ -20,9 +22,18 @@ import { HealthController } from './health.controller';
         connection: new Redis(config.getOrThrow<string>('REDIS_URL'), { maxRetriesPerRequest: null }),
       }),
     }),
-    BullModule.registerQueue({ name: MONITORING_QUEUE }, { name: BILLING_QUEUE }, { name: NOTIFICATIONS_QUEUE }),
+    BullModule.registerQueue({ name: MONITORING_QUEUE }, { name: BILLING_QUEUE }, { name: NOTIFICATIONS_QUEUE }, { name: REPORTS_QUEUE }),
   ],
   controllers: [HealthController],
-  providers: [PrismaService, MonitoringProcessor, BillingProcessor, ClosingDigestProcessor, MailerService, SchedulerService],
+  providers: [
+    PrismaService,
+    MonitoringProcessor,
+    BillingProcessor,
+    ClosingDigestProcessor,
+    ReportDeliveryProcessor,
+    MailerService,
+    SecretCryptoService,
+    SchedulerService,
+  ],
 })
 export class AppModule {}

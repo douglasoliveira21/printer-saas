@@ -55,5 +55,13 @@ export const NAV_ITEMS: NavItem[] = [
   { label: "Relatórios", href: "/relatorios", icon: BarChart3 },
   { label: "Alertas", href: "/alertas", icon: Bell },
   { label: "Agents", href: "/agents", icon: Cpu },
-  { label: "Configurações", href: "/configuracoes", icon: Settings },
+  {
+    label: "Configurações",
+    href: "/configuracoes",
+    icon: Settings,
+    children: [
+      { label: "Geral", href: "/configuracoes" },
+      { label: "E-mail", href: "/configuracoes/email" },
+    ],
+  },
 ];
