@@ -77,6 +77,7 @@ model Tenant {
   serviceOrderTypes       ServiceOrderTypeCatalog[]
   departments             Department[]
   closingSettings         TenantClosingSettings?
+  supplyLevelFilters      SupplyLevelFilter[]
 
   @@map("tenants")
 }
@@ -404,6 +405,7 @@ model Customer {
   visibleToUsers   UserVisibleCustomer[]
   notificationTypeSettings NotificationTypeCustomer[]
   reportDeliveries         ReportDeliveryCustomer[]
+  supplyLevelFilters       SupplyLevelFilter[]
 
   @@index([tenantId])
   @@map("customers")
@@ -789,6 +791,24 @@ model ConsumableReplacement {
   @@index([tenantId, status])
   @@index([printerId, type, color])
   @@map("consumable_replacements")
+}
+
+// Suprimentos > Níveis dos suprimentos: um filtro salvo e nomeado, sempre
+// escopado a um único cliente (spec do usuário: "por cada cliente"). Não
+// guarda nenhuma leitura em si — ao abrir, a tela busca ao vivo as
+// impressoras desse cliente com a última leitura de cada consumível, então
+// o filtro nunca fica desatualizado.
+model SupplyLevelFilter {
+  id         String   @id @default(uuid())
+  tenantId   String
+  tenant     Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name       String
+  customerId String
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+
+  @@index([tenantId])
+  @@map("supply_level_filters")
 }
 
 model PrinterComment {

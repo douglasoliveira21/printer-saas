@@ -51,6 +51,7 @@ const TENANT_SCOPED_MODELS = new Set([
   'ServiceOrderTypeCatalog',
   'Department',
   'TenantClosingSettings',
+  'SupplyLevelFilter',
 ]);
 
 const READ_OPS = new Set(['findFirst', 'findFirstOrThrow', 'findMany', 'count', 'aggregate', 'groupBy']);

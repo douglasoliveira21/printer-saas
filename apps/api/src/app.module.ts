@@ -33,6 +33,7 @@ import { EmailSettingsModule } from './settings/email/email-settings.module';
 import { DepartmentsModule } from './settings/departments/departments.module';
 import { PreventiveMaintenanceModule } from './settings/preventive-maintenance/preventive-maintenance.module';
 import { PrinterErrorCodesModule } from './settings/printer-error-codes/printer-error-codes.module';
+import { SupplyLevelFiltersModule } from './supply-level-filters/supply-level-filters.module';
 import { ServiceOrderTypesModule } from './settings/service-order-types/service-order-types.module';
 import { HealthController } from './health/health.controller';
 
@@ -84,6 +85,7 @@ import { HealthController } from './health/health.controller';
     PreventiveMaintenanceModule,
     PrinterErrorCodesModule,
     ServiceOrderTypesModule,
+    SupplyLevelFiltersModule,
   ],
   controllers: [HealthController],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
