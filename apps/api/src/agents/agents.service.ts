@@ -332,6 +332,17 @@ export class AgentsService {
         }
       }
 
+      if (device.alerts?.length) {
+        await this.prisma.printerAlertReading.createMany({
+          data: device.alerts.map((a) => ({
+            printerId: printer.id,
+            code: a.code,
+            description: a.description,
+            severity: a.severity,
+          })),
+        });
+      }
+
       results.push({ fingerprint, printerId: printer.id, status: printer.status });
     }
     return { processed: results.length, results };

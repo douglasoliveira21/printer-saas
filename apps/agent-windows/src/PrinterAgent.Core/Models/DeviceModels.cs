@@ -19,6 +19,7 @@ public class DiscoveredDevice
     public string? SysDescr { get; set; }
     public DeviceCounters? Counters { get; set; }
     public List<DeviceConsumable>? Consumables { get; set; }
+    public List<DeviceAlert>? Alerts { get; set; }
 
     /// <summary>"SNMP" (default, network discovery) or "MANUAL" (added by IP or found via USB, without a network probe).</summary>
     public string? CollectionMethod { get; set; }
@@ -82,6 +83,14 @@ public class DeviceConsumable
     public string? Capacity { get; set; }
     public string? Name { get; set; }
     public string? Serial { get; set; }
+}
+
+/// <summary>One row of the printer's own Printer-MIB prtAlertTable (RFC 3805) — the raw error/alert code and description as reported by the device itself, never invented.</summary>
+public class DeviceAlert
+{
+    public string? Code { get; set; }
+    public string? Description { get; set; }
+    public string? Severity { get; set; }
 }
 
 public class SubmitDevicesRequest

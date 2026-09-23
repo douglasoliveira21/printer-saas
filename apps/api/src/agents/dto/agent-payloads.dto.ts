@@ -87,6 +87,20 @@ class DeviceConsumableDto {
   serial?: string;
 }
 
+class DeviceAlertDto {
+  @IsOptional()
+  @IsString()
+  code?: string;
+
+  @IsOptional()
+  @IsString()
+  description?: string;
+
+  @IsOptional()
+  @IsString()
+  severity?: string;
+}
+
 class DeviceCapabilitiesDto {
   @IsOptional()
   @IsBoolean()
@@ -168,6 +182,12 @@ class DeviceDto {
   @IsOptional()
   @IsBoolean()
   supportsA3?: boolean;
+
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => DeviceAlertDto)
+  alerts?: DeviceAlertDto[];
 
   @IsOptional()
   @IsIn(DEVICE_TYPES)

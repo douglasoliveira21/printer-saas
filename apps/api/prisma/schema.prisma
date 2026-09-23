@@ -687,6 +687,7 @@ model Printer {
   counters                       CounterReading[]
   consumables                    ConsumableReading[]
   alerts                         Alert[]
+  errorCodeReadings              PrinterAlertReading[]
   serviceOrders                  ServiceOrder[]
   contracts                      Contract[]
   replacements                   ConsumableReplacement[]
@@ -730,6 +731,27 @@ model ConsumableReading {
 
   @@index([printerId, collectedAt])
   @@map("consumable_readings")
+}
+
+// Raw alert/error state read straight from the printer's own Printer-MIB
+// prtAlertTable (RFC 3805, vendor-agnostic standard OID — see
+// PrinterMibOids.cs on the Agent side) — distinct from the `Alert` model,
+// which is this SaaS's own monitoring alerts (offline, low supply, etc.).
+// `description` is whatever text the printer itself reports (often terse or
+// vendor-jargon); `code` is optionally cross-referenced against
+// PrinterErrorCodeCatalog client-side for a friendlier label when a match
+// exists, but this table never depends on that catalog existing.
+model PrinterAlertReading {
+  id          String   @id @default(uuid())
+  printerId   String
+  printer     Printer  @relation(fields: [printerId], references: [id], onDelete: Cascade)
+  code        String?
+  description String?
+  severity    String? // printer's own severity word (e.g. "critical", "warning"), never invented when absent
+  collectedAt DateTime @default(now())
+
+  @@index([printerId, collectedAt])
+  @@map("printer_alert_readings")
 }
 
 enum ConsumableReplacementStatus {

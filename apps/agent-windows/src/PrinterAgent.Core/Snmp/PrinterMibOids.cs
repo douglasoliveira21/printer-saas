@@ -55,6 +55,19 @@ public static class PrinterMibOids
     public const string PrtMarkerSuppliesLevelTable = "1.3.6.1.2.1.43.11.1.1.9.1";
     public const string PrtMarkerSuppliesMaxCapacityTable = "1.3.6.1.2.1.43.11.1.1.8.1";
 
+    // Printer-MIB alert table (walked — one row per active alert/error
+    // condition). Vendor-agnostic standard OIDs (RFC 3805 prtAlertEntry,
+    // column numbers verified against the published MIB text, not guessed):
+    // prtAlertSeverityLevel (2), prtAlertCode (7), prtAlertDescription (8).
+    public const string PrtAlertSeverityLevelTable = "1.3.6.1.2.1.43.18.1.1.2.1";
+    public const string PrtAlertCodeTable = "1.3.6.1.2.1.43.18.1.1.7.1";
+    public const string PrtAlertDescriptionTable = "1.3.6.1.2.1.43.18.1.1.8.1";
+
+    // prtAlertSeverityLevel enum values (RFC 3805) — other(1) is never
+    // reported as a severity string, only critical/warning are meaningful.
+    public const int AlertSeverityCritical = 3;
+    public const int AlertSeverityWarning = 4;
+
     public static readonly (string Keyword, string Color)[] SupplyColorKeywords =
     [
         ("black", "black"),

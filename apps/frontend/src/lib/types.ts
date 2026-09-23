@@ -139,6 +139,18 @@ export interface Printer {
   agent?: { id: string; name: string; hostname: string | null; status?: AgentStatus; lastHeartbeatAt?: string | null } | null;
   counters?: CounterReading[];
   consumables?: ConsumableReading[];
+  errorCodeReadings?: PrinterAlertReading[];
+}
+
+/** Raw alert/error condition read straight from the printer's own Printer-MIB prtAlertTable — never invented when the device doesn't report one. */
+export interface PrinterAlertReading {
+  id: string;
+  code: string | null;
+  description: string | null;
+  severity: string | null;
+  collectedAt: string;
+  /** Cross-referenced against Configurações > Alertas > catálogo de códigos de erro, when a match exists. */
+  catalogMatch: { id: string; description: string; severity: AlertLevel } | null;
 }
 
 /** One group of printers sharing the same serial number (see GET /printers/duplicates). */

@@ -136,6 +136,8 @@ public class SnmpDeviceReader
         device.Capabilities.A3 = device.SupportsA3;
         if (device.SupportsA3 is not null) device.CapabilitySources["a3"] = "printer_mib";
 
+        device.Alerts = await ReadAlertsAsync(endpoint, communityOctet, version, timeoutMs, ct);
+
         // sysDescr alone (plain MIB-II) answers from routers, switches, NAS
         // boxes, servers with an SNMP agent installed too — this reader just
         // reports what it found, it no longer decides "is this a printer?"
@@ -260,6 +262,59 @@ public class SnmpDeviceReader
             return null;
         }
     }
+
+    /// <summary>
+    /// Walks the Printer-MIB alert table — one row per active alert/error
+    /// condition the printer itself is currently reporting (RFC 3805
+    /// prtAlertTable). Empty table (not an exception) on devices with no
+    /// active alert, which is the common/healthy case, not a failure.
+    /// </summary>
+    private async Task<List<DeviceAlert>?> ReadAlertsAsync(IPEndPoint endpoint, OctetString community, VersionCode version, int timeoutMs, CancellationToken ct)
+    {
+        try
+        {
+            var codes = await WalkAsync(endpoint, community, version, PrinterMibOids.PrtAlertCodeTable, timeoutMs, ct);
+            if (codes.Count == 0)
+            {
+                return null;
+            }
+
+            var descriptions = await WalkAsync(endpoint, community, version, PrinterMibOids.PrtAlertDescriptionTable, timeoutMs, ct);
+            var severities = await WalkAsync(endpoint, community, version, PrinterMibOids.PrtAlertSeverityLevelTable, timeoutMs, ct);
+
+            var result = new List<DeviceAlert>();
+            foreach (var (oid, code) in codes)
+            {
+                var index = oid[(oid.LastIndexOf('.') + 1)..];
+                var description = descriptions.GetValueOrDefault($"{PrinterMibOids.PrtAlertDescriptionTable}.{index}");
+                var severity = ClassifyAlertSeverity(severities.GetValueOrDefault($"{PrinterMibOids.PrtAlertSeverityLevelTable}.{index}"));
+
+                if (string.IsNullOrWhiteSpace(code) && string.IsNullOrWhiteSpace(description))
+                {
+                    continue;
+                }
+
+                result.Add(new DeviceAlert { Code = code, Description = description, Severity = severity });
+            }
+
+            return result.Count > 0 ? result : null;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "Alert table not available for {Endpoint}", endpoint);
+            return null;
+        }
+    }
+
+    private static string? ClassifyAlertSeverity(string? raw) =>
+        int.TryParse(raw, out var level)
+            ? level switch
+            {
+                PrinterMibOids.AlertSeverityCritical => "critical",
+                PrinterMibOids.AlertSeverityWarning => "warning",
+                _ => null,
+            }
+            : null;
 
     /// <summary>
     /// Detects whether this device has at least one input tray physically
@@ -551,6 +606,8 @@ public class SnmpDeviceReader
         device.Capabilities.A3 = device.SupportsA3;
         if (device.SupportsA3 is not null) device.CapabilitySources["a3"] = "printer_mib";
 
+        device.Alerts = await ReadAlertsV3Async(endpoint, privacyProvider, contextName, userName, report, timeoutMs, ct);
+
         return new SnmpProbeResult
         {
             Device = device,
@@ -781,6 +838,43 @@ public class SnmpDeviceReader
         catch (Exception ex)
         {
             _logger.LogDebug(ex, "Supplies table not available for {Endpoint}", endpoint);
+            return null;
+        }
+    }
+
+    private async Task<List<DeviceAlert>?> ReadAlertsV3Async(IPEndPoint endpoint, IPrivacyProvider privacyProvider, OctetString contextName, OctetString userName, ISnmpMessage report, int timeoutMs, CancellationToken ct)
+    {
+        try
+        {
+            var codes = await WalkV3Async(endpoint, privacyProvider, contextName, userName, report, PrinterMibOids.PrtAlertCodeTable, timeoutMs, ct);
+            if (codes.Count == 0)
+            {
+                return null;
+            }
+
+            var descriptions = await WalkV3Async(endpoint, privacyProvider, contextName, userName, report, PrinterMibOids.PrtAlertDescriptionTable, timeoutMs, ct);
+            var severities = await WalkV3Async(endpoint, privacyProvider, contextName, userName, report, PrinterMibOids.PrtAlertSeverityLevelTable, timeoutMs, ct);
+
+            var result = new List<DeviceAlert>();
+            foreach (var (oid, code) in codes)
+            {
+                var index = oid[(oid.LastIndexOf('.') + 1)..];
+                var description = descriptions.GetValueOrDefault($"{PrinterMibOids.PrtAlertDescriptionTable}.{index}");
+                var severity = ClassifyAlertSeverity(severities.GetValueOrDefault($"{PrinterMibOids.PrtAlertSeverityLevelTable}.{index}"));
+
+                if (string.IsNullOrWhiteSpace(code) && string.IsNullOrWhiteSpace(description))
+                {
+                    continue;
+                }
+
+                result.Add(new DeviceAlert { Code = code, Description = description, Severity = severity });
+            }
+
+            return result.Count > 0 ? result : null;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "Alert table not available for {Endpoint}", endpoint);
             return null;
         }
     }

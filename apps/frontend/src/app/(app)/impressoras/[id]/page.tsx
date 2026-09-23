@@ -274,6 +274,35 @@ export default function PrinterDetailPage({ params }: { params: Promise<{ id: st
               </div>
             )}
           </div>
+
+          <div>
+            <h2 className="mb-3 flex items-center gap-2 text-lg font-semibold">
+              <ShieldAlert className="h-5 w-5 text-neutral-400" />
+              Códigos de erro reportados pela impressora
+            </h2>
+            {!printer.errorCodeReadings || printer.errorCodeReadings.length === 0 ? (
+              <p className="text-sm text-neutral-400">Nenhum código de erro reportado pela impressora ainda.</p>
+            ) : (
+              <div className="space-y-2">
+                {printer.errorCodeReadings.map((reading) => (
+                  <Card key={reading.id}>
+                    <CardContent className="flex flex-wrap items-center gap-3 py-3">
+                      {reading.severity === "critical" ? (
+                        <ShieldAlert className="h-4 w-4 text-red-600" />
+                      ) : (
+                        <AlertTriangle className="h-4 w-4 text-amber-600" />
+                      )}
+                      {reading.code && <Badge variant="outline">{reading.code}</Badge>}
+                      <span className="text-sm">
+                        {reading.catalogMatch?.description ?? reading.description ?? "Sem descrição reportada"}
+                      </span>
+                      <span className="ml-auto text-xs text-neutral-400">{new Date(reading.collectedAt).toLocaleString("pt-BR")}</span>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </div>
         </TabsContent>
 
         <TabsContent value="history" className="mt-4">

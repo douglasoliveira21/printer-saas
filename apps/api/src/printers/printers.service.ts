@@ -112,6 +112,7 @@ export class PrintersService {
         department: { select: { id: true, name: true } },
         counters: { orderBy: { collectedAt: 'desc' }, take: 50 },
         consumables: { orderBy: { collectedAt: 'desc' }, take: 50 },
+        errorCodeReadings: { orderBy: { collectedAt: 'desc' }, take: 20 },
       },
     });
     if (!printer) {
@@ -150,7 +151,22 @@ export class PrintersService {
       };
     });
 
-    return { ...printer, consumables: consumablesWithForecast };
+    // Cross-referenced against the manual catalog (Configurações > Alertas)
+    // only for a friendlier label — the raw reading itself never depends on
+    // a catalog entry existing.
+    const errorCodesWithCatalogMatch = await Promise.all(
+      printer.errorCodeReadings.map(async (reading) => {
+        if (!reading.code || !printer.manufacturer) {
+          return { ...reading, catalogMatch: null };
+        }
+        const catalogMatch = await this.tenantPrisma.client.printerErrorCodeCatalog.findFirst({
+          where: { manufacturer: printer.manufacturer, code: reading.code },
+        });
+        return { ...reading, catalogMatch };
+      }),
+    );
+
+    return { ...printer, consumables: consumablesWithForecast, errorCodeReadings: errorCodesWithCatalogMatch };
   }
 
   /** Merges supply replacements and service orders into one chronological feed (spec: "linha do tempo de suprimentos e peças"). */
