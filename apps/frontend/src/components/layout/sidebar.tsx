@@ -26,12 +26,12 @@ export function Sidebar({ className }: { className?: string }) {
           <Image src="/logo.png" alt="Printer SaaS" width={160} height={48} className="h-full w-auto object-contain py-2" />
         )}
       </div>
-      <div className="flex-1 space-y-1 overflow-y-auto p-3">
+      <div className="flex-1 space-y-1 overflow-y-auto py-3">
         {user?.isSuperAdmin && (
           <Link
             href="/plataforma"
             className={cn(
-              "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+              "flex items-center gap-3 px-4 py-2 text-sm font-medium transition-colors",
               pathname.startsWith("/plataforma")
                 ? "bg-sidebar-primary text-sidebar-primary-foreground"
                 : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
@@ -68,7 +68,7 @@ function NavLink({ item, active }: { item: NavItem; active: boolean }) {
     <Link
       href={item.href}
       className={cn(
-        "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+        "flex items-center gap-3 px-4 py-2 text-sm font-medium transition-colors",
         active
           ? "bg-sidebar-primary text-sidebar-primary-foreground"
           : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
@@ -97,7 +97,7 @@ function NavGroup({ item, pathname }: { item: NavItem; pathname: string }) {
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
         className={cn(
-          "flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+          "flex w-full items-center gap-3 px-4 py-2 text-sm font-medium transition-colors",
           groupActive
             ? "bg-sidebar-primary/10 text-sidebar-foreground"
             : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
