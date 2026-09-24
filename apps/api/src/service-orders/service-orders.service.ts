@@ -216,6 +216,7 @@ export class ServiceOrdersService {
         parts: { orderBy: { createdAt: 'asc' } },
         photos: { orderBy: { createdAt: 'asc' } },
         serviceOrderTypeCatalog: { select: { id: true, name: true, blankLinesOnPrint: true } },
+        alerts: { orderBy: { createdAt: 'desc' } },
       },
     });
     if (!serviceOrder) {

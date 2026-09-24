@@ -384,6 +384,7 @@ export interface ServiceOrder {
   serviceOrderTypeCatalog?: { id: string; name: string; blankLinesOnPrint: number } | null;
   parts?: ServiceOrderPart[];
   photos?: ServiceOrderPhoto[];
+  alerts?: Alert[];
 }
 
 export type ContractStatus = "DRAFT" | "ACTIVE" | "SUSPENDED" | "ENDED" | "EXPIRED";

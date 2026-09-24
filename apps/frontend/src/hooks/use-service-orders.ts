@@ -77,6 +77,7 @@ export function useUpdateServiceOrderStatus() {
 
 export interface UpdateServiceOrderInput {
   id: string;
+  title?: string;
   description?: string;
   symptoms?: string[];
   serviceType?: ServiceOrderType;
