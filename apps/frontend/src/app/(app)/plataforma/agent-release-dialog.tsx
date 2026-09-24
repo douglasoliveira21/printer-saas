@@ -44,7 +44,18 @@ export function AgentReleaseDialog({
 
   useEffect(() => {
     if (!open) return;
-    setForm(release ? { ...release } : EMPTY);
+    setForm(
+      release
+        ? {
+            version: release.version,
+            downloadUrl: release.downloadUrl,
+            sha256: release.sha256,
+            signingCertThumbprint: release.signingCertThumbprint,
+            releaseNotes: release.releaseNotes,
+            isActive: release.isActive,
+          }
+        : EMPTY,
+    );
   }, [open, release]);
 
   function patch(update: Partial<AgentReleaseInput>) {
