@@ -9,7 +9,8 @@
         MinHeight="600" MinWidth="760"
         WindowStartupLocation="CenterScreen"
         Background="White"
-        Icon="agent.ico">
+        Icon="agent.ico"
+        Closing="Window_Closing">
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>

@@ -148,10 +148,14 @@
          running inside the elevated install. -->
     <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOXTEXT" Value="Abrir o Vgon Printer Agent agora" />
     <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOX" Value="1" />
+    <!-- Full formatted path ([AGENTFOLDER]...) instead of a bare filename +
+         Directory: Directory only sets CreateProcess's working directory,
+         it does NOT guarantee the bare exe name resolves against it, which
+         is why "Abrir o programa" was silently doing nothing. -->
     <CustomAction Id="LaunchApplication"
-                  Directory="AGENTFOLDER"
-                  ExeCommand="PrinterAgentSetup.exe"
-                  Return="asyncNoWait" />
+                  ExeCommand="[AGENTFOLDER]PrinterAgentSetup.exe"
+                  Return="asyncNoWait"
+                  Impersonate="yes" />
 
     <WixVariable Id="WixUILicenseRtf" Value="License.rtf" />
 

@@ -251,6 +251,61 @@ public class WindowsServiceInstaller
         using var controller = new ServiceController(ServiceName);
         controller.Start();
         controller.WaitForStatus(ServiceControllerStatus.Running, TimeSpan.FromSeconds(15));
+
+        RegisterAutoStart();
+    }
+
+    /// <summary>
+    /// The Windows Service itself (registered above with start=auto) already
+    /// survives a reboot on its own — this is a separate thing: making the
+    /// ConfigTool's tray icon/window (the person's control surface for
+    /// Start/Stop/Sair) come back too after every login, starting straight
+    /// into the tray (--tray) instead of popping the full window on every
+    /// boot. HKCU (not HKLM) on purpose: applies per logged-in user, no
+    /// extra elevation needed to write it (the whole install already runs
+    /// elevated, but this key doesn't need to be).
+    /// </summary>
+    private void RegisterAutoStart()
+    {
+        var exePath = Path.Combine(InstallPath, "PrinterAgentSetup.exe");
+        using var key = Microsoft.Win32.Registry.CurrentUser.CreateSubKey(@"Software\Microsoft\Windows\CurrentVersion\Run");
+        key.SetValue("VgonPrinterAgent", $"\"{exePath}\" --tray");
+    }
+
+    /// <summary>
+    /// Late-bound COM interop with WScript.Shell (the same mechanism the
+    /// Windows Script Host / classic VBScript installers have always used
+    /// to create .lnk files) — no NuGet package needed, and it's a real
+    /// Explorer shortcut (unlike hand-writing the .lnk binary format).
+    /// </summary>
+    public static void CreateDesktopShortcut()
+    {
+        var exePath = Path.Combine(InstallPath, "PrinterAgentSetup.exe");
+        var desktopPath = Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory);
+        var shortcutPath = Path.Combine(desktopPath, "Vgon Printer Agent.lnk");
+
+        var shellType = Type.GetTypeFromProgID("WScript.Shell") ?? throw new InvalidOperationException("WScript.Shell indisponível nesta máquina.");
+        dynamic shell = Activator.CreateInstance(shellType)!;
+        try
+        {
+            dynamic shortcut = shell.CreateShortcut(shortcutPath);
+            try
+            {
+                shortcut.TargetPath = exePath;
+                shortcut.WorkingDirectory = InstallPath;
+                shortcut.IconLocation = exePath;
+                shortcut.Description = "Vgon Printer Agent";
+                shortcut.Save();
+            }
+            finally
+            {
+                System.Runtime.InteropServices.Marshal.FinalReleaseComObject(shortcut);
+            }
+        }
+        finally
+        {
+            System.Runtime.InteropServices.Marshal.FinalReleaseComObject(shell);
+        }
     }
 
     public void Start()
@@ -273,6 +328,9 @@ public class WindowsServiceInstaller
         {
             Directory.Delete(InstallPath, recursive: true);
         }
+
+        using var key = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Run", writable: true);
+        key?.DeleteValue("VgonPrinterAgent", throwOnMissingValue: false);
     }
 
     public string? ReadRecentLogTail(int maxLines = 40)

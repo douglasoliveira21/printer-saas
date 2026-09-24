@@ -1,8 +1,10 @@
+using System.Diagnostics;
 using System.Windows;
 using System.Windows.Controls.Primitives;
 using System.Windows.Media;
 using System.Windows.Threading;
 using PrinterAgent.Core.Discovery;
+using WinForms = System.Windows.Forms;
 
 namespace PrinterAgent.ConfigTool;
 
@@ -12,7 +14,9 @@ public partial class MainWindow : Window
     private readonly DispatcherTimer _refreshTimer;
     private readonly AgentContext _context;
     private readonly InstallSeed? _seed;
+    private readonly WinForms.NotifyIcon _trayIcon;
     private bool _tabsInitialized;
+    private bool _exiting;
 
     public MainWindow()
     {
@@ -22,7 +26,18 @@ public partial class MainWindow : Window
         _refreshTimer.Tick += (_, _) => RefreshStatus();
         _refreshTimer.Start();
 
-        ApiUrlText.Text = _installer.GetConfiguredApiUrl() ?? WindowsServiceInstaller.DefaultApiUrl;
+        _trayIcon = CreateTrayIcon();
+
+        // Só confia no appsettings.json salvo em Program Files quando o
+        // serviço está DE FATO instalado — uma instalação anterior que
+        // falhou no meio (ex.: arquivo travado por outro processo) pode
+        // deixar esse arquivo lá com o ApiUrl de desenvolvimento
+        // (localhost) do template, mesmo sem o Agent nunca ter chegado a
+        // ser registrado. Sem essa checagem, a tela mostrava "Servidor:
+        // http://localhost:3001" mesmo dizendo "não instalado".
+        ApiUrlText.Text = _installer.GetState() != AgentServiceState.NotInstalled
+            ? _installer.GetConfiguredApiUrl() ?? WindowsServiceInstaller.DefaultApiUrl
+            : WindowsServiceInstaller.DefaultApiUrl;
 
         // Seed file dropped next to the exe (from the site's "Adicionar Agent"
         // download) means the token doesn't need to be typed in by hand.
@@ -61,6 +76,93 @@ public partial class MainWindow : Window
         }
 
         RefreshStatus();
+    }
+
+    /// <summary>
+    /// Fecha (X) só esconde a janela — o Agent continua rodando perto do
+    /// relógio. Duplo clique ou "Abrir" no menu reabre; "Sair" é a única
+    /// forma de encerrar o programa de verdade, e exige confirmação porque
+    /// para o monitoramento junto.
+    /// </summary>
+    private WinForms.NotifyIcon CreateTrayIcon()
+    {
+        var icon = System.Drawing.Icon.ExtractAssociatedIcon(Process.GetCurrentProcess().MainModule!.FileName!);
+
+        var openItem = new WinForms.ToolStripMenuItem("Abrir");
+        openItem.Click += (_, _) => ShowFromTray();
+
+        var exitItem = new WinForms.ToolStripMenuItem("Sair");
+        exitItem.Click += (_, _) => ExitApplication();
+
+        var menu = new WinForms.ContextMenuStrip();
+        menu.Items.Add(openItem);
+        menu.Items.Add(new WinForms.ToolStripSeparator());
+        menu.Items.Add(exitItem);
+
+        var trayIcon = new WinForms.NotifyIcon
+        {
+            Icon = icon,
+            Text = "Vgon Printer Agent",
+            ContextMenuStrip = menu,
+            Visible = true,
+        };
+        trayIcon.DoubleClick += (_, _) => ShowFromTray();
+        return trayIcon;
+    }
+
+    private void ShowFromTray()
+    {
+        Show();
+        WindowState = WindowState.Normal;
+        Activate();
+    }
+
+    private void Window_Closing(object? sender, System.ComponentModel.CancelEventArgs e)
+    {
+        if (_exiting)
+        {
+            return;
+        }
+        e.Cancel = true;
+        Hide();
+        _trayIcon.ShowBalloonTip(3000, "Vgon Printer Agent", "O Agent continua rodando perto do relógio. Clique com o botão direito no ícone para sair de verdade.", WinForms.ToolTipIcon.Info);
+    }
+
+    /// <summary>
+    /// The only real exit path. Confirms first because it also stops the
+    /// Windows Service (spec: this tray icon existing = monitoring is
+    /// active) — closing the window alone (Window_Closing above) never
+    /// reaches here, so an accidental Alt+F4/X can't silently stop
+    /// monitoring.
+    /// </summary>
+    private void ExitApplication()
+    {
+        var result = MessageBox.Show(this,
+            "Deseja realmente sair? Isso vai parar o monitoramento das impressoras nesta máquina.",
+            "Vgon Printer Agent", MessageBoxButton.YesNo, MessageBoxImage.Warning);
+        if (result != MessageBoxResult.Yes)
+        {
+            return;
+        }
+
+        try
+        {
+            if (_installer.GetState() == AgentServiceState.Running)
+            {
+                _installer.Stop();
+            }
+        }
+        catch
+        {
+            // Best-effort — não deixa uma falha ao parar o serviço impedir o programa de fechar.
+        }
+
+        _exiting = true;
+        _trayIcon.Visible = false;
+        _trayIcon.Dispose();
+        Close();
+        WinForms.Application.Exit();
+        Application.Current.Shutdown();
     }
 
     private void RefreshStatus()
@@ -180,6 +282,20 @@ public partial class MainWindow : Window
                 _installer.MarkInstallSeedUsed();
             }
             MessageBox.Show(this, "Agent instalado e iniciado com sucesso.", "Vgon Printer Agent", MessageBoxButton.OK, MessageBoxImage.Information);
+
+            var addShortcut = MessageBox.Show(this, "Deseja adicionar um atalho na Área de Trabalho?",
+                "Vgon Printer Agent", MessageBoxButton.YesNo, MessageBoxImage.Question);
+            if (addShortcut == MessageBoxResult.Yes)
+            {
+                try
+                {
+                    WindowsServiceInstaller.CreateDesktopShortcut();
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show(this, $"Não foi possível criar o atalho: {ex.Message}", "Vgon Printer Agent", MessageBoxButton.OK, MessageBoxImage.Warning);
+                }
+            }
         }
         catch (Exception ex)
         {

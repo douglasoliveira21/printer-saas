@@ -6,11 +6,26 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
+    <!-- WPF has no built-in system tray icon (NotifyIcon) — pulling in
+         WinForms just for that is the standard, well-supported way to get
+         one in a WPF app, not a sign this should have been a WinForms app. -->
+    <UseWindowsForms>true</UseWindowsForms>
     <RootNamespace>PrinterAgent.ConfigTool</RootNamespace>
     <AssemblyName>PrinterAgentSetup</AssemblyName>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationIcon>agent.ico</ApplicationIcon>
   </PropertyGroup>
+
+  <!-- UseWPF + UseWindowsForms together make the SDK add implicit global
+       usings for BOTH System.Windows and System.Windows.Forms, so unqualified
+       "Application"/"UserControl" (used all over the existing WPF code and
+       XAML codegen) become ambiguous. WinForms types are only ever needed
+       via the explicit "WinForms" alias (see MainWindow.xaml.cs), so drop
+       its implicit global using instead of qualifying every WPF reference. -->
+  <ItemGroup>
+    <Using Remove="System.Windows.Forms" />
+    <Using Remove="System.Drawing" />
+  </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="System.ServiceProcess.ServiceController" Version="10.0.0" />
