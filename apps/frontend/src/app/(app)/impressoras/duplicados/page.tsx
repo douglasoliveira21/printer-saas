@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { PageHeader } from "@/components/shared/page-header";
 import { EmptyState } from "@/components/shared/empty-state";
-import { OnlineBadge, PRINTER_STATUS_LABEL, connectionLabel, formatDateTime, ownerLabel } from "@/components/shared/printer-badges";
+import { OnlineBadge, StatusIcon, connectionLabel, formatDateTime, ownerLabel } from "@/components/shared/printer-badges";
 import { usePrinterDuplicates } from "@/hooks/use-printers";
 import type { PrinterDuplicateGroup } from "@/lib/types";
 
@@ -79,7 +79,7 @@ function DuplicateGroupCard({ group }: { group: PrinterDuplicateGroup }) {
                 <Link href={`/impressoras/${p.id}`} className="font-medium hover:underline">
                   {p.manufacturer || "Fabricante não disponível"} {p.model || ""}
                 </Link>
-                <Badge variant={p.status === "MONITORED" ? "default" : "outline"}>{PRINTER_STATUS_LABEL[p.status]}</Badge>
+                <StatusIcon status={p.status} />
                 <OnlineBadge status={p.onlineStatus} />
               </div>
               <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">

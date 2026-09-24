@@ -4,7 +4,6 @@ import { useState } from "react";
 import Link from "next/link";
 import { Search, Printer as PrinterIcon } from "lucide-react";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
@@ -13,7 +12,7 @@ import { ResponsiveDataTable, type DataTableColumn } from "@/components/shared/r
 import {
   OnlineBadge,
   ColorBadge,
-  PRINTER_STATUS_LABEL,
+  StatusIcon,
   connectionLabel,
   ownerLabel,
 } from "@/components/shared/printer-badges";
@@ -78,7 +77,7 @@ export default function ParqueCompletoPage() {
     {
       key: "status",
       header: "Status",
-      cell: (p) => <Badge variant={p.status === "MONITORED" ? "default" : "outline"}>{PRINTER_STATUS_LABEL[p.status]}</Badge>,
+      cell: (p) => <StatusIcon status={p.status} />,
       hideOnMobile: true,
     },
     { key: "color", header: "Cor", cell: (p) => <ColorBadge capabilities={p.capabilities} /> },
