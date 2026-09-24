@@ -35,13 +35,20 @@ node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"
 - `postgres_data`: dados do Postgres — **nunca** tratar o volume Docker como único
   backup (ver seção de backups abaixo).
 - `redis_data`: persistência opcional do Redis (filas sobrevivem a restart do container).
-- `api_uploads`: **única exceção** à regra de stateless abaixo — fotos anexadas
-  em Ordens de Serviço (`/repo/apps/api/uploads` dentro do container `api`).
-  No EasyPanel, criar um volume persistente pro serviço `api` apontando pra
-  esse caminho (Service → Mounts/Storage → adicionar volume, path
-  `/repo/apps/api/uploads`). **Sem isso, as fotos somem a cada redeploy**
-  (o container é recriado do zero). O app serve esses arquivos publicamente
-  em `/uploads/...` — não é o lugar certo pra nada sensível.
+- `api_uploads`: **única exceção** à regra de stateless abaixo — tudo que o
+  `api` salva em disco (`/repo/apps/api/uploads` dentro do container),
+  incluindo fotos anexadas em Ordens de Serviço **e a logo da empresa**
+  (Configurações > Informações da empresa, salva em
+  `uploads/tenant-logo/...`). No EasyPanel, criar um volume persistente pro
+  serviço `api` apontando pra esse caminho (Service → Mounts/Storage →
+  adicionar volume, path `/repo/apps/api/uploads`). **Sem isso, tudo que foi
+  salvo ali some a cada redeploy** — o container é recriado do zero, mas o
+  banco continua achando que o arquivo existe (só guarda o caminho), daí a
+  logo "para de funcionar" e a impressão é de que a configuração se perdeu.
+  Configure esse volume **antes** do primeiro upload de logo/foto em
+  produção — senão é preciso subir o arquivo de novo depois de criar o
+  volume. O app serve esses arquivos publicamente em `/uploads/...` — não é
+  o lugar certo pra nada sensível.
 
 Fora isso, os apps (`api`, `worker`, `frontend`) são stateless — não presumem
 filesystem persistente; qualquer outro estado vai para Postgres/Redis.
