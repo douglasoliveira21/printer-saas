@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useAddServiceOrderPart, useRemoveServiceOrderPart, useUpdateServiceOrder } from "@/hooks/use-service-orders";
+import { useInventoryItems } from "@/hooks/use-inventory";
 import { getApiErrorMessage } from "@/lib/api-client";
 import type { ServiceOrder, ServiceOrderBillingType } from "@/lib/types";
 import { BILLING_TYPE_LABEL } from "./labels";
@@ -19,6 +20,7 @@ function currency(value: number | string | null) {
 }
 
 export function PartsSection({ order }: { order: ServiceOrder }) {
+  const [inventoryItemId, setInventoryItemId] = useState("");
   const [name, setName] = useState("");
   const [quantity, setQuantity] = useState("1");
   const [unitValue, setUnitValue] = useState("");
@@ -29,16 +31,37 @@ export function PartsSection({ order }: { order: ServiceOrder }) {
   const addPart = useAddServiceOrderPart();
   const removePart = useRemoveServiceOrderPart();
   const updateOrder = useUpdateServiceOrder();
+  const { data: inventoryItems } = useInventoryItems();
 
   const parts = order.parts ?? [];
   const materialsTotal = parts.reduce((sum, p) => sum + p.quantity * Number(p.unitValue), 0);
   const total = materialsTotal + Number(laborCost || 0) + Number(travelCost || 0);
   const costsDirty = String(laborCost) !== (order.laborCost ?? "") || String(travelCost) !== (order.travelCost ?? "") || billingType !== (order.billingType ?? "");
 
+  // Selecionar um item do estoque prefila nome e valor unitário com o preço
+  // de venda cadastrado (Estoque > Novo item) — o técnico ainda pode ajustar
+  // antes de adicionar, e uma linha sem item selecionado continua sendo um
+  // serviço avulso digitado na hora, como antes.
+  function handleSelectInventoryItem(id: string) {
+    setInventoryItemId(id);
+    const item = inventoryItems?.find((i) => i.id === id);
+    if (item) {
+      setName(item.name);
+      setUnitValue(item.salePrice !== null ? String(item.salePrice) : "");
+    }
+  }
+
   async function handleAddPart() {
     if (!name.trim() || !unitValue) return;
     try {
-      await addPart.mutateAsync({ serviceOrderId: order.id, name: name.trim(), quantity: Number(quantity), unitValue: Number(unitValue) });
+      await addPart.mutateAsync({
+        serviceOrderId: order.id,
+        name: name.trim(),
+        quantity: Number(quantity),
+        unitValue: Number(unitValue),
+        inventoryItemId: inventoryItemId || undefined,
+      });
+      setInventoryItemId("");
       setName("");
       setQuantity("1");
       setUnitValue("");
@@ -78,7 +101,8 @@ export function PartsSection({ order }: { order: ServiceOrder }) {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Item</TableHead>
+              <TableHead>Item de estoque</TableHead>
+              <TableHead>Descrição</TableHead>
               <TableHead>Quantidade</TableHead>
               <TableHead>Valor unit.</TableHead>
               <TableHead>Total</TableHead>
@@ -88,6 +112,7 @@ export function PartsSection({ order }: { order: ServiceOrder }) {
           <TableBody>
             {parts.map((p) => (
               <TableRow key={p.id}>
+                <TableCell className="text-muted-foreground">{p.inventoryItemId ? "Estoque" : "Avulso"}</TableCell>
                 <TableCell>{p.name}</TableCell>
                 <TableCell>{p.quantity}</TableCell>
                 <TableCell>{currency(p.unitValue)}</TableCell>
@@ -101,7 +126,23 @@ export function PartsSection({ order }: { order: ServiceOrder }) {
             ))}
             <TableRow>
               <TableCell>
-                <Input placeholder="Nome da peça" value={name} onChange={(e) => setName(e.target.value)} />
+                <Select value={inventoryItemId} onValueChange={(v) => handleSelectInventoryItem(v ?? "")}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Serviço avulso">
+                      {(v: string) => (v ? inventoryItems?.find((i) => i.id === v)?.name || v : "Serviço avulso")}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    {inventoryItems?.map((item) => (
+                      <SelectItem key={item.id} value={item.id}>
+                        {item.name} ({item.quantity} em estoque)
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </TableCell>
+              <TableCell>
+                <Input placeholder="Descrição" value={name} onChange={(e) => setName(e.target.value)} />
               </TableCell>
               <TableCell>
                 <Input className="w-20" type="number" min="1" value={quantity} onChange={(e) => setQuantity(e.target.value)} />

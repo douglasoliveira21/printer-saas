@@ -101,7 +101,10 @@ export function CreateServiceOrderDialog() {
         const next = { ...line, ...patch };
         if (patch.inventoryItemId !== undefined) {
           const item = inventoryItems?.find((i) => i.id === patch.inventoryItemId);
-          if (item) next.name = item.name;
+          if (item) {
+            next.name = item.name;
+            next.unitValue = item.salePrice !== null ? String(item.salePrice) : next.unitValue;
+          }
         }
         return next;
       }),

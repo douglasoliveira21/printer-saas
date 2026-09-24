@@ -407,13 +407,6 @@ export class ServiceOrdersService {
     doc.moveTo(marginLeft, doc.y).lineTo(marginLeft + contentWidth, doc.y).strokeColor('#dddddd').lineWidth(1).stroke();
     doc.moveDown();
 
-    // --- Título ---
-    const customerName = (so.customer as any).tradeName || (so.customer as any).legalName;
-    doc.fillColor('black').fontSize(18).font('Helvetica-Bold').text(`Ordem de Serviço #${so.number}`);
-    if (so.title) doc.fontSize(12).font('Helvetica').fillColor('#333333').text(so.title);
-    doc.fontSize(9).fillColor('gray').text(`Aberta em ${so.createdAt.toLocaleString('pt-BR')} — ${customerName}`);
-    doc.fillColor('black').moveDown();
-
     const section = (title: string) => {
       const y = doc.y;
       doc.rect(marginLeft, y, contentWidth, 20).fill(brandColor);
@@ -425,8 +418,63 @@ export class ServiceOrdersService {
       doc.font('Helvetica-Bold').text(`${label}: `, { continued: true }).font('Helvetica').text(value);
     };
 
+    // --- Dados de cadastro completo do cliente — primeiro bloco de conteúdo,
+    // logo abaixo do cabeçalho da empresa, em formato de ficha (linhas de
+    // planilha) para consulta rápida por quem for atender presencialmente. ---
+    const cust = so.customer as any;
+    const custAddressParts = [cust.street, cust.number, cust.complement, cust.neighborhood, cust.city, cust.state].filter(Boolean);
+    const custAddress = custAddressParts.length > 0 ? custAddressParts.join(', ') : cust.address || '—';
+    const custContact = cust.contactName ? `${cust.contactName}${cust.contactRole ? ` (${cust.contactRole})` : ''}` : '—';
+
+    section('Dados do cliente');
+    {
+      const gridRows: [string, string][][] = [
+        [
+          ['Cliente', cust.tradeName || cust.legalName],
+          ['Razão social', cust.legalName],
+        ],
+        [
+          ['Documento', cust.document || '—'],
+          ['Telefone', cust.phone || cust.whatsapp || '—'],
+        ],
+        [
+          ['E-mail', cust.email || '—'],
+          ['Contato', custContact],
+        ],
+      ];
+      const colWidth = contentWidth / 2;
+      const rowHeight = 18;
+      const gridTop = doc.y;
+      doc.font('Helvetica').fontSize(8.5).fillColor('black');
+      gridRows.forEach((row, rowIndex) => {
+        const y = gridTop + rowIndex * rowHeight;
+        row.forEach(([label, value], colIndex) => {
+          doc.text(`${label}: ${value}`, marginLeft + colIndex * colWidth + 6, y + 5, { width: colWidth - 12 });
+        });
+      });
+      const addressY = gridTop + gridRows.length * rowHeight;
+      doc.text(`Endereço: ${custAddress}`, marginLeft + 6, addressY + 5, { width: contentWidth - 12 });
+      const gridBottom = addressY + rowHeight;
+
+      // Grade da ficha (linhas de planilha): borda externa, divisória
+      // vertical ao meio e uma linha horizontal por registro.
+      doc.strokeColor('#cccccc').lineWidth(0.5);
+      doc.rect(marginLeft, gridTop, contentWidth, gridBottom - gridTop).stroke();
+      doc.moveTo(marginLeft + colWidth, gridTop).lineTo(marginLeft + colWidth, addressY).stroke();
+      for (let r = 1; r <= gridRows.length; r++) {
+        const y = gridTop + r * rowHeight;
+        doc.moveTo(marginLeft, y).lineTo(marginLeft + contentWidth, y).stroke();
+      }
+      doc.y = gridBottom + 10;
+    }
+
+    // --- Título ---
+    doc.fillColor('black').fontSize(18).font('Helvetica-Bold').text(`Ordem de Serviço #${so.number}`);
+    if (so.title) doc.fontSize(12).font('Helvetica').fillColor('#333333').text(so.title);
+    doc.fontSize(9).fillColor('gray').text(`Aberta em ${so.createdAt.toLocaleString('pt-BR')}`);
+    doc.fillColor('black').moveDown();
+
     section('1. Abertura');
-    field('Cliente', customerName);
     if (so.location) field('Unidade/filial', (so.location as any).name);
     if (so.printer) field('Equipamento', `${(so.printer as any).manufacturer ?? ''} ${(so.printer as any).model ?? ''}`.trim());
     if (so.technician) field('Técnico responsável', (so.technician as any).name);
@@ -447,36 +495,51 @@ export class ServiceOrdersService {
     if (so.causeIdentified) field('Causa identificada', so.causeIdentified);
     if (so.testsPerformed) field('Testes realizados', so.testsPerformed);
     if (so.defectiveParts) field('Peças com problema', so.defectiveParts);
-    if (so.suppliesUsed) field('Suprimentos utilizados', so.suppliesUsed);
     if (so.technicalNotes) field('Observações técnicas', so.technicalNotes);
     doc.moveDown();
 
     section('4. Peças e materiais');
     const parts = so.parts as any[];
     if (parts.length > 0) {
-      const cols = { name: marginLeft, qty: marginLeft + 260, unit: marginLeft + 330, total: marginLeft + 430 };
-      const rowY = doc.y;
+      // Colunas com largura fixa (linhas de planilha: cada uma vira uma
+      // coluna com borda própria, não só texto alinhado por posição).
+      const colWidths = [contentWidth - 60 - 70 - 90, 60, 70, 90];
+      const colX = [
+        marginLeft,
+        marginLeft + colWidths[0],
+        marginLeft + colWidths[0] + colWidths[1],
+        marginLeft + colWidths[0] + colWidths[1] + colWidths[2],
+      ];
+      const headers = ['Item', 'Qtd.', 'Unit. (R$)', 'Total (R$)'];
+      const rowHeight = 18;
+      const tableTop = doc.y;
+
       doc.font('Helvetica-Bold').fontSize(9).fillColor('#555555');
-      doc.text('Item', cols.name, rowY, { width: 250 });
-      doc.text('Qtd.', cols.qty, rowY, { width: 60 });
-      doc.text('Unit. (R$)', cols.unit, rowY, { width: 90 });
-      doc.text('Total (R$)', cols.total, rowY, { width: 90 });
-      doc.y = rowY + 14;
-      doc.moveTo(marginLeft, doc.y).lineTo(marginLeft + contentWidth, doc.y).strokeColor('#dddddd').stroke();
-      doc.moveDown(0.3);
-      doc.font('Helvetica').fontSize(10).fillColor('black');
+      headers.forEach((h, i) => doc.text(h, colX[i] + 5, tableTop + 5, { width: colWidths[i] - 10 }));
 
       let materialsTotal = 0;
-      for (const part of parts) {
+      doc.font('Helvetica').fontSize(9.5).fillColor('black');
+      parts.forEach((part, rowIndex) => {
         const lineTotal = part.quantity * Number(part.unitValue);
         materialsTotal += lineTotal;
-        const y = doc.y;
-        doc.text(part.name, cols.name, y, { width: 250 });
-        doc.text(String(part.quantity), cols.qty, y, { width: 60 });
-        doc.text(Number(part.unitValue).toFixed(2), cols.unit, y, { width: 90 });
-        doc.text(lineTotal.toFixed(2), cols.total, y, { width: 90 });
-        doc.y = y + 16;
+        const y = tableTop + (rowIndex + 1) * rowHeight;
+        doc.text(part.name, colX[0] + 5, y + 5, { width: colWidths[0] - 10 });
+        doc.text(String(part.quantity), colX[1] + 5, y + 5, { width: colWidths[1] - 10 });
+        doc.text(Number(part.unitValue).toFixed(2), colX[2] + 5, y + 5, { width: colWidths[2] - 10 });
+        doc.text(lineTotal.toFixed(2), colX[3] + 5, y + 5, { width: colWidths[3] - 10 });
+      });
+
+      const tableBottom = tableTop + (parts.length + 1) * rowHeight;
+      doc.strokeColor('#cccccc').lineWidth(0.5);
+      doc.rect(marginLeft, tableTop, contentWidth, tableBottom - tableTop).stroke();
+      for (let c = 1; c < colX.length; c++) {
+        doc.moveTo(colX[c], tableTop).lineTo(colX[c], tableBottom).stroke();
       }
+      for (let r = 1; r <= parts.length + 1; r++) {
+        const y = tableTop + r * rowHeight;
+        doc.moveTo(marginLeft, y).lineTo(marginLeft + contentWidth, y).stroke();
+      }
+      doc.y = tableBottom + 10;
 
       // "Exibir linhas adicionais em branco nos itens do chamado"
       // (Configurações > Chamados) — número de linhas configurado por tipo de chamado.
@@ -509,40 +572,25 @@ export class ServiceOrdersService {
     if (so.attendanceNotes) field('Observações', so.attendanceNotes);
     doc.moveDown();
 
-    for (const photo of so.photos as any[]) {
-      const filePath = join(process.cwd(), 'uploads', photo.path);
-      if (existsSync(filePath)) {
-        doc.fontSize(9).font('Helvetica-Bold').text(photo.phase === 'BEFORE' ? 'Foto antes' : 'Foto depois');
-        doc.font('Helvetica');
-        try {
-          doc.image(filePath, { width: 200 });
-        } catch {
-          // unreadable/corrupt image — skip rather than fail the whole PDF
-        }
-        doc.moveDown(0.5);
-      }
-    }
-
     section('6. Resultado');
     if (so.solution) field('Solução aplicada', so.solution);
     if (so.equipmentWorking !== null) field('Equipamento funcionando', so.equipmentWorking ? 'Sim' : 'Não');
     doc.moveDown();
 
-    section('7. Aprovação do cliente');
-    if (so.approvalName) {
-      field('Confirmado por', so.approvalName);
-      if (so.approvalAt) field('Data/hora', so.approvalAt.toLocaleString('pt-BR'));
-      if (so.approvalNotes) field('Observação do cliente', so.approvalNotes);
-      if (so.approvalSignature?.startsWith('data:image')) {
-        try {
-          const base64 = so.approvalSignature.split(',')[1];
-          doc.image(Buffer.from(base64, 'base64'), { width: 200 });
-        } catch {
-          // malformed signature data — omit rather than fail the whole PDF
-        }
-      }
-    } else {
-      doc.text('Ainda não aprovada pelo cliente.');
+    // --- Assinaturas em papel: sem captura digital, só duas linhas em
+    // branco para cliente e técnico assinarem à caneta na via impressa. ---
+    section('7. Assinaturas');
+    doc.moveDown(2.5);
+    {
+      const gap = 40;
+      const sigWidth = (contentWidth - gap) / 2;
+      const sigY = doc.y;
+      doc.strokeColor('#000000').lineWidth(0.75);
+      doc.moveTo(marginLeft, sigY).lineTo(marginLeft + sigWidth, sigY).stroke();
+      doc.moveTo(marginLeft + sigWidth + gap, sigY).lineTo(marginLeft + sigWidth + gap + sigWidth, sigY).stroke();
+      doc.fontSize(9).fillColor('black');
+      doc.text('Assinatura do cliente', marginLeft, sigY + 4, { width: sigWidth, align: 'center' });
+      doc.text('Assinatura do técnico', marginLeft + sigWidth + gap, sigY + 4, { width: sigWidth, align: 'center' });
     }
 
     // --- Rodapé com numeração de página, em todas as páginas já geradas ---
