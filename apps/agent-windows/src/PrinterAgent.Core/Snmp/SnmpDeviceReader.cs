@@ -185,6 +185,9 @@ public class SnmpDeviceReader
         device.Capabilities.A3 = device.SupportsA3;
         if (device.SupportsA3 is not null) device.CapabilitySources["a3"] = "printer_mib";
 
+        device.Capabilities.Duplex = await DetectSupportsDuplexAsync(endpoint, communityOctet, version, timeoutMs, ct);
+        if (device.Capabilities.Duplex is not null) device.CapabilitySources["duplex"] = "printer_mib";
+
         device.Alerts = await ReadAlertsAsync(endpoint, communityOctet, version, timeoutMs, ct);
 
         // sysDescr alone (plain MIB-II) answers from routers, switches, NAS
@@ -364,6 +367,27 @@ public class SnmpDeviceReader
                 _ => null,
             }
             : null;
+
+    /// <summary>
+    /// Detects duplex support purely from Printer-MIB's own declared paper
+    /// paths (RFC 3805 prtMediaPathTable — never inferred from the model
+    /// name or guessed, spec §67): a device that lists a "2-sided" path
+    /// alongside its "1-sided" one has automatic duplex. Returns null when
+    /// the device doesn't expose this table at all (genuinely unknown —
+    /// previously the ONLY source for Duplex was IPP; devices that answer
+    /// SNMP but not IPP, or whose IPP response doesn't include it, never got
+    /// a Duplex value even when they clearly support it — confirmed against
+    /// a real Samsung SL-M4070FR's SNMP dump, which lists exactly this).
+    /// </summary>
+    private async Task<bool?> DetectSupportsDuplexAsync(IPEndPoint endpoint, OctetString community, VersionCode version, int timeoutMs, CancellationToken ct)
+    {
+        var descriptions = await WalkAsync(endpoint, community, version, PrinterMibOids.PrtMediaPathDescriptionTable, timeoutMs, ct);
+        if (descriptions.Count == 0)
+        {
+            return null;
+        }
+        return descriptions.Values.Any(d => d.Contains("2-sided", StringComparison.OrdinalIgnoreCase) || d.Contains("duplex", StringComparison.OrdinalIgnoreCase));
+    }
 
     /// <summary>
     /// Detects whether this device has at least one input tray physically
@@ -679,6 +703,9 @@ public class SnmpDeviceReader
         device.Capabilities.A3 = device.SupportsA3;
         if (device.SupportsA3 is not null) device.CapabilitySources["a3"] = "printer_mib";
 
+        device.Capabilities.Duplex = await DetectSupportsDuplexV3Async(endpoint, privacyProvider, contextName, userName, report, timeoutMs, ct);
+        if (device.Capabilities.Duplex is not null) device.CapabilitySources["duplex"] = "printer_mib";
+
         device.Alerts = await ReadAlertsV3Async(endpoint, privacyProvider, contextName, userName, report, timeoutMs, ct);
 
         return new SnmpProbeResult
@@ -950,6 +977,16 @@ public class SnmpDeviceReader
             _logger.LogDebug(ex, "Alert table not available for {Endpoint}", endpoint);
             return null;
         }
+    }
+
+    private async Task<bool?> DetectSupportsDuplexV3Async(IPEndPoint endpoint, IPrivacyProvider privacyProvider, OctetString contextName, OctetString userName, ISnmpMessage report, int timeoutMs, CancellationToken ct)
+    {
+        var descriptions = await WalkV3Async(endpoint, privacyProvider, contextName, userName, report, PrinterMibOids.PrtMediaPathDescriptionTable, timeoutMs, ct);
+        if (descriptions.Count == 0)
+        {
+            return null;
+        }
+        return descriptions.Values.Any(d => d.Contains("2-sided", StringComparison.OrdinalIgnoreCase) || d.Contains("duplex", StringComparison.OrdinalIgnoreCase));
     }
 
     private async Task<bool?> DetectSupportsA3V3Async(IPEndPoint endpoint, IPrivacyProvider privacyProvider, OctetString contextName, OctetString userName, ISnmpMessage report, int timeoutMs, CancellationToken ct)

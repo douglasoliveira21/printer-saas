@@ -28,6 +28,22 @@ public class ModelDatabaseEntry
     /// <summary>Only applied together with an exact rawModelAlias match (never with the fuzzy modelPattern) — confirms a specific, identified unit is monochrome-only when SNMP/IPP didn't otherwise say so.</summary>
     [JsonPropertyName("colorHint")]
     public bool? ColorHint { get; set; }
+
+    /// <summary>
+    /// Same exact-match discipline as colorHint, for capabilities that have
+    /// no reliable standard SNMP/IPP signal at all (unlike Duplex/A3, which
+    /// now come from Printer-MIB directly — see SnmpDeviceReader). Only ever
+    /// set from the manufacturer's own published spec for a specifically
+    /// identified unit, never guessed from a model-name pattern.
+    /// </summary>
+    [JsonPropertyName("copyHint")]
+    public bool? CopyHint { get; set; }
+
+    [JsonPropertyName("scanHint")]
+    public bool? ScanHint { get; set; }
+
+    [JsonPropertyName("faxHint")]
+    public bool? FaxHint { get; set; }
 }
 
 /// <summary>
@@ -111,7 +127,18 @@ public class ModelDatabase
     }
 
     /// <summary>Same exact-match rule as LookupDisplayName — only fires for a specifically identified unit, never a fuzzy family match.</summary>
-    public bool? LookupColorHint(string? manufacturer, string? rawModel)
+    public bool? LookupColorHint(string? manufacturer, string? rawModel) => LookupExactHint(manufacturer, rawModel, e => e.ColorHint);
+
+    /// <summary>Whether a specifically identified unit does walk-up copying — no reliable standard SNMP/IPP signal exists for this, unlike Duplex/A3 (see SnmpDeviceReader), so it only ever comes from a manufacturer-confirmed exact match here.</summary>
+    public bool? LookupCopyHint(string? manufacturer, string? rawModel) => LookupExactHint(manufacturer, rawModel, e => e.CopyHint);
+
+    /// <summary>Same as LookupCopyHint, for scanning.</summary>
+    public bool? LookupScanHint(string? manufacturer, string? rawModel) => LookupExactHint(manufacturer, rawModel, e => e.ScanHint);
+
+    /// <summary>Same as LookupCopyHint, for fax.</summary>
+    public bool? LookupFaxHint(string? manufacturer, string? rawModel) => LookupExactHint(manufacturer, rawModel, e => e.FaxHint);
+
+    private bool? LookupExactHint(string? manufacturer, string? rawModel, Func<ModelDatabaseEntry, bool?> selector)
     {
         if (string.IsNullOrWhiteSpace(rawModel))
         {
@@ -119,7 +146,8 @@ public class ModelDatabase
         }
         foreach (var entry in _entries)
         {
-            if (entry.RawModelAlias is null || entry.ColorHint is null)
+            var hint = selector(entry);
+            if (entry.RawModelAlias is null || hint is null)
             {
                 continue;
             }
@@ -133,7 +161,7 @@ public class ModelDatabase
             {
                 continue;
             }
-            return entry.ColorHint;
+            return hint;
         }
         return null;
     }

@@ -125,6 +125,33 @@ public class DeviceProbeOrchestrator
                 device.CapabilitySources["color"] = "model_database";
             }
         }
+        if (device.Capabilities.Copy is null)
+        {
+            var copyHint = _modelDatabase.LookupCopyHint(device.Manufacturer, device.Model);
+            if (copyHint is not null)
+            {
+                device.Capabilities.Copy = copyHint;
+                device.CapabilitySources["copy"] = "model_database";
+            }
+        }
+        if (device.Capabilities.Scan is null)
+        {
+            var scanHint = _modelDatabase.LookupScanHint(device.Manufacturer, device.Model);
+            if (scanHint is not null)
+            {
+                device.Capabilities.Scan = scanHint;
+                device.CapabilitySources["scan"] = "model_database";
+            }
+        }
+        if (device.Capabilities.Fax is null)
+        {
+            var faxHint = _modelDatabase.LookupFaxHint(device.Manufacturer, device.Model);
+            if (faxHint is not null)
+            {
+                device.Capabilities.Fax = faxHint;
+                device.CapabilitySources["fax"] = "model_database";
+            }
+        }
 
         // A device with a single marker (no per-colorant breakdown
         // available — see SnmpDeviceReader.ReadCountersAsync) only ever
@@ -195,16 +222,16 @@ public class DeviceProbeOrchestrator
                 .FirstOrDefault(m => ipp.MakeAndModel!.Contains(m, StringComparison.OrdinalIgnoreCase));
         }
 
-        // IPP > Printer-MIB > model database priority — Printer-MIB (via
-        // DetectSupportsA3Async) already set A3 when it could; IPP only
-        // fills in what SNMP didn't determine. Color/duplex have no
-        // Printer-MIB source in this phase, so IPP is the only source.
+        // Printer-MIB (via DetectSupportsA3Async/DetectSupportsDuplexAsync)
+        // already set A3/Duplex when it could; IPP only fills in what SNMP
+        // didn't determine. Color has no Printer-MIB source in this phase,
+        // so IPP is the only source for it.
         if (ipp.ColorSupported is not null)
         {
             device.Capabilities.Color = ipp.ColorSupported;
             device.CapabilitySources["color"] = "ipp";
         }
-        if (ipp.DuplexSupported is not null)
+        if (device.Capabilities.Duplex is null && ipp.DuplexSupported is not null)
         {
             device.Capabilities.Duplex = ipp.DuplexSupported;
             device.CapabilitySources["duplex"] = "ipp";

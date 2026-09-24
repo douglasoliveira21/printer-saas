@@ -40,6 +40,15 @@ public static class PrinterMibOids
     public const int MediaUnitMicrometers = 4;
     public const int MediaUnitTenThousandthsOfInch = 3;
 
+    // Printer-MIB media path table (walked — one row per paper path the
+    // device has). prtMediaPathDescription (RFC 3805 column 10) is free text
+    // but devices consistently label 2-sided paths as such (e.g. "2-sided,
+    // long edge feed, paper path") — confirmed against a real Samsung
+    // SL-M4070FR's SNMP dump, not guessed. A device whose only path is
+    // "1-sided" doesn't support duplex; one with no media path table at all
+    // is unknown (null), same as today.
+    public const string PrtMediaPathDescriptionTable = "1.3.6.1.2.1.43.13.4.1.10";
+
     // Printer-MIB marker table (walked — one row per marking engine). Most
     // devices expose a single marker (index 1, same value as
     // PrtMarkerLifeCountTotal above), but devices with separate mono/color
