@@ -4,7 +4,6 @@ import {
   Users,
   Wrench,
   Wallet,
-  Boxes,
   Droplet,
   BarChart3,
   Cpu,
@@ -49,7 +48,6 @@ export const NAV_ITEMS: NavItem[] = [
       { label: "Contratos", href: "/contratos" },
     ],
   },
-  { label: "Estoque", href: "/estoque", icon: Boxes },
   {
     label: "Suprimentos",
     href: "/suprimentos",
@@ -57,6 +55,7 @@ export const NAV_ITEMS: NavItem[] = [
     children: [
       { label: "Reposição e Trocas", href: "/suprimentos" },
       { label: "Níveis dos Suprimentos", href: "/suprimentos/niveis" },
+      { label: "Estoque", href: "/estoque" },
     ],
   },
   { label: "Relatórios", href: "/relatorios", icon: BarChart3 },
