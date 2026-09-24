@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.IO;
 using System.ServiceProcess;
 using System.Text.Json;
+using System.Threading;
 
 namespace PrinterAgent.ConfigTool;
 
@@ -314,6 +315,32 @@ public class WindowsServiceInstaller
         {
             // service doesn't exist — nothing to stop
         }
+
+        // The SCM reports Stopped as soon as the service signals it's done,
+        // but the underlying process (a self-contained .NET host) can take a
+        // moment longer to actually unload and release its own runtime DLLs
+        // (clrjit.dll etc.) — without this, InstallOrUpdate's file copy right
+        // after can race the OS and fail with "being used by another
+        // process" even though the service already shows Stopped.
+        WaitForProcessExit("PrinterAgent.Service", TimeSpan.FromSeconds(10));
+    }
+
+    private static void WaitForProcessExit(string processName, TimeSpan timeout)
+    {
+        var deadline = DateTime.UtcNow + timeout;
+        while (DateTime.UtcNow < deadline)
+        {
+            var processes = Process.GetProcessesByName(processName);
+            if (processes.Length == 0)
+            {
+                return;
+            }
+            foreach (var p in processes)
+            {
+                p.Dispose();
+            }
+            Thread.Sleep(300);
+        }
     }
 
     private void DeleteServiceIfExists()
@@ -361,7 +388,30 @@ public class WindowsServiceInstaller
         }
         foreach (var file in Directory.GetFiles(source, "*", SearchOption.AllDirectories))
         {
-            File.Copy(file, file.Replace(source, destination), overwrite: true);
+            CopyFileWithRetry(file, file.Replace(source, destination));
+        }
+    }
+
+    /// <summary>
+    /// Defense-in-depth alongside WaitForProcessExit above — a leftover
+    /// antivirus scan or Explorer handle on the just-stopped process's DLLs
+    /// can still hold a lock for a bit longer than the process itself does,
+    /// so a plain one-shot File.Copy can still hit "being used by another
+    /// process" (spec: this exact error is what prompted this fix).
+    /// </summary>
+    private static void CopyFileWithRetry(string source, string destination, int maxAttempts = 5)
+    {
+        for (var attempt = 1; attempt <= maxAttempts; attempt++)
+        {
+            try
+            {
+                File.Copy(source, destination, overwrite: true);
+                return;
+            }
+            catch (IOException) when (attempt < maxAttempts)
+            {
+                Thread.Sleep(500);
+            }
         }
     }
 }
