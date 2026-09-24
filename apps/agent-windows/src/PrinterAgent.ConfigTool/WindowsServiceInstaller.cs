@@ -35,6 +35,20 @@ public class WindowsServiceInstaller
     public static readonly string InstallPath =
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "PrinterSaaS", "Agent");
 
+    /// <summary>
+    /// Where the WINDOWS SERVICE's own files live — a dedicated subfolder of
+    /// InstallPath, deliberately NOT the same folder as InstallPath itself.
+    /// When installed via the MSI, PrinterAgentSetup.exe (this ConfigTool)
+    /// lives directly in InstallPath and is the process actually running
+    /// this install — copying the Service's self-contained runtime (which
+    /// ships its own clrjit.dll/coreclr.dll/etc., same filenames as
+    /// ConfigTool's own) into that same root would try to overwrite DLLs
+    /// this very process already has loaded, failing with "being used by
+    /// another process" no matter how long WaitForProcessExit waits (it's
+    /// not the OLD service process holding the lock, it's THIS one).
+    /// </summary>
+    public static readonly string ServiceInstallPath = Path.Combine(InstallPath, "Service");
+
     public static readonly string LogsPath =
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "PrinterSaaS", "Agent", "Logs");
 
@@ -62,7 +76,7 @@ public class WindowsServiceInstaller
 
     public string? GetConfiguredApiUrl()
     {
-        var path = Path.Combine(InstallPath, "appsettings.json");
+        var path = Path.Combine(ServiceInstallPath, "appsettings.json");
         if (!File.Exists(path))
         {
             return null;
@@ -81,7 +95,7 @@ public class WindowsServiceInstaller
     /// <summary>Comma-separated networks as currently configured, e.g. "192.168.1.0/24, 192.168.2.10-192.168.2.50" — for pre-filling the UI.</summary>
     public string? GetConfiguredNetworks()
     {
-        var path = Path.Combine(InstallPath, "appsettings.json");
+        var path = Path.Combine(ServiceInstallPath, "appsettings.json");
         if (!File.Exists(path))
         {
             return null;
@@ -103,7 +117,7 @@ public class WindowsServiceInstaller
 
     public string GetConfiguredSnmpCommunity()
     {
-        var path = Path.Combine(InstallPath, "appsettings.json");
+        var path = Path.Combine(ServiceInstallPath, "appsettings.json");
         if (!File.Exists(path))
         {
             return "public";
@@ -121,7 +135,7 @@ public class WindowsServiceInstaller
 
     public AgentDiscoverySettings GetConfiguredDiscoverySettings()
     {
-        var path = Path.Combine(InstallPath, "appsettings.json");
+        var path = Path.Combine(ServiceInstallPath, "appsettings.json");
         if (!File.Exists(path))
         {
             return new AgentDiscoverySettings(60, 30, true);
@@ -144,7 +158,7 @@ public class WindowsServiceInstaller
     /// <summary>Writes discovery/heartbeat intervals back to appsettings.json. Takes effect on the next service start (see Configurações tab's "Salvar e reiniciar").</summary>
     public void SetConfiguredDiscoverySettings(AgentDiscoverySettings settings)
     {
-        var appsettingsPath = Path.Combine(InstallPath, "appsettings.json");
+        var appsettingsPath = Path.Combine(ServiceInstallPath, "appsettings.json");
         if (!File.Exists(appsettingsPath))
         {
             throw new InvalidOperationException("Agent ainda não foi instalado nesta máquina.");
@@ -217,10 +231,10 @@ public class WindowsServiceInstaller
         StopServiceIfRunning();
         DeleteServiceIfExists();
 
-        Directory.CreateDirectory(InstallPath);
-        CopyDirectory(ServiceSourcePath, InstallPath);
+        Directory.CreateDirectory(ServiceInstallPath);
+        CopyDirectory(ServiceSourcePath, ServiceInstallPath);
 
-        var appsettingsPath = Path.Combine(InstallPath, "appsettings.json");
+        var appsettingsPath = Path.Combine(ServiceInstallPath, "appsettings.json");
         var json = File.ReadAllText(appsettingsPath);
         using var doc = JsonDocument.Parse(json);
         var settings = JsonSerializer.Deserialize<Dictionary<string, object>>(json)!;
@@ -238,10 +252,10 @@ public class WindowsServiceInstaller
 
         File.WriteAllText(appsettingsPath, JsonSerializer.Serialize(settings, new JsonSerializerOptions { WriteIndented = true }));
 
-        var exePath = Path.Combine(InstallPath, "PrinterAgent.Service.exe");
+        var exePath = Path.Combine(ServiceInstallPath, "PrinterAgent.Service.exe");
         if (!File.Exists(exePath))
         {
-            throw new InvalidOperationException($"PrinterAgent.Service.exe não encontrado em '{InstallPath}'.");
+            throw new InvalidOperationException($"PrinterAgent.Service.exe não encontrado em '{ServiceInstallPath}'.");
         }
 
         RunScOrThrow($"create {ServiceName} binPath= \"{exePath}\" start= auto DisplayName= \"Vgon Printer Agent\"");
@@ -324,9 +338,12 @@ public class WindowsServiceInstaller
     {
         StopServiceIfRunning();
         DeleteServiceIfExists();
-        if (Directory.Exists(InstallPath))
+        // Só a subpasta do Serviço — InstallPath (raiz) também abriga o
+        // PrinterAgentSetup.exe (este próprio processo, quando instalado
+        // pelo MSI), que continua sendo dono da limpeza dos SEUS arquivos.
+        if (Directory.Exists(ServiceInstallPath))
         {
-            Directory.Delete(InstallPath, recursive: true);
+            Directory.Delete(ServiceInstallPath, recursive: true);
         }
 
         using var key = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Run", writable: true);
