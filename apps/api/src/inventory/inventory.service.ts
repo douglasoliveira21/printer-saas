@@ -13,7 +13,20 @@ export class InventoryService {
 
   create(dto: CreateInventoryItemDto) {
     return this.tenantPrisma.client.inventoryItem.create({
-      data: { name: dto.name, type: dto.type, minQuantity: dto.minQuantity ?? 0 } as any,
+      data: {
+        name: dto.name,
+        type: dto.type,
+        code: dto.code,
+        manufacturer: dto.manufacturer,
+        model: dto.model,
+        color: dto.color,
+        standardLifespanPages: dto.standardLifespanPages,
+        costPrice: dto.costPrice,
+        salePrice: dto.salePrice,
+        notes: dto.notes,
+        quantity: dto.quantity ?? 0,
+        minQuantity: dto.minQuantity ?? 0,
+      } as any,
     });
   }
 

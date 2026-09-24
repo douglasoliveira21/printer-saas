@@ -336,6 +336,7 @@ export interface ServiceOrderPhoto {
 export interface ServiceOrder {
   id: string;
   number: number;
+  title: string | null;
   status: ServiceOrderStatus;
   priority: ServiceOrderPriority;
   type: string | null;
@@ -544,6 +545,14 @@ export interface InventoryItem {
   id: string;
   name: string;
   type: string;
+  code: string | null;
+  manufacturer: string | null;
+  model: string | null;
+  color: string | null;
+  standardLifespanPages: number | null;
+  costPrice: number | null;
+  salePrice: number | null;
+  notes: string | null;
   quantity: number;
   minQuantity: number;
   movements?: InventoryMovement[];

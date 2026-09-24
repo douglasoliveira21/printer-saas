@@ -11,6 +11,7 @@ import type { InventoryItem } from "@/lib/types";
 import { CreateItemDialog } from "./create-item-dialog";
 import { MovementDialog } from "./movement-dialog";
 import { ItemActionsMenu } from "./item-actions-menu";
+import { inventoryTypeLabel } from "./inventory-types";
 
 export default function EstoquePage() {
   const { data: items, isLoading } = useInventoryItems();
@@ -29,7 +30,7 @@ export default function EstoquePage() {
 
   const columns: DataTableColumn<InventoryItem>[] = [
     { key: "name", header: "Item", cell: (i) => i.name, hideOnMobile: true },
-    { key: "type", header: "Tipo", cell: (i) => i.type },
+    { key: "type", header: "Tipo", cell: (i) => inventoryTypeLabel(i.type) },
     {
       key: "quantity",
       header: "Estoque atual",

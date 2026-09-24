@@ -46,10 +46,12 @@ export function CreateServiceOrderFromAlertDialog({ alert }: { alert: Alert }) {
     event.preventDefault();
     try {
       await createServiceOrder.mutateAsync({
+        title: alert.message,
         customerId: customerId!,
         printerId: alert.printer?.id,
         priority,
         description,
+        alertId: alert.id,
       });
       toast.success("Chamado criado");
       setOpen(false);

@@ -353,6 +353,41 @@ async function syncSystemAdminRolePermissions() {
   console.log(`Synced Admin roles: granted ${grantedCount} missing permission(s) across ${adminRoles.length} role(s)`);
 }
 
+// Nomes pedidos pelo usuário pra aparecerem prontos no select "Tipo de
+// chamado" da abertura de OS — continuam editáveis/removíveis depois em
+// Configurações > Chamados, isto só garante que cada tenant começa com eles.
+const DEFAULT_SERVICE_ORDER_TYPES = [
+  'Impressora atolando papel',
+  'Impressora fazendo muito barulho',
+  'Impressora manchando as folhas',
+  'Manutenção corretiva',
+  'Manutenção preventiva',
+  'Outro',
+  'Reposição de suprimentos',
+  'Solicitação de toner reserva',
+  'Substituição de equipamento',
+  'Visita técnica',
+];
+
+async function syncDefaultServiceOrderTypes() {
+  const tenants = await prisma.tenant.findMany({ where: { id: { not: '00000000-0000-0000-0000-000000000000' } }, select: { id: true } });
+
+  let createdCount = 0;
+  for (const tenant of tenants) {
+    const existing = await prisma.serviceOrderTypeCatalog.findMany({ where: { tenantId: tenant.id }, select: { name: true } });
+    const existingNames = new Set(existing.map((t) => t.name));
+    const missing = DEFAULT_SERVICE_ORDER_TYPES.filter((name) => !existingNames.has(name));
+    if (missing.length === 0) continue;
+
+    await prisma.serviceOrderTypeCatalog.createMany({
+      data: missing.map((name) => ({ tenantId: tenant.id, name })),
+    });
+    createdCount += missing.length;
+  }
+
+  console.log(`Synced default service order types: created ${createdCount} across ${tenants.length} tenant(s)`);
+}
+
 async function seedPlans() {
   const plans = [
     { name: 'Starter', maxUsers: 3, maxCustomers: 10, maxPrinters: 25, maxAgents: 5, priceMonthly: 199 },
@@ -371,6 +406,7 @@ async function main() {
   await seedDemoTenant();
   await seedPlatformSuperAdmin();
   await syncSystemAdminRolePermissions();
+  await syncDefaultServiceOrderTypes();
 }
 
 main()

@@ -34,6 +34,7 @@ export function useServiceOrder(id: string | undefined) {
 }
 
 export interface CreateServiceOrderInput {
+  title: string;
   customerId: string;
   locationId?: string;
   printerId?: string;
@@ -41,10 +42,15 @@ export interface CreateServiceOrderInput {
   serviceType?: ServiceOrderType;
   serviceOrderTypeCatalogId?: string;
   priority?: ServiceOrderPriority;
+  status?: "OPEN" | "SCHEDULED";
   description?: string;
   symptoms?: string[];
   scheduledAt?: string;
+  arrivedAt?: string;
+  departedAt?: string;
   laborCost?: number;
+  travelCost?: number;
+  alertId?: string;
 }
 
 export function useCreateServiceOrder() {

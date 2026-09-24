@@ -1,4 +1,4 @@
-import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import type { Queue } from 'bullmq';
 import { unlink } from 'node:fs/promises';
@@ -65,6 +65,17 @@ export class ServiceOrdersService {
     const printer = dto.printerId ? await this.assertBelongsToTenant('printer', dto.printerId) : null;
     if (dto.technicianId) await this.assertBelongsToTenant('user', dto.technicianId);
 
+    let alert: { id: string; serviceOrderId: string | null } | null = null;
+    if (dto.alertId) {
+      alert = await this.tenantPrisma.client.alert.findFirst({ where: { id: dto.alertId } });
+      if (!alert) {
+        throw new NotFoundException('Alerta não encontrado');
+      }
+      if (alert.serviceOrderId) {
+        throw new BadRequestException('Este alerta já está vinculado a outra OS');
+      }
+    }
+
     // Per-tenant sequential number. Race-safe enough for MVP volume via a
     // serializable retry would be ideal, but a simple max+1 inside the
     // client's own tenant scope is fine at this scale — revisit with a
@@ -99,6 +110,7 @@ export class ServiceOrdersService {
     const created = await this.tenantPrisma.client.serviceOrder.create({
       data: {
         number: (last?.number ?? 0) + 1,
+        title: dto.title,
         customerId: dto.customerId,
         locationId: dto.locationId,
         printerId: dto.printerId,
@@ -108,14 +120,22 @@ export class ServiceOrdersService {
         serviceType: dto.serviceType,
         serviceOrderTypeCatalogId: dto.serviceOrderTypeCatalogId,
         priority: dto.priority,
+        status: dto.status,
         description: dto.description,
         symptoms: dto.symptoms ?? [],
         counterAtOpening,
         scheduledAt: dto.scheduledAt ? new Date(dto.scheduledAt) : undefined,
         slaDueAt,
         laborCost,
+        travelCost: dto.travelCost,
+        arrivedAt: dto.arrivedAt ? new Date(dto.arrivedAt) : undefined,
+        departedAt: dto.departedAt ? new Date(dto.departedAt) : undefined,
       } as any,
     });
+
+    if (alert) {
+      await this.tenantPrisma.client.alert.update({ where: { id: alert.id }, data: { serviceOrderId: created.id } });
+    }
 
     if (dto.technicianId) {
       void this.notificationsQueue.add('ticket-assigned', {

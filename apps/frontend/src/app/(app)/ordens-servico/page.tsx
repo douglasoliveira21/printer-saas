@@ -80,6 +80,7 @@ export default function OrdensServicoPage() {
 
   const columns: DataTableColumn<ServiceOrder>[] = [
     { key: "number", header: "Número", cell: (o) => `#${o.number}`, hideOnMobile: true },
+    { key: "title", header: "Título", cell: (o) => o.title || "—" },
     { key: "customer", header: "Cliente", cell: (o) => o.customer?.tradeName || o.customer?.legalName || "—" },
     {
       key: "printer",
@@ -189,7 +190,7 @@ export default function OrdensServicoPage() {
           emptyIcon={Wrench}
           emptyTitle="Nenhuma ordem de serviço registrada ainda"
           rowHref={orderHref}
-          cardTitle={(o) => `#${o.number} — ${o.customer?.tradeName || o.customer?.legalName || "—"}`}
+          cardTitle={(o) => (o.title ? `#${o.number} — ${o.title}` : `#${o.number} — ${o.customer?.tradeName || o.customer?.legalName || "—"}`)}
           cardMeta={(o) => <Badge variant={PRIORITY_CONFIG[o.priority].variant}>{PRIORITY_CONFIG[o.priority].label}</Badge>}
           cardActions={(o) => <EditServiceOrderDialog order={o} />}
         />

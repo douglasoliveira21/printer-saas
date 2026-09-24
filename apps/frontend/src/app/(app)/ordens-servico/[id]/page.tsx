@@ -35,7 +35,10 @@ export default function ServiceOrderDetailPage({ params }: { params: Promise<{ i
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold">OS #{order.number}</h1>
+          <h1 className="text-2xl font-semibold">
+            OS #{order.number}
+            {order.title ? ` — ${order.title}` : ""}
+          </h1>
           <p className="text-sm text-muted-foreground">{order.customer?.tradeName || order.customer?.legalName}</p>
         </div>
         <Badge variant={order.status === "DONE" ? "default" : order.status === "CANCELLED" ? "secondary" : "outline"}>

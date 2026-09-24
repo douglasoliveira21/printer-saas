@@ -1,17 +1,9 @@
 import { PartialType } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import { IsBoolean, IsDateString, IsEnum, IsInt, IsNumber, IsOptional, IsString, Min } from 'class-validator';
-import { CreateServiceOrderDto } from './create-service-order.dto';
+import { CreateServiceOrderDto, ServiceOrderStatusDto } from './create-service-order.dto';
 
-export enum ServiceOrderStatusDto {
-  OPEN = 'OPEN',
-  SCHEDULED = 'SCHEDULED',
-  IN_PROGRESS = 'IN_PROGRESS',
-  WAITING_PART = 'WAITING_PART',
-  WAITING_CUSTOMER = 'WAITING_CUSTOMER',
-  DONE = 'DONE',
-  CANCELLED = 'CANCELLED',
-}
+export { ServiceOrderStatusDto };
 
 export enum ServiceOrderBillingTypeDto {
   CONTRACT = 'CONTRACT',
@@ -62,20 +54,6 @@ export class UpdateServiceOrderDto extends PartialType(CreateServiceOrderDto) {
   @IsNumber()
   @Min(0)
   laborCost?: number;
-
-  @IsOptional()
-  @Type(() => Number)
-  @IsNumber()
-  @Min(0)
-  travelCost?: number;
-
-  @IsOptional()
-  @IsDateString()
-  arrivedAt?: string;
-
-  @IsOptional()
-  @IsDateString()
-  departedAt?: string;
 
   @IsOptional()
   @Type(() => Number)

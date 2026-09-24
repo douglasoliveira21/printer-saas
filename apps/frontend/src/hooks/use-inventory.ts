@@ -23,10 +23,25 @@ export function useInventoryItem(id: string | undefined) {
   });
 }
 
+export interface CreateInventoryItemInput {
+  name: string;
+  type: string;
+  code?: string;
+  manufacturer?: string;
+  model: string;
+  color?: string;
+  standardLifespanPages?: number;
+  costPrice?: number;
+  salePrice?: number;
+  notes?: string;
+  quantity?: number;
+  minQuantity?: number;
+}
+
 export function useCreateInventoryItem() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (input: { name: string; type: string; minQuantity?: number }) => {
+    mutationFn: async (input: CreateInventoryItemInput) => {
       const { data } = await apiClient.post<InventoryItem>("/inventory/items", input);
       return data;
     },
