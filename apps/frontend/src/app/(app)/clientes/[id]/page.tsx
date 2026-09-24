@@ -23,6 +23,7 @@ import { EditCustomerDialog } from "./edit-customer-dialog";
 import { LocationCard } from "./location-card";
 import { HistoryTab } from "./history-tab";
 import { SettingsTab } from "./settings-tab";
+import { AgentTab } from "./agent-tab";
 
 export default function CustomerDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -76,6 +77,7 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
       <Tabs defaultValue="dados">
         <TabsList>
           <TabsTrigger value="dados">Dados</TabsTrigger>
+          <TabsTrigger value="agent">Agent</TabsTrigger>
           <TabsTrigger value="historico">Histórico</TabsTrigger>
           <TabsTrigger value="configuracoes">Configurações</TabsTrigger>
         </TabsList>
@@ -127,6 +129,10 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
               </div>
             )}
           </div>
+        </TabsContent>
+
+        <TabsContent value="agent" className="mt-4">
+          <AgentTab customer={customer} />
         </TabsContent>
 
         <TabsContent value="historico" className="mt-4">

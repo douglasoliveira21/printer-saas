@@ -5,7 +5,6 @@ import { Badge } from "@/components/ui/badge";
 import { PageHeader } from "@/components/shared/page-header";
 import { ResponsiveDataTable, type DataTableColumn } from "@/components/shared/responsive-data-table";
 import { useAgents } from "@/hooks/use-agents";
-import { CreateAgentDialog } from "./create-agent-dialog";
 import { AgentActionsMenu } from "./agent-actions-menu";
 import type { Agent } from "@/lib/types";
 
@@ -40,7 +39,7 @@ export default function AgentsPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Agents" actions={<CreateAgentDialog />} />
+      <PageHeader title="Agents" />
 
       <ResponsiveDataTable
         columns={columns}
@@ -49,6 +48,7 @@ export default function AgentsPage() {
         isLoading={isLoading}
         emptyIcon={Cpu}
         emptyTitle="Nenhum Agent instalado ainda"
+        emptyDescription="O Agent é vinculado a um cliente pela aba Agent, na tela de detalhes do cliente."
         cardTitle={(a) => a.name}
         cardMeta={(a) => <Badge variant={STATUS_CONFIG[a.status].variant}>{STATUS_CONFIG[a.status].label}</Badge>}
         cardActions={(a) => <AgentActionsMenu agent={a} />}

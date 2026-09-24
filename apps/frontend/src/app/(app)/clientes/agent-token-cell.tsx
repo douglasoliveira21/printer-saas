@@ -24,7 +24,7 @@ export function AgentTokenCell({ agent }: { agent: Customer["agent"] }) {
 
   if (!agent) {
     return (
-      <span className="text-xs text-muted-foreground" title="Este cliente ainda não tem nenhum Agent — crie um na tela Agents.">
+      <span className="text-xs text-muted-foreground" title="Este cliente ainda não tem nenhum Agent — abra o cliente e vá na aba Agent para gerar o token de instalação.">
         Sem Agent
       </span>
     );
