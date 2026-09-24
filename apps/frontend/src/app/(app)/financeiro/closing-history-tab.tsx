@@ -28,7 +28,9 @@ export function ClosingHistoryTab() {
     <div className="space-y-4">
       <Select value={customerId} onValueChange={(v) => setCustomerId(v ?? "")}>
         <SelectTrigger className="w-full sm:w-64">
-          <SelectValue placeholder="Selecione o cliente" />
+          <SelectValue placeholder="Selecione o cliente">
+            {(v: string) => (v ? customers?.data.find((c) => c.id === v)?.tradeName || customers?.data.find((c) => c.id === v)?.legalName || v : "Selecione o cliente")}
+          </SelectValue>
         </SelectTrigger>
         <SelectContent>
           {customers?.data.map((c) => (

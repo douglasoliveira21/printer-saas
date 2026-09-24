@@ -62,7 +62,9 @@ export function EditServiceOrderDialog({ order }: { order: ServiceOrder }) {
               <Label>Técnico responsável</Label>
               <Select value={technicianId} onValueChange={(v) => setTechnicianId(v ?? "")}>
                 <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Não atribuído" />
+                  <SelectValue placeholder="Não atribuído">
+                  {(v: string) => (v ? users?.find((u) => u.id === v)?.name || v : "Não atribuído")}
+                </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   {users?.map((user) => (

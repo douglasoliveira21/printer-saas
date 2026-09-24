@@ -79,7 +79,13 @@ export function AddContractPrinterDialog({ contract }: { contract: Contract }) {
               <Label>Impressora *</Label>
               <Select value={printerId} onValueChange={(v) => setPrinterId(v ?? "")}>
                 <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Selecione a impressora" />
+                  <SelectValue placeholder="Selecione a impressora">
+                    {(v: string) => {
+                      if (!v) return "Selecione a impressora";
+                      const p = availablePrinters.find((printer) => printer.id === v);
+                      return p ? `${p.manufacturer} ${p.model} (${p.ip})` : v;
+                    }}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   {availablePrinters.map((p) => (

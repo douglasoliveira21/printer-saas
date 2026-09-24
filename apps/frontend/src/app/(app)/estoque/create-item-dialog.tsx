@@ -100,7 +100,9 @@ export function CreateItemDialog() {
               <Label>Tipo *</Label>
               <Select value={type} onValueChange={(v) => v && setType(v)}>
                 <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Selecione o tipo de suprimento/peça" />
+                  <SelectValue placeholder="Selecione o tipo de suprimento/peça">
+                    {(v: string) => (v ? TYPE_OPTIONS.find((t) => t.value === v)?.label || v : "Selecione o tipo de suprimento/peça")}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   {TYPE_OPTIONS.map((t) => (

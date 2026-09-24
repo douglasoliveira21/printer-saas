@@ -47,7 +47,9 @@ export default function PainelPage() {
       <div className="flex flex-wrap items-center gap-4">
         <Select value={customerId} onValueChange={(v) => setCustomerId(v ?? "")}>
           <SelectTrigger className="w-full sm:w-64">
-            <SelectValue placeholder="Todos os clientes" />
+            <SelectValue placeholder="Todos os clientes">
+              {(v: string) => (v ? customers?.data.find((c) => c.id === v)?.tradeName || customers?.data.find((c) => c.id === v)?.legalName || v : "Todos os clientes")}
+            </SelectValue>
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="">Todos os clientes</SelectItem>

@@ -104,7 +104,9 @@ export function CreateAgentDialog() {
                 <Label>Cliente</Label>
                 <Select value={customerId} onValueChange={(v) => { setCustomerId(v ?? ""); setLocationId(""); }}>
                   <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Selecione (opcional)" />
+                    <SelectValue placeholder="Selecione (opcional)">
+                      {(v: string) => (v ? customers?.data.find((c) => c.id === v)?.tradeName || customers?.data.find((c) => c.id === v)?.legalName || v : "Selecione (opcional)")}
+                    </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
                     {customers?.data.map((c) => (
@@ -120,7 +122,9 @@ export function CreateAgentDialog() {
                   <Label>Local</Label>
                   <Select value={locationId} onValueChange={(v) => setLocationId(v ?? "")}>
                     <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Selecione o local" />
+                      <SelectValue placeholder="Selecione o local">
+                        {(v: string) => (v ? customer.locations.find((l) => l.id === v)?.name || v : "Selecione o local")}
+                      </SelectValue>
                     </SelectTrigger>
                     <SelectContent>
                       {customer.locations.map((l) => (

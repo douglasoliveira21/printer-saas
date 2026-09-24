@@ -68,7 +68,9 @@ export function RegisterReplacementDialog({ printerId, type, color }: { printerI
                 <Label>Baixar do estoque (opcional)</Label>
                 <Select value={inventoryItemId} onValueChange={(v) => setInventoryItemId(v ?? "")}>
                   <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Nenhum item de estoque vinculado" />
+                    <SelectValue placeholder="Nenhum item de estoque vinculado">
+                      {(v: string) => (v ? items?.find((item) => item.id === v)?.name || v : "Nenhum item de estoque vinculado")}
+                    </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
                     {items.map((item) => (

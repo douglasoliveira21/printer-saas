@@ -113,7 +113,9 @@ export function ClosingMonthTab() {
       <div className="flex flex-wrap items-center gap-3 print:hidden">
         <Select value={customerId} onValueChange={(v) => setCustomerId(v ?? "")}>
           <SelectTrigger className="w-full sm:w-64">
-            <SelectValue placeholder="Selecione o cliente" />
+            <SelectValue placeholder="Selecione o cliente">
+              {(v: string) => (v ? customers?.data.find((c) => c.id === v)?.tradeName || customers?.data.find((c) => c.id === v)?.legalName || v : "Selecione o cliente")}
+            </SelectValue>
           </SelectTrigger>
           <SelectContent>
             {customers?.data.map((c) => (

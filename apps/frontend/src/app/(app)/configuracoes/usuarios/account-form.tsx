@@ -134,7 +134,9 @@ export function AccountForm({
             <Label>Cliente *</Label>
             <Select value={value.customerId ?? ""} onValueChange={(v) => setValue((prev) => ({ ...prev, customerId: v ?? undefined }))}>
               <SelectTrigger className="w-full">
-                <SelectValue placeholder="Selecione o cliente" />
+                <SelectValue placeholder="Selecione o cliente">
+                  {(v: string) => (v ? customers?.data.find((c) => c.id === v)?.tradeName || customers?.data.find((c) => c.id === v)?.legalName || v : "Selecione o cliente")}
+                </SelectValue>
               </SelectTrigger>
               <SelectContent>
                 {customers?.data.map((c) => (

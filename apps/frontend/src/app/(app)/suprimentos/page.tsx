@@ -121,7 +121,9 @@ export default function SuprimentosPage() {
           <div className="flex justify-end">
             <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v ?? "")}>
               <SelectTrigger className="w-full sm:w-48">
-                <SelectValue placeholder="Todos os status" />
+                <SelectValue placeholder="Todos os status">
+                  {(v: ConsumableReplacementStatus | "") => (v ? REPLACEMENT_STATUS_LABEL[v] : "Todos os status")}
+                </SelectValue>
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="PREDICTED">Previstas</SelectItem>

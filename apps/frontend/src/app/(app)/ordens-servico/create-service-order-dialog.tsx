@@ -173,7 +173,9 @@ export function CreateServiceOrderDialog() {
               <Label>Cliente *</Label>
               <Select value={customerId} onValueChange={(v) => { setCustomerId(v ?? ""); setLocationId(""); setPrinterId(""); }}>
                 <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Selecione o cliente" />
+                  <SelectValue placeholder="Selecione o cliente">
+                    {(v: string) => (v ? customers?.data.find((c) => c.id === v)?.tradeName || customers?.data.find((c) => c.id === v)?.legalName || v : "Selecione o cliente")}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   {customers?.data.map((c) => (
@@ -190,7 +192,9 @@ export function CreateServiceOrderDialog() {
                 <Label>Local</Label>
                 <Select value={locationId} onValueChange={(v) => setLocationId(v ?? "")}>
                   <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Selecione (opcional)" />
+                    <SelectValue placeholder="Selecione (opcional)">
+                      {(v: string) => (v ? customer.locations.find((l) => l.id === v)?.name || v : "Selecione (opcional)")}
+                    </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
                     {customer.locations.map((l) => (
@@ -207,7 +211,9 @@ export function CreateServiceOrderDialog() {
               <Label>Tipo de chamado</Label>
               <Select value={serviceOrderTypeCatalogId} onValueChange={(v) => setServiceOrderTypeCatalogId(v ?? "")}>
                 <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Selecione o tipo de chamado" />
+                  <SelectValue placeholder="Selecione o tipo de chamado">
+                    {(v: string) => (v ? types?.find((t) => t.id === v)?.name || v : "Selecione o tipo de chamado")}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   {types?.filter((t) => t.active).map((t) => (
@@ -224,7 +230,13 @@ export function CreateServiceOrderDialog() {
                 <Label>Impressora</Label>
                 <Select value={printerId} onValueChange={(v) => { setPrinterId(v ?? ""); setAlertId(""); }}>
                   <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Selecione (opcional) — caso seja manutenção em uma impressora específica" />
+                    <SelectValue placeholder="Selecione (opcional) — caso seja manutenção em uma impressora específica">
+                      {(v: string) => {
+                        if (!v) return "Selecione (opcional) — caso seja manutenção em uma impressora específica";
+                        const p = printers?.data.find((printer) => printer.id === v);
+                        return p ? `${p.manufacturer} ${p.model} (${p.ip})` : v;
+                      }}
+                    </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
                     {printers.data.map((p) => (
@@ -242,7 +254,9 @@ export function CreateServiceOrderDialog() {
                 <Label>Alerta relacionado</Label>
                 <Select value={alertId} onValueChange={(v) => setAlertId(v ?? "")}>
                   <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Vincular um alerta em aberto desta impressora (opcional)" />
+                    <SelectValue placeholder="Vincular um alerta em aberto desta impressora (opcional)">
+                      {(v: string) => (v ? printerAlerts?.find((a) => a.id === v)?.message || v : "Vincular um alerta em aberto desta impressora (opcional)")}
+                    </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
                     {printerAlerts.map((a) => (
@@ -260,7 +274,9 @@ export function CreateServiceOrderDialog() {
                 <Label>Técnico responsável</Label>
                 <Select value={technicianId} onValueChange={(v) => setTechnicianId(v ?? "")}>
                   <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Não atribuído" />
+                    <SelectValue placeholder="Não atribuído">
+                      {(v: string) => (v ? users?.find((u) => u.id === v)?.name || v : "Não atribuído")}
+                    </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
                     {users?.map((u) => (
@@ -338,7 +354,9 @@ export function CreateServiceOrderDialog() {
                       <TableCell>
                         <Select value={line.inventoryItemId} onValueChange={(v) => updateLine(line.key, { inventoryItemId: v ?? "" })}>
                           <SelectTrigger className="w-full">
-                            <SelectValue placeholder="Serviço avulso" />
+                            <SelectValue placeholder="Serviço avulso">
+                              {(v: string) => (v ? inventoryItems?.find((item) => item.id === v)?.name || v : "Serviço avulso")}
+                            </SelectValue>
                           </SelectTrigger>
                           <SelectContent>
                             {inventoryItems?.map((item) => (

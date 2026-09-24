@@ -68,7 +68,9 @@ export function OpeningSection({ order }: { order: ServiceOrder }) {
             <Label>Tipo de chamado (Configurações &gt; Chamados)</Label>
             <Select value={typeCatalogId} onValueChange={(v) => setTypeCatalogId(v ?? "")}>
               <SelectTrigger className="w-full">
-                <SelectValue placeholder="Selecione (opcional)" />
+                <SelectValue placeholder="Selecione (opcional)">
+                  {(v: string) => (v ? catalogTypes?.find((t) => t.id === v)?.name || v : "Selecione (opcional)")}
+                </SelectValue>
               </SelectTrigger>
               <SelectContent>
                 {catalogTypes?.filter((t) => t.active).map((t) => (

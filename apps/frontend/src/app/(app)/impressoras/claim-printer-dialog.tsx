@@ -57,7 +57,9 @@ export function ClaimPrinterDialog({ printer, onClose }: { printer: Printer; onC
               }}
             >
               <SelectTrigger className="w-full">
-                <SelectValue placeholder="Selecione o cliente" />
+                <SelectValue placeholder="Selecione o cliente">
+                  {(v: string) => (v ? customers?.data.find((c) => c.id === v)?.tradeName || customers?.data.find((c) => c.id === v)?.legalName || v : "Selecione o cliente")}
+                </SelectValue>
               </SelectTrigger>
               <SelectContent>
                 {customers?.data.map((c) => (
@@ -74,7 +76,9 @@ export function ClaimPrinterDialog({ printer, onClose }: { printer: Printer; onC
               <Label>Local</Label>
               <Select value={locationId} onValueChange={(value) => setLocationId(value ?? "")}>
                 <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Selecione o local (opcional)" />
+                  <SelectValue placeholder="Selecione o local (opcional)">
+                    {(v: string) => (v ? customer.locations.find((l) => l.id === v)?.name || v : "Selecione o local (opcional)")}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   {customer.locations.map((l) => (

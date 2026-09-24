@@ -178,7 +178,9 @@ export function CreateContractDialog() {
                 <Label>Cliente *</Label>
                 <Select value={customerId} onValueChange={(v) => { setCustomerId(v ?? ""); setSelectedPrinterIds([]); }}>
                   <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Selecione o cliente" />
+                    <SelectValue placeholder="Selecione o cliente">
+                      {(v: string) => (v ? customers?.data.find((c) => c.id === v)?.tradeName || customers?.data.find((c) => c.id === v)?.legalName || v : "Selecione o cliente")}
+                    </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
                     {customers?.data.map((c) => (

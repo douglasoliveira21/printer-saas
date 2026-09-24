@@ -99,7 +99,9 @@ export function CreateEntryDialog() {
                 <Label>Cliente</Label>
                 <Select value={customerId} onValueChange={(v) => setCustomerId(v ?? "")}>
                   <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Selecione (opcional)" />
+                    <SelectValue placeholder="Selecione (opcional)">
+                      {(v: string) => (v ? customers?.data.find((c) => c.id === v)?.tradeName || customers?.data.find((c) => c.id === v)?.legalName || v : "Selecione (opcional)")}
+                    </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
                     {customers?.data.map((c) => (

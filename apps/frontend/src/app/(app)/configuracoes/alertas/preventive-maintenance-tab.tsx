@@ -69,7 +69,13 @@ export function PreventiveMaintenanceTab() {
               <Label>Impressora</Label>
               <Select value={printerId} onValueChange={(v) => setPrinterId(v ?? "")}>
                 <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Selecione" />
+                  <SelectValue placeholder="Selecione">
+                    {(v: string) => {
+                      if (!v) return "Selecione";
+                      const p = printers?.data.find((printer) => printer.id === v);
+                      return p ? `${p.manufacturer} ${p.model} (${p.ip})` : v;
+                    }}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   {printers?.data.map((p) => (
