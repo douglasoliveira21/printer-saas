@@ -156,7 +156,7 @@ export default function LoginPage() {
           </form>
 
           <p className="text-center text-xs text-muted-foreground">
-            Printer SaaS · © {new Date().getFullYear()} Vgon. Todos os direitos reservados.
+            Vgon Printer · © {new Date().getFullYear()} Vgon. Todos os direitos reservados.
           </p>
         </div>
       </div>

@@ -1,7 +1,7 @@
 #Requires -RunAsAdministrator
 <#
 .SYNOPSIS
-  Installs the Printer SaaS Agent as a Windows Service.
+  Installs the Vgon Printer Agent as a Windows Service.
 
 .DESCRIPTION
   Pragmatic MVP installer (spec §11): copies the published, self-contained
@@ -11,7 +11,7 @@
   this folder — this script is the "AgentSetup" for now.
 
 .PARAMETER ApiUrl
-  Base URL of the Printer SaaS API, e.g. https://api.seudominio.com.br
+  Base URL of the Vgon Printer API, e.g. https://api.seudominio.com.br
 
 .PARAMETER EnrollmentToken
   One-time installation token from "Configurações > Agents > Adicionar Agent" in the SaaS.
@@ -66,8 +66,8 @@ if (-not (Test-Path $exePath)) {
 }
 
 Write-Host "Registering Windows Service '$ServiceName'..."
-& sc.exe create $ServiceName binPath= "`"$exePath`"" start= auto DisplayName= "Printer SaaS Agent" | Out-Null
-& sc.exe description $ServiceName "Descobre e monitora impressoras na rede local para o Printer SaaS." | Out-Null
+& sc.exe create $ServiceName binPath= "`"$exePath`"" start= auto DisplayName= "Vgon Printer Agent" | Out-Null
+& sc.exe description $ServiceName "Descobre e monitora impressoras na rede local para o Vgon Printer." | Out-Null
 & sc.exe failure $ServiceName reset= 86400 actions= restart/60000/restart/60000/restart/60000 | Out-Null
 
 Write-Host "Starting service..."

@@ -23,7 +23,7 @@ export function Sidebar({ className }: { className?: string }) {
           // eslint-disable-next-line @next/next/no-img-element -- tenant logo is an arbitrary uploaded file, not a build-time-known asset
           <img src={uploadedFileUrl(tenant.logoUrl)} alt={tenant.name} className="h-full max-w-full object-contain py-2" />
         ) : (
-          <Image src="/logo.png" alt="Printer SaaS" width={160} height={48} className="h-full w-auto object-contain py-2" />
+          <Image src="/logo.png" alt="Vgon Printer" width={160} height={48} className="h-full w-auto object-contain py-2" />
         )}
       </div>
       <div className="flex-1 space-y-1 overflow-y-auto py-3">

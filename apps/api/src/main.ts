@@ -37,7 +37,7 @@ async function bootstrap() {
   app.useGlobalFilters(new HttpExceptionFilter());
 
   const swaggerConfig = new DocumentBuilder()
-    .setTitle('Printer SaaS API')
+    .setTitle('Vgon Printer API')
     .setDescription('Multi-tenant printer fleet management API')
     .setVersion('1.0')
     .addBearerAuth()

@@ -10,7 +10,7 @@ public class AgentOptions
 {
     public const string SectionName = "Agent";
 
-    /// <summary>Base URL of the Printer SaaS API, e.g. https://api.seudominio.com.br</summary>
+    /// <summary>Base URL of the Vgon Printer API, e.g. https://api.seudominio.com.br</summary>
     public string ApiUrl { get; set; } = "http://localhost:3001";
 
     /// <summary>One-time installation token (spec §12) — only used once, on first run.</summary>

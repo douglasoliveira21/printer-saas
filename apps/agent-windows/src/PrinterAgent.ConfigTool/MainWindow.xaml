@@ -5,7 +5,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:PrinterAgent.ConfigTool"
         mc:Ignorable="d"
-        Title="Printer SaaS Agent" Height="760" Width="900"
+        Title="Vgon Printer Agent" Height="760" Width="900"
         MinHeight="600" MinWidth="760"
         WindowStartupLocation="CenterScreen"
         Background="White"
@@ -28,7 +28,7 @@
 
                 <StackPanel Grid.Column="0" Orientation="Horizontal">
                     <Image Source="Assets/logo.png" Width="28" Height="28" Margin="0,0,10,0"/>
-                    <TextBlock Text="Printer SaaS Agent" Style="{StaticResource TitleText}" FontSize="16" VerticalAlignment="Center"/>
+                    <TextBlock Text="Vgon Printer Agent" Style="{StaticResource TitleText}" FontSize="16" VerticalAlignment="Center"/>
                 </StackPanel>
 
                 <StackPanel Grid.Column="1" Orientation="Horizontal" Margin="24,0,0,0" VerticalAlignment="Center">

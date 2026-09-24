@@ -244,8 +244,8 @@ public class WindowsServiceInstaller
             throw new InvalidOperationException($"PrinterAgent.Service.exe não encontrado em '{InstallPath}'.");
         }
 
-        RunScOrThrow($"create {ServiceName} binPath= \"{exePath}\" start= auto DisplayName= \"Printer SaaS Agent\"");
-        RunSc($"description {ServiceName} \"Descobre e monitora impressoras na rede local para o Printer SaaS.\"");
+        RunScOrThrow($"create {ServiceName} binPath= \"{exePath}\" start= auto DisplayName= \"Vgon Printer Agent\"");
+        RunSc($"description {ServiceName} \"Descobre e monitora impressoras na rede local para o Vgon Printer.\"");
         RunSc($"failure {ServiceName} reset= 86400 actions= restart/60000/restart/60000/restart/60000");
 
         using var controller = new ServiceController(ServiceName);

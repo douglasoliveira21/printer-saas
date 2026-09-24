@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-  Builds the distributable Printer SaaS Agent package: PrinterAgentSetup.exe
+  Builds the distributable Vgon Printer Agent package: PrinterAgentSetup.exe
   (the GUI installer/dashboard) plus the Windows Service files it installs.
 
 .DESCRIPTION

@@ -1,4 +1,4 @@
-# Printer SaaS — Agent Windows
+# Vgon Printer — Agent Windows
 
 Agent .NET (C#) que roda como Windows Service na rede do cliente: descobre
 impressoras via SNMP, coleta contadores/consumíveis e envia tudo normalizado
@@ -164,7 +164,7 @@ um `.msi`.
 Ele instala os mesmos arquivos que `PrinterAgentSetup.exe` já instalava
 (ConfigTool + ServiceFiles em `C:\Program Files\PrinterSaaS\Agent`) e cria
 um atalho no Menu Iniciar — mas **não registra o Windows Service sozinho**.
-Depois de instalado, abra "Printer SaaS Agent" no Menu Iniciar (é o mesmo
+Depois de instalado, abra "Vgon Printer Agent" no Menu Iniciar (é o mesmo
 `PrinterAgentSetup.exe` de sempre) e preencha ApiUrl/token/redes do jeito
 que já fazia: é esse passo que efetivamente cria e inicia o serviço. A
 desinstalação, por outro lado, já limpa o serviço sozinha (`sc.exe stop` +

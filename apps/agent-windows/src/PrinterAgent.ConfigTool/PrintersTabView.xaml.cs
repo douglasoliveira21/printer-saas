@@ -83,7 +83,7 @@ public partial class PrintersTabView : UserControl
         }
         var confirm = MessageBox.Show(
             Window.GetWindow(this), $"Remover {ids.Count} impressora(s)? Só funciona para as ainda não monitoradas.",
-            "Printer SaaS Agent", MessageBoxButton.YesNo, MessageBoxImage.Question);
+            "Vgon Printer Agent", MessageBoxButton.YesNo, MessageBoxImage.Question);
         if (confirm != MessageBoxResult.Yes) return;
 
         var errors = new List<string>();
@@ -107,7 +107,7 @@ public partial class PrintersTabView : UserControl
         if (errors.Count > 0)
         {
             var summary = removed > 0 ? $"{removed} removida(s). Falhas:\n" : "";
-            MessageBox.Show(Window.GetWindow(this), summary + string.Join("\n", errors), "Printer SaaS Agent", MessageBoxButton.OK, MessageBoxImage.Warning);
+            MessageBox.Show(Window.GetWindow(this), summary + string.Join("\n", errors), "Vgon Printer Agent", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
         await RefreshAsync();
     }

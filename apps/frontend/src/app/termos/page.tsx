@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 
-export const metadata = { title: "Termos de Uso — Printer SaaS" };
+export const metadata = { title: "Termos de Uso — Vgon Printer" };
 
 export default function TermosPage() {
   return (

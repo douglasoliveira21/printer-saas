@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 
-export const metadata = { title: "Política de Privacidade — Printer SaaS" };
+export const metadata = { title: "Política de Privacidade — Vgon Printer" };
 
 export default function PrivacidadePage() {
   return (

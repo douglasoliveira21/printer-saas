@@ -2,8 +2,8 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "Printer SaaS",
-    short_name: "Printer SaaS",
+    name: "Vgon Printer",
+    short_name: "Vgon Printer",
     description: "Gestão, monitoramento e operação para empresas de locação e manutenção de impressoras",
     start_url: "/painel",
     display: "standalone",

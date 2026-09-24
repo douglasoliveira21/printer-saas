@@ -97,6 +97,6 @@ public partial class ToolsTabView : UserControl
             CollectionMethod = "MANUAL",
         };
         await _context.ApiClient.SubmitDevicesAsync(new SubmitDevicesRequest { Devices = [device] }, CancellationToken.None);
-        MessageBox.Show(Window.GetWindow(this), $"\"{printer.Name}\" adicionada. Veja na aba Impressoras.", "Printer SaaS Agent", MessageBoxButton.OK, MessageBoxImage.Information);
+        MessageBox.Show(Window.GetWindow(this), $"\"{printer.Name}\" adicionada. Veja na aba Impressoras.", "Vgon Printer Agent", MessageBoxButton.OK, MessageBoxImage.Information);
     }
 }

@@ -2,8 +2,8 @@
 <Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
      xmlns:util="http://wixtoolset.org/schemas/v4/wxs/util">
 
-  <Package Name="Printer SaaS Agent"
-           Manufacturer="Printer SaaS"
+  <Package Name="Vgon Printer Agent"
+           Manufacturer="Vgon"
            Version="$(var.ProductVersion)"
            UpgradeCode="E05C2949-EA44-4763-80DD-F89576819E63"
            Scope="perMachine">
@@ -27,10 +27,10 @@
       correctly, with a real uninstall/upgrade story" — same division of
       responsibility as build-package.ps1 already had.
     -->
-    <MajorUpgrade DowngradeErrorMessage="Uma versão mais nova do Printer SaaS Agent já está instalada." />
+    <MajorUpgrade DowngradeErrorMessage="Uma versão mais nova do Vgon Printer Agent já está instalada." />
     <MediaTemplate EmbedCab="yes" />
 
-    <Feature Id="Main" Title="Printer SaaS Agent" Level="1">
+    <Feature Id="Main" Title="Vgon Printer Agent" Level="1">
       <ComponentGroupRef Id="ConfigToolFiles" />
       <ComponentGroupRef Id="UpdaterFiles" />
       <ComponentGroupRef Id="ServiceFilesGroup" />
@@ -48,8 +48,8 @@
           <Component Id="StartMenuShortcutComponent" Guid="8F1A6B2E-4C3D-4E5A-9B1C-2D3E4F5A6B7C">
             <Shortcut Id="StartMenuShortcut"
                       Directory="ProgramMenuFolder"
-                      Name="Printer SaaS Agent"
-                      Description="Configurar e monitorar o Printer SaaS Agent"
+                      Name="Vgon Printer Agent"
+                      Description="Configurar e monitorar o Vgon Printer Agent"
                       Target="[AGENTFOLDER]PrinterAgentSetup.exe"
                       WorkingDirectory="AGENTFOLDER" />
             <RemoveFolder Id="RemoveProgramMenuFolder" Directory="ProgramMenuFolder" On="uninstall" />
@@ -146,7 +146,7 @@
          user to close the app. Requires elevation same as the MSI itself
          (see PrinterAgent.ConfigTool's app.manifest) — inherits it from
          running inside the elevated install. -->
-    <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOXTEXT" Value="Abrir o Printer SaaS Agent agora" />
+    <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOXTEXT" Value="Abrir o Vgon Printer Agent agora" />
     <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOX" Value="1" />
     <CustomAction Id="LaunchApplication"
                   Directory="AGENTFOLDER"

@@ -129,7 +129,7 @@ public partial class MainWindow : Window
         if (!alreadyInstalled && string.IsNullOrWhiteSpace(token))
         {
             MessageBox.Show(this, "Informe o token de instalação gerado no SaaS (Configurações → Agents → Adicionar Agent).",
-                "Printer SaaS Agent", MessageBoxButton.OK, MessageBoxImage.Warning);
+                "Vgon Printer Agent", MessageBoxButton.OK, MessageBoxImage.Warning);
             return;
         }
 
@@ -142,11 +142,11 @@ public partial class MainWindow : Window
             {
                 _installer.MarkInstallSeedUsed();
             }
-            MessageBox.Show(this, "Agent instalado e iniciado com sucesso.", "Printer SaaS Agent", MessageBoxButton.OK, MessageBoxImage.Information);
+            MessageBox.Show(this, "Agent instalado e iniciado com sucesso.", "Vgon Printer Agent", MessageBoxButton.OK, MessageBoxImage.Information);
         }
         catch (Exception ex)
         {
-            MessageBox.Show(this, $"Falha ao instalar: {ex.Message}", "Printer SaaS Agent", MessageBoxButton.OK, MessageBoxImage.Error);
+            MessageBox.Show(this, $"Falha ao instalar: {ex.Message}", "Vgon Printer Agent", MessageBoxButton.OK, MessageBoxImage.Error);
         }
         finally
         {
@@ -163,7 +163,7 @@ public partial class MainWindow : Window
         }
         catch (Exception ex)
         {
-            MessageBox.Show(this, $"Falha ao iniciar: {ex.Message}", "Printer SaaS Agent", MessageBoxButton.OK, MessageBoxImage.Error);
+            MessageBox.Show(this, $"Falha ao iniciar: {ex.Message}", "Vgon Printer Agent", MessageBoxButton.OK, MessageBoxImage.Error);
         }
         RefreshStatus();
     }
@@ -176,7 +176,7 @@ public partial class MainWindow : Window
         }
         catch (Exception ex)
         {
-            MessageBox.Show(this, $"Falha ao parar: {ex.Message}", "Printer SaaS Agent", MessageBoxButton.OK, MessageBoxImage.Error);
+            MessageBox.Show(this, $"Falha ao parar: {ex.Message}", "Vgon Printer Agent", MessageBoxButton.OK, MessageBoxImage.Error);
         }
         RefreshStatus();
     }
@@ -184,7 +184,7 @@ public partial class MainWindow : Window
     private void UninstallButton_Click(object sender, RoutedEventArgs e)
     {
         var result = MessageBox.Show(this, "Isso vai parar e remover o serviço do Agent desta máquina. Continuar?",
-            "Printer SaaS Agent", MessageBoxButton.YesNo, MessageBoxImage.Question);
+            "Vgon Printer Agent", MessageBoxButton.YesNo, MessageBoxImage.Question);
         if (result != MessageBoxResult.Yes)
         {
             return;
@@ -193,11 +193,11 @@ public partial class MainWindow : Window
         try
         {
             _installer.Uninstall();
-            MessageBox.Show(this, "Agent removido.", "Printer SaaS Agent", MessageBoxButton.OK, MessageBoxImage.Information);
+            MessageBox.Show(this, "Agent removido.", "Vgon Printer Agent", MessageBoxButton.OK, MessageBoxImage.Information);
         }
         catch (Exception ex)
         {
-            MessageBox.Show(this, $"Falha ao desinstalar: {ex.Message}", "Printer SaaS Agent", MessageBoxButton.OK, MessageBoxImage.Error);
+            MessageBox.Show(this, $"Falha ao desinstalar: {ex.Message}", "Vgon Printer Agent", MessageBoxButton.OK, MessageBoxImage.Error);
         }
         RefreshStatus();
     }

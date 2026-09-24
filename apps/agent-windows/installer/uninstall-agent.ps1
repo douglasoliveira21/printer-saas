@@ -1,7 +1,7 @@
 #Requires -RunAsAdministrator
 <#
 .SYNOPSIS
-  Stops and removes the Printer SaaS Agent Windows Service and its files.
+  Stops and removes the Vgon Printer Agent Windows Service and its files.
   Does NOT remove logs or stored credentials under ProgramData\PrinterSaaS\Agent
   unless -RemoveData is passed.
 #>

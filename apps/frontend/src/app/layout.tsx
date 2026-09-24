@@ -16,10 +16,10 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: { default: "Printer SaaS", template: "%s · Printer SaaS" },
+  title: { default: "Vgon Printer", template: "%s · Vgon Printer" },
   description: "Gestão, monitoramento e operação para empresas de locação e manutenção de impressoras",
   openGraph: {
-    title: "Printer SaaS",
+    title: "Vgon Printer",
     description: "Gestão, monitoramento e operação para empresas de locação e manutenção de impressoras",
     locale: "pt_BR",
     type: "website",

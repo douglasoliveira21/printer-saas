@@ -57,7 +57,7 @@ function ResetPasswordForm() {
       <Card className="w-full max-w-sm">
         <CardHeader className="items-center text-center">
           <div className="mb-2 flex h-14 w-14 items-center justify-center overflow-hidden rounded-full bg-blue-600">
-            <Image src="/logo.png" alt="Printer SaaS" width={56} height={56} className="object-cover" />
+            <Image src="/logo.png" alt="Vgon Printer" width={56} height={56} className="object-cover" />
           </div>
           <CardTitle className="text-xl">Redefinir senha</CardTitle>
           <CardDescription>Escolha uma nova senha para sua conta</CardDescription>

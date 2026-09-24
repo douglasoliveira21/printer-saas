@@ -6,7 +6,7 @@ namespace PrinterAgent.Core.Update;
 /// <summary>
 /// Verifies a downloaded update package is (a) genuinely Authenticode-signed
 /// and the signature/certificate chain is valid per Windows' own trust
-/// engine, and (b) signed specifically by the Printer SaaS publishing
+/// engine, and (b) signed specifically by the Vgon Printer publishing
 /// certificate — not just "signed by someone Windows happens to trust".
 ///
 /// (b) is the actual security boundary for auto-update: without it, any
