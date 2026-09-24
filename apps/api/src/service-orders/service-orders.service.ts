@@ -358,82 +358,162 @@ export class ServiceOrdersService {
 
   async generatePdf(id: string, options?: { showBlankLines?: boolean }): Promise<Buffer> {
     const so = await this.findOne(id);
+    const tenant = await this.tenantPrisma.client.tenant.findUnique({ where: { id: this.tenantPrisma.tenantId } });
 
-    const doc = new PDFDocument({ margin: 50 });
+    // bufferPages: true lets the footer (page numbers) be drawn only after
+    // every section above is already laid out and the total page count is
+    // known — drawing it inline as each page fills would need to predict
+    // page breaks by hand.
+    const doc = new PDFDocument({ margin: 50, bufferPages: true });
     const chunks: Buffer[] = [];
     doc.on('data', (chunk) => chunks.push(chunk));
     const done = new Promise<Buffer>((resolve) => doc.on('end', () => resolve(Buffer.concat(chunks))));
 
-    const customerName = (so.customer as any).tradeName || (so.customer as any).legalName;
+    const marginLeft = doc.page.margins.left;
+    const marginRight = doc.page.margins.right;
+    const contentWidth = doc.page.width - marginLeft - marginRight;
+    const brandColor = '#1d4ed8';
 
-    doc.fontSize(18).text(`Ordem de Serviço #${so.number}`, { align: 'left' });
-    doc.fontSize(10).fillColor('gray').text(`Aberta em ${so.createdAt.toLocaleString('pt-BR')}`);
-    doc.fillColor('black').moveDown();
-
-    doc.fontSize(12).text('1. Abertura', { underline: true });
-    doc.fontSize(10).text(`Cliente: ${customerName}`);
-    if (so.location) doc.text(`Unidade/filial: ${(so.location as any).name}`);
-    if (so.printer) doc.text(`Equipamento: ${(so.printer as any).manufacturer ?? ''} ${(so.printer as any).model ?? ''}`.trim());
-    if (so.technician) doc.text(`Técnico responsável: ${(so.technician as any).name}`);
-    if (so.createdBy) doc.text(`Aberta por: ${(so.createdBy as any).name}`);
-    doc.text(`Tipo de atendimento: ${so.serviceType ? SERVICE_TYPE_LABEL[so.serviceType] : 'Não informado'}`);
-    doc.text(`Prioridade: ${PRIORITY_LABEL[so.priority]}`);
-    doc.moveDown();
-
-    doc.fontSize(12).text('2. Problema / Solicitação', { underline: true });
-    doc.fontSize(10).text(`Descrição: ${so.description ?? 'Não informado'}`);
-    if (so.symptoms.length > 0) doc.text(`Sintomas: ${so.symptoms.join(', ')}`);
-    if (so.counterAtOpening !== null) doc.text(`Contador na abertura: ${so.counterAtOpening} páginas`);
-    doc.moveDown();
-
-    doc.fontSize(12).text('3. Diagnóstico técnico', { underline: true });
-    doc.fontSize(10);
-    if (so.diagnosis) doc.text(`Diagnóstico: ${so.diagnosis}`);
-    if (so.causeIdentified) doc.text(`Causa identificada: ${so.causeIdentified}`);
-    if (so.testsPerformed) doc.text(`Testes realizados: ${so.testsPerformed}`);
-    if (so.defectiveParts) doc.text(`Peças com problema: ${so.defectiveParts}`);
-    if (so.suppliesUsed) doc.text(`Suprimentos utilizados: ${so.suppliesUsed}`);
-    if (so.technicalNotes) doc.text(`Observações técnicas: ${so.technicalNotes}`);
-    doc.moveDown();
-
-    doc.fontSize(12).text('4. Peças e materiais', { underline: true });
-    doc.fontSize(10);
-    let materialsTotal = 0;
-    for (const part of so.parts as any[]) {
-      const lineTotal = part.quantity * Number(part.unitValue);
-      materialsTotal += lineTotal;
-      doc.text(`${part.name} — Qtd: ${part.quantity} — Unit: R$ ${Number(part.unitValue).toFixed(2)} — Total: R$ ${lineTotal.toFixed(2)}`);
-    }
-    // "Exibir linhas adicionais em branco nos itens do chamado" (Configurações
-    // > Chamados) — número de linhas configurado por tipo de chamado.
-    if (options?.showBlankLines) {
-      const blankLines = (so.serviceOrderTypeCatalog as any)?.blankLinesOnPrint ?? 0;
-      for (let i = 0; i < blankLines; i++) {
-        doc.text('_'.repeat(60));
+    // --- Cabeçalho: logo do tenant à esquerda, dados da empresa à direita ---
+    const headerTop = doc.y;
+    let logoBottom = headerTop;
+    if (tenant?.logoUrl) {
+      const logoPath = join(process.cwd(), 'uploads', tenant.logoUrl);
+      if (existsSync(logoPath)) {
+        try {
+          doc.image(logoPath, marginLeft, headerTop, { fit: [170, 60] });
+          logoBottom = headerTop + 60;
+        } catch {
+          // arquivo de logo corrompido/ilegível — segue sem quebrar o PDF
+        }
       }
     }
-    const laborCost = Number(so.laborCost ?? 0);
-    const travelCost = Number(so.travelCost ?? 0);
-    doc.text(`Materiais: R$ ${materialsTotal.toFixed(2)}`);
-    doc.text(`Mão de obra: R$ ${laborCost.toFixed(2)}`);
-    doc.text(`Deslocamento: R$ ${travelCost.toFixed(2)}`);
-    doc.fontSize(11).text(`Total: R$ ${(materialsTotal + laborCost + travelCost).toFixed(2)}`);
-    doc.fontSize(10).text(`Cobrança: ${so.billingType ? BILLING_TYPE_LABEL[so.billingType] : 'Não informado'}`);
+
+    const infoWidth = 240;
+    const infoX = marginLeft + contentWidth - infoWidth;
+    doc.y = headerTop;
+    const companyName = tenant?.name || tenant?.legalName;
+    if (companyName) {
+      doc.fontSize(12).font('Helvetica-Bold').fillColor('black').text(companyName, infoX, doc.y, { width: infoWidth, align: 'right' });
+    }
+    doc.font('Helvetica').fontSize(9).fillColor('#444444');
+    if (tenant?.document) doc.text(tenant.document, infoX, doc.y, { width: infoWidth, align: 'right' });
+    if (tenant?.address) doc.text(tenant.address, infoX, doc.y, { width: infoWidth, align: 'right' });
+    const contactLine = [tenant?.phone, tenant?.email].filter(Boolean).join(' · ');
+    if (contactLine) doc.text(contactLine, infoX, doc.y, { width: infoWidth, align: 'right' });
+    const infoBottom = doc.y;
+
+    doc.y = Math.max(logoBottom, infoBottom) + 12;
+    doc.moveTo(marginLeft, doc.y).lineTo(marginLeft + contentWidth, doc.y).strokeColor('#dddddd').lineWidth(1).stroke();
     doc.moveDown();
 
-    doc.fontSize(12).text('5. Atendimento do técnico', { underline: true });
-    doc.fontSize(10);
-    if (so.arrivedAt) doc.text(`Chegada: ${so.arrivedAt.toLocaleString('pt-BR')}`);
-    if (so.departedAt) doc.text(`Saída: ${so.departedAt.toLocaleString('pt-BR')}`);
-    if (so.mileageKm !== null) doc.text(`Quilometragem: ${so.mileageKm} km`);
-    if (so.activityPerformed) doc.text(`Atividade realizada: ${so.activityPerformed}`);
-    if (so.attendanceNotes) doc.text(`Observações: ${so.attendanceNotes}`);
+    // --- Título ---
+    const customerName = (so.customer as any).tradeName || (so.customer as any).legalName;
+    doc.fillColor('black').fontSize(18).font('Helvetica-Bold').text(`Ordem de Serviço #${so.number}`);
+    if (so.title) doc.fontSize(12).font('Helvetica').fillColor('#333333').text(so.title);
+    doc.fontSize(9).fillColor('gray').text(`Aberta em ${so.createdAt.toLocaleString('pt-BR')} — ${customerName}`);
+    doc.fillColor('black').moveDown();
+
+    const section = (title: string) => {
+      const y = doc.y;
+      doc.rect(marginLeft, y, contentWidth, 20).fill(brandColor);
+      doc.fillColor('white').font('Helvetica-Bold').fontSize(11).text(title, marginLeft + 8, y + 5);
+      doc.fillColor('black').font('Helvetica').fontSize(10);
+      doc.y = y + 28;
+    };
+    const field = (label: string, value: string) => {
+      doc.font('Helvetica-Bold').text(`${label}: `, { continued: true }).font('Helvetica').text(value);
+    };
+
+    section('1. Abertura');
+    field('Cliente', customerName);
+    if (so.location) field('Unidade/filial', (so.location as any).name);
+    if (so.printer) field('Equipamento', `${(so.printer as any).manufacturer ?? ''} ${(so.printer as any).model ?? ''}`.trim());
+    if (so.technician) field('Técnico responsável', (so.technician as any).name);
+    if (so.createdBy) field('Aberta por', (so.createdBy as any).name);
+    field('Tipo de chamado', (so.serviceOrderTypeCatalog as any)?.name ?? (so.serviceType ? SERVICE_TYPE_LABEL[so.serviceType] : 'Não informado'));
+    field('Prioridade', PRIORITY_LABEL[so.priority]);
+    field('Status', STATUS_LABEL[so.status]);
+    doc.moveDown();
+
+    section('2. Problema / Solicitação');
+    field('Descrição', so.description ?? 'Não informado');
+    if (so.symptoms.length > 0) field('Sintomas', so.symptoms.join(', '));
+    if (so.counterAtOpening !== null) field('Contador na abertura', `${so.counterAtOpening} páginas`);
+    doc.moveDown();
+
+    section('3. Diagnóstico técnico');
+    if (so.diagnosis) field('Diagnóstico', so.diagnosis);
+    if (so.causeIdentified) field('Causa identificada', so.causeIdentified);
+    if (so.testsPerformed) field('Testes realizados', so.testsPerformed);
+    if (so.defectiveParts) field('Peças com problema', so.defectiveParts);
+    if (so.suppliesUsed) field('Suprimentos utilizados', so.suppliesUsed);
+    if (so.technicalNotes) field('Observações técnicas', so.technicalNotes);
+    doc.moveDown();
+
+    section('4. Peças e materiais');
+    const parts = so.parts as any[];
+    if (parts.length > 0) {
+      const cols = { name: marginLeft, qty: marginLeft + 260, unit: marginLeft + 330, total: marginLeft + 430 };
+      const rowY = doc.y;
+      doc.font('Helvetica-Bold').fontSize(9).fillColor('#555555');
+      doc.text('Item', cols.name, rowY, { width: 250 });
+      doc.text('Qtd.', cols.qty, rowY, { width: 60 });
+      doc.text('Unit. (R$)', cols.unit, rowY, { width: 90 });
+      doc.text('Total (R$)', cols.total, rowY, { width: 90 });
+      doc.y = rowY + 14;
+      doc.moveTo(marginLeft, doc.y).lineTo(marginLeft + contentWidth, doc.y).strokeColor('#dddddd').stroke();
+      doc.moveDown(0.3);
+      doc.font('Helvetica').fontSize(10).fillColor('black');
+
+      let materialsTotal = 0;
+      for (const part of parts) {
+        const lineTotal = part.quantity * Number(part.unitValue);
+        materialsTotal += lineTotal;
+        const y = doc.y;
+        doc.text(part.name, cols.name, y, { width: 250 });
+        doc.text(String(part.quantity), cols.qty, y, { width: 60 });
+        doc.text(Number(part.unitValue).toFixed(2), cols.unit, y, { width: 90 });
+        doc.text(lineTotal.toFixed(2), cols.total, y, { width: 90 });
+        doc.y = y + 16;
+      }
+
+      // "Exibir linhas adicionais em branco nos itens do chamado"
+      // (Configurações > Chamados) — número de linhas configurado por tipo de chamado.
+      if (options?.showBlankLines) {
+        const blankLines = (so.serviceOrderTypeCatalog as any)?.blankLinesOnPrint ?? 0;
+        for (let i = 0; i < blankLines; i++) {
+          doc.text('_'.repeat(70));
+        }
+      }
+
+      const laborCost = Number(so.laborCost ?? 0);
+      const travelCost = Number(so.travelCost ?? 0);
+      doc.moveDown(0.5);
+      field('Materiais', `R$ ${materialsTotal.toFixed(2)}`);
+      field('Mão de obra', `R$ ${laborCost.toFixed(2)}`);
+      field('Deslocamento', `R$ ${travelCost.toFixed(2)}`);
+      doc.font('Helvetica-Bold').fontSize(11).text(`Total: R$ ${(materialsTotal + laborCost + travelCost).toFixed(2)}`);
+      doc.font('Helvetica').fontSize(10);
+      field('Cobrança', so.billingType ? BILLING_TYPE_LABEL[so.billingType] : 'Não informado');
+    } else {
+      doc.text('Nenhum item lançado.');
+    }
+    doc.moveDown();
+
+    section('5. Atendimento do técnico');
+    if (so.arrivedAt) field('Chegada', so.arrivedAt.toLocaleString('pt-BR'));
+    if (so.departedAt) field('Saída', so.departedAt.toLocaleString('pt-BR'));
+    if (so.mileageKm !== null) field('Quilometragem', `${so.mileageKm} km`);
+    if (so.activityPerformed) field('Atividade realizada', so.activityPerformed);
+    if (so.attendanceNotes) field('Observações', so.attendanceNotes);
     doc.moveDown();
 
     for (const photo of so.photos as any[]) {
       const filePath = join(process.cwd(), 'uploads', photo.path);
       if (existsSync(filePath)) {
-        doc.fontSize(9).text(photo.phase === 'BEFORE' ? 'Foto antes' : 'Foto depois');
+        doc.fontSize(9).font('Helvetica-Bold').text(photo.phase === 'BEFORE' ? 'Foto antes' : 'Foto depois');
+        doc.font('Helvetica');
         try {
           doc.image(filePath, { width: 200 });
         } catch {
@@ -443,18 +523,16 @@ export class ServiceOrdersService {
       }
     }
 
-    doc.fontSize(12).text('6. Resultado', { underline: true });
-    doc.fontSize(10).text(`Status: ${STATUS_LABEL[so.status]}`);
-    if (so.solution) doc.text(`Solução aplicada: ${so.solution}`);
-    if (so.equipmentWorking !== null) doc.text(`Equipamento funcionando: ${so.equipmentWorking ? 'Sim' : 'Não'}`);
+    section('6. Resultado');
+    if (so.solution) field('Solução aplicada', so.solution);
+    if (so.equipmentWorking !== null) field('Equipamento funcionando', so.equipmentWorking ? 'Sim' : 'Não');
     doc.moveDown();
 
-    doc.fontSize(12).text('7. Aprovação do cliente', { underline: true });
-    doc.fontSize(10);
+    section('7. Aprovação do cliente');
     if (so.approvalName) {
-      doc.text(`Confirmado por: ${so.approvalName}`);
-      if (so.approvalAt) doc.text(`Data/hora: ${so.approvalAt.toLocaleString('pt-BR')}`);
-      if (so.approvalNotes) doc.text(`Observação do cliente: ${so.approvalNotes}`);
+      field('Confirmado por', so.approvalName);
+      if (so.approvalAt) field('Data/hora', so.approvalAt.toLocaleString('pt-BR'));
+      if (so.approvalNotes) field('Observação do cliente', so.approvalNotes);
       if (so.approvalSignature?.startsWith('data:image')) {
         try {
           const base64 = so.approvalSignature.split(',')[1];
@@ -465,6 +543,17 @@ export class ServiceOrdersService {
       }
     } else {
       doc.text('Ainda não aprovada pelo cliente.');
+    }
+
+    // --- Rodapé com numeração de página, em todas as páginas já geradas ---
+    const pageRange = doc.bufferedPageRange();
+    for (let i = 0; i < pageRange.count; i++) {
+      doc.switchToPage(pageRange.start + i);
+      const bottom = doc.page.height - doc.page.margins.bottom + 15;
+      doc.fontSize(8).fillColor('#999999').text(`${companyName ?? ''} — OS #${so.number} — Página ${i + 1} de ${pageRange.count}`, marginLeft, bottom, {
+        width: contentWidth,
+        align: 'center',
+      });
     }
 
     doc.end();
