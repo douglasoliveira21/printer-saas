@@ -48,6 +48,33 @@
                 </StackPanel>
             </Border>
 
+            <Border Background="{StaticResource SurfaceBrush}" CornerRadius="8" Padding="14" Margin="0,0,0,14">
+                <StackPanel>
+                    <TextBlock Text="Diagnóstico SNMP" Style="{StaticResource SectionLabel}"/>
+                    <TextBlock Text="Para impressoras que não trazem número de série, contadores etc. — consulta o IP diretamente e lista tudo que ela responde, para identificarmos o OID certo desse modelo."
+                               Style="{StaticResource CaptionText}" TextWrapping="Wrap"/>
+                    <Grid Margin="0,8,0,4">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="140"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBox x:Name="DiagnosticIpTextBox" Grid.Column="0" Margin="0,0,8,0" />
+                        <TextBox x:Name="DiagnosticCommunityTextBox" Grid.Column="1" Margin="0,0,8,0" />
+                        <Button x:Name="DiagnosticRunButton" Grid.Column="2" Content="Consultar" Style="{StaticResource SecondaryButton}" Click="DiagnosticRunButton_Click"/>
+                    </Grid>
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                        <TextBlock Text="IP da impressora — community à direita (padrão: public)" Style="{StaticResource CaptionText}"/>
+                    </StackPanel>
+                    <TextBlock x:Name="DiagnosticStatus" FontSize="12" Foreground="{StaticResource MutedBrush}" TextWrapping="Wrap" Margin="0,0,0,6"/>
+                    <Button x:Name="DiagnosticCopyButton" Content="Copiar resultado" Style="{StaticResource SecondaryButton}"
+                            HorizontalAlignment="Left" Margin="0,0,0,8" Click="DiagnosticCopyButton_Click" Visibility="Collapsed"/>
+                    <TextBox x:Name="DiagnosticResultText" FontFamily="Consolas" FontSize="11" IsReadOnly="True"
+                             TextWrapping="NoWrap" AcceptsReturn="True" VerticalScrollBarVisibility="Auto"
+                             HorizontalScrollBarVisibility="Auto" Height="260"/>
+                </StackPanel>
+            </Border>
+
         </StackPanel>
     </ScrollViewer>
 </UserControl>

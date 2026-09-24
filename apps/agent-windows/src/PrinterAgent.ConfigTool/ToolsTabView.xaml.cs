@@ -1,3 +1,4 @@
+using System.Net;
 using System.Windows;
 using System.Windows.Controls;
 using PrinterAgent.Core.Configuration;
@@ -18,6 +19,7 @@ public partial class ToolsTabView : UserControl
     public void Initialize(AgentContext context)
     {
         _context = context;
+        DiagnosticCommunityTextBox.Text = context.Installer.GetConfiguredSnmpCommunity();
     }
 
     private async void NetworkScanButton_Click(object sender, RoutedEventArgs e)
@@ -98,5 +100,56 @@ public partial class ToolsTabView : UserControl
         };
         await _context.ApiClient.SubmitDevicesAsync(new SubmitDevicesRequest { Devices = [device] }, CancellationToken.None);
         MessageBox.Show(Window.GetWindow(this), $"\"{printer.Name}\" adicionada. Veja na aba Impressoras.", "Vgon Printer Agent", MessageBoxButton.OK, MessageBoxImage.Information);
+    }
+
+    private (string Oid, string Value)[] _lastDiagnosticResult = [];
+
+    private async void DiagnosticRunButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (_context is null) return;
+
+        var ipText = DiagnosticIpTextBox.Text.Trim();
+        if (!IPAddress.TryParse(ipText, out var ip))
+        {
+            DiagnosticStatus.Text = "Informe um IP válido (ex.: 192.168.25.50).";
+            return;
+        }
+
+        var community = string.IsNullOrWhiteSpace(DiagnosticCommunityTextBox.Text) ? "public" : DiagnosticCommunityTextBox.Text.Trim();
+
+        DiagnosticRunButton.IsEnabled = false;
+        DiagnosticCopyButton.Visibility = Visibility.Collapsed;
+        DiagnosticStatus.Text = "Consultando...";
+        DiagnosticResultText.Text = "";
+        try
+        {
+            var result = await _context.SnmpReader.DiagnosticWalkAsync(ip, community, timeoutMs: 2000, retries: 1, CancellationToken.None);
+            _lastDiagnosticResult = result.ToArray();
+
+            if (_lastDiagnosticResult.Length == 0)
+            {
+                DiagnosticStatus.Text = "Nenhuma resposta SNMP desse IP (v1/v2c, community informada). Confira IP, community e se a impressora tem SNMP habilitado.";
+                return;
+            }
+
+            DiagnosticResultText.Text = string.Join(Environment.NewLine, _lastDiagnosticResult.Select(r => $"{r.Oid} = {r.Value}"));
+            DiagnosticStatus.Text = $"{_lastDiagnosticResult.Length} valor(es) encontrado(s). Copie e envie para análise.";
+            DiagnosticCopyButton.Visibility = Visibility.Visible;
+        }
+        catch (Exception ex)
+        {
+            DiagnosticStatus.Text = $"Falha na consulta: {ex.Message}";
+        }
+        finally
+        {
+            DiagnosticRunButton.IsEnabled = true;
+        }
+    }
+
+    private void DiagnosticCopyButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (_lastDiagnosticResult.Length == 0) return;
+        Clipboard.SetText(DiagnosticResultText.Text);
+        DiagnosticStatus.Text = "Copiado.";
     }
 }

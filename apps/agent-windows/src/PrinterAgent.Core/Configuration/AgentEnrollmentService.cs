@@ -68,5 +68,5 @@ public class AgentEnrollmentService
 
 public static class AgentVersion
 {
-    public const string Current = "1.0.0";
+    public const string Current = "1.0.1";
 }

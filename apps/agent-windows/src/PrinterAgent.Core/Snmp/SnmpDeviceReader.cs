@@ -62,6 +62,52 @@ public class SnmpDeviceReader
         return result;
     }
 
+    /// <summary>
+    /// Roots dumped by <see cref="DiagnosticWalkAsync"/> — not just Printer-MIB
+    /// (RFC 3805), also "system" (sysDescr/sysObjectID) and the two HP private
+    /// trees this codebase already knows about (see VendorProviders.cs's
+    /// hpHttpMgSerialNumber and the classic HP LaserJet usage-counter MIB) —
+    /// so a single diagnostic run surfaces whatever an uncooperative unit
+    /// actually answers, without needing to already know which tree works.
+    /// </summary>
+    private static readonly string[] DiagnosticRootOids =
+    [
+        "1.3.6.1.2.1.1",        // system
+        "1.3.6.1.2.1.43",       // Printer-MIB (RFC 3805)
+        "1.3.6.1.4.1.11.2.36",  // HP-httpManageable-MIB (hpHttpMgSerialNumber lives here)
+        "1.3.6.1.4.1.11.2.3.9", // Legacy HP LaserJet/JetDirect private usage-counter MIB
+    ];
+
+    /// <summary>
+    /// Raw OID-by-OID dump for troubleshooting a specific uncooperative
+    /// device (spec: HP LaserJet P1102w and similar budget models that
+    /// don't answer the standard OIDs the collection pipeline above tries).
+    /// Used only by the ConfigTool's "Diagnóstico SNMP" tool — never by the
+    /// regular discovery/collection pipeline, which only ever reads
+    /// verified, documented OIDs (see VendorProviders.cs's own rule).
+    /// </summary>
+    public async Task<IReadOnlyList<(string Oid, string Value)>> DiagnosticWalkAsync(
+        IPAddress ip, string community, int timeoutMs, int retries, CancellationToken ct)
+    {
+        var endpoint = new IPEndPoint(ip, 161);
+        var communityOctet = new OctetString(community);
+
+        var sysDescrV2 = await TryGetAsync(endpoint, communityOctet, VersionCode.V2, PrinterMibOids.SysDescr, timeoutMs, retries, ct);
+        var version = sysDescrV2 is not null ? VersionCode.V2 : VersionCode.V1;
+
+        var results = new List<(string, string)>();
+        foreach (var root in DiagnosticRootOids)
+        {
+            ct.ThrowIfCancellationRequested();
+            var walked = await WalkAsync(endpoint, communityOctet, version, root, timeoutMs, ct);
+            foreach (var (oid, value) in walked)
+            {
+                results.Add((oid, value));
+            }
+        }
+        return results;
+    }
+
     private async Task<SnmpProbeResult?> ProbeWithVersionAsync(
         IPAddress ip, string community, VersionCode version, int timeoutMs, int retries, CancellationToken ct)
     {
