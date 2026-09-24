@@ -1,71 +1,21 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { toast } from "sonner";
-import { Trash2, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { useDeleteServiceOrderPhoto, useUpdateServiceOrder, useUploadServiceOrderPhoto } from "@/hooks/use-service-orders";
-import { getApiErrorMessage, uploadedFileUrl } from "@/lib/api-client";
-import type { ServiceOrder, ServiceOrderPhotoPhase } from "@/lib/types";
+import { useUpdateServiceOrder } from "@/hooks/use-service-orders";
+import { getApiErrorMessage } from "@/lib/api-client";
+import type { ServiceOrder } from "@/lib/types";
 
 function toLocalInputValue(iso: string | null) {
   if (!iso) return "";
   const d = new Date(iso);
   const offset = d.getTimezoneOffset();
   return new Date(d.getTime() - offset * 60000).toISOString().slice(0, 16);
-}
-
-function PhotoGrid({ order, phase }: { order: ServiceOrder; phase: ServiceOrderPhotoPhase }) {
-  const inputRef = useRef<HTMLInputElement>(null);
-  const upload = useUploadServiceOrderPhoto();
-  const deletePhoto = useDeleteServiceOrderPhoto();
-  const photos = (order.photos ?? []).filter((p) => p.phase === phase);
-
-  async function handleFileChange(event: React.ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0];
-    if (!file) return;
-    try {
-      await upload.mutateAsync({ serviceOrderId: order.id, phase, file });
-    } catch (error) {
-      toast.error(getApiErrorMessage(error, "Erro ao enviar foto"));
-    } finally {
-      if (inputRef.current) inputRef.current.value = "";
-    }
-  }
-
-  return (
-    <div className="space-y-2">
-      <Label>{phase === "BEFORE" ? "Fotos antes" : "Fotos depois"}</Label>
-      <div className="flex flex-wrap gap-3">
-        {photos.map((photo) => (
-          <div key={photo.id} className="group relative h-24 w-24 overflow-hidden rounded-md border border-border">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={uploadedFileUrl(photo.path)} alt="" className="h-full w-full object-cover" />
-            <button
-              type="button"
-              className="absolute right-1 top-1 rounded bg-black/60 p-1 text-white opacity-0 group-hover:opacity-100"
-              onClick={() => deletePhoto.mutate({ serviceOrderId: order.id, photoId: photo.id })}
-            >
-              <Trash2 className="h-3 w-3" />
-            </button>
-          </div>
-        ))}
-        <button
-          type="button"
-          onClick={() => inputRef.current?.click()}
-          className="flex h-24 w-24 flex-col items-center justify-center gap-1 rounded-md border border-dashed border-border text-muted-foreground hover:bg-muted"
-        >
-          <Upload className="h-4 w-4" />
-          <span className="text-xs">{upload.isPending ? "Enviando..." : "Adicionar"}</span>
-        </button>
-        <input ref={inputRef} type="file" accept="image/*" className="hidden" onChange={handleFileChange} />
-      </div>
-    </div>
-  );
 }
 
 export function AttendanceSection({ order }: { order: ServiceOrder }) {
@@ -139,11 +89,6 @@ export function AttendanceSection({ order }: { order: ServiceOrder }) {
         <div className="space-y-2">
           <Label htmlFor="attendanceNotes">Observações</Label>
           <Textarea id="attendanceNotes" rows={2} value={attendanceNotes} onChange={(e) => setAttendanceNotes(e.target.value)} />
-        </div>
-
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <PhotoGrid order={order} phase="BEFORE" />
-          <PhotoGrid order={order} phase="AFTER" />
         </div>
 
         <div className="flex justify-end">

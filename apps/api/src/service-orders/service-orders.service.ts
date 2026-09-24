@@ -465,6 +465,11 @@ export class ServiceOrdersService {
         const y = gridTop + r * rowHeight;
         doc.moveTo(marginLeft, y).lineTo(marginLeft + contentWidth, y).stroke();
       }
+      // As chamadas de texto acima usam x absoluto (célula a célula), o que
+      // deixa o cursor horizontal do pdfkit (doc.x) fora da margem esquerda —
+      // sem resetar aqui, o próximo texto "fluido" (sem x explícito) nasce
+      // deslocado e quebra estranho.
+      doc.x = marginLeft;
       doc.y = gridBottom + 10;
     }
 
@@ -539,6 +544,12 @@ export class ServiceOrdersService {
         const y = tableTop + r * rowHeight;
         doc.moveTo(marginLeft, y).lineTo(marginLeft + contentWidth, y).stroke();
       }
+      // Mesmo motivo do bloco "Dados do cliente": texto da tabela usa x
+      // absoluto por célula, então o cursor horizontal precisa ser resetado
+      // manualmente antes dos campos "fluidos" (Materiais, Mão de obra...)
+      // que vêm a seguir — sem isso eles nasciam perto da margem direita e
+      // quebravam a rótulo/valor em linhas separadas.
+      doc.x = marginLeft;
       doc.y = tableBottom + 10;
 
       // "Exibir linhas adicionais em branco nos itens do chamado"
