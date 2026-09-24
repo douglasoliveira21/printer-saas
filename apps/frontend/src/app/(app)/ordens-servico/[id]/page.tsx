@@ -12,7 +12,7 @@ import { DiagnosisSection } from "./diagnosis-section";
 import { PartsSection } from "./parts-section";
 import { AttendanceSection } from "./attendance-section";
 import { ResolutionSection } from "./resolution-section";
-import { ApprovalSection } from "./approval-section";
+import { PdfSection } from "./pdf-section";
 
 export default function ServiceOrderDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -53,7 +53,7 @@ export default function ServiceOrderDetailPage({ params }: { params: Promise<{ i
         <PartsSection order={order} />
         <AttendanceSection order={order} />
         <ResolutionSection order={order} />
-        <ApprovalSection order={order} />
+        <PdfSection order={order} />
       </div>
     </div>
   );
