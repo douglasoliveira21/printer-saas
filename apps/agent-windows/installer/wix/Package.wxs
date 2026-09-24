@@ -153,6 +153,7 @@
          it does NOT guarantee the bare exe name resolves against it, which
          is why "Abrir o programa" was silently doing nothing. -->
     <CustomAction Id="LaunchApplication"
+                  Directory="AGENTFOLDER"
                   ExeCommand="[AGENTFOLDER]PrinterAgentSetup.exe"
                   Return="asyncNoWait"
                   Impersonate="yes" />
