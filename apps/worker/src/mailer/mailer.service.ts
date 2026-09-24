@@ -3,7 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import nodemailer, { type Transporter } from 'nodemailer';
 import { PrismaService } from '../prisma/prisma.service';
 import { SecretCryptoService } from '../common/secret-crypto.service';
-import { sendViaGraph } from './graph-mailer';
+import { sendViaGraph, sendViaGraphDelegated } from './graph-mailer';
 
 /**
  * Per-tenant-aware mail sender. Each tenant can configure its own provider
@@ -46,6 +46,13 @@ export class MailerService implements OnModuleInit {
 
     const settings = await this.prisma.tenantEmailSettings.findUnique({ where: { tenantId: params.tenantId } });
 
+    if (settings?.provider === 'MICROSOFT365' && settings.m365RefreshTokenEncrypted) {
+      const sent = await this.sendViaM365Delegated(params.tenantId, settings.m365RefreshTokenEncrypted, params);
+      if (sent !== null) return sent;
+      // Refresh token inválido/revogado — cai pro legado abaixo (se
+      // configurado) em vez de simplesmente desistir do envio.
+    }
+
     if (settings?.provider === 'MICROSOFT365' && settings.m365TenantId && settings.m365ClientId && settings.m365ClientSecretEncrypted && settings.m365SenderUpn) {
       const clientSecret = this.crypto.decrypt(settings.m365ClientSecretEncrypted);
       if (clientSecret) {
@@ -54,7 +61,7 @@ export class MailerService implements OnModuleInit {
           params,
         );
       }
-      this.logger.error(`Microsoft 365 configurado para o tenant ${params.tenantId} mas o client secret não pôde ser decriptado.`);
+      this.logger.error(`Microsoft 365 (legado) configurado para o tenant ${params.tenantId} mas o client secret não pôde ser decriptado.`);
     }
 
     const transporter = await this.resolveSmtpTransporter(params.tenantId, settings);
@@ -71,6 +78,40 @@ export class MailerService implements OnModuleInit {
       this.logger.error(`Falha ao enviar e-mail "${params.subject}": ${(error as Error).message}`);
       return false;
     }
+  }
+
+  /**
+   * Returns null (not false) when the delegated flow can't even be attempted
+   * (Plataforma sem App Registration configurado, ou secret ilegível) — o
+   * caller trata isso como "tenta o legado", diferente de um envio que
+   * realmente falhou (false).
+   */
+  private async sendViaM365Delegated(
+    tenantId: string,
+    refreshTokenEncrypted: string,
+    params: { to: string[]; subject: string; html: string },
+  ): Promise<boolean | null> {
+    const platform = await this.prisma.platformSettings.findUnique({ where: { id: 'singleton' } });
+    const clientSecret = platform?.m365ClientSecretEncrypted ? this.crypto.decrypt(platform.m365ClientSecretEncrypted) : null;
+    const refreshToken = this.crypto.decrypt(refreshTokenEncrypted);
+    if (!platform?.m365ClientId || !clientSecret || !refreshToken) {
+      this.logger.error(`Microsoft 365 conectado para o tenant ${tenantId}, mas o App Registration da Plataforma não está configurado.`);
+      return null;
+    }
+
+    const result = await sendViaGraphDelegated({ clientId: platform.m365ClientId, clientSecret, refreshToken }, params);
+
+    // Microsoft costuma rotacionar o refresh token a cada uso — sem
+    // persistir o novo, a conexão do tenant para de funcionar silenciosamente
+    // assim que o token antigo expirar.
+    if (result.refreshToken !== refreshToken) {
+      await this.prisma.tenantEmailSettings.updateMany({
+        where: { tenantId },
+        data: { m365RefreshTokenEncrypted: this.crypto.encrypt(result.refreshToken) },
+      });
+    }
+
+    return result.sent;
   }
 
   private async resolveSmtpTransporter(

@@ -6,12 +6,14 @@ import { PrinterCatalogController } from './printer-catalog/printer-catalog.cont
 import { PrinterCatalogService } from './printer-catalog/printer-catalog.service';
 import { AgentReleasesController } from './agent-releases/agent-releases.controller';
 import { AgentReleasesService } from './agent-releases/agent-releases.service';
+import { PlatformEmailSettingsController } from './email-settings/platform-email-settings.controller';
+import { PlatformEmailSettingsService } from './email-settings/platform-email-settings.service';
 import { AuthModule } from '../auth/auth.module';
 
 @Module({
   imports: [AuthModule],
-  controllers: [PlatformController, PrinterCatalogController, AgentReleasesController],
-  providers: [PlatformService, SuperAdminGuard, PrinterCatalogService, AgentReleasesService],
-  exports: [AgentReleasesService],
+  controllers: [PlatformController, PrinterCatalogController, AgentReleasesController, PlatformEmailSettingsController],
+  providers: [PlatformService, SuperAdminGuard, PrinterCatalogService, AgentReleasesService, PlatformEmailSettingsService],
+  exports: [AgentReleasesService, PlatformEmailSettingsService],
 })
 export class PlatformModule {}

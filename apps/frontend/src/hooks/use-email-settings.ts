@@ -10,10 +10,9 @@ export interface EmailSettings {
   smtpUser: string | null;
   hasSmtpPassword: boolean;
   smtpFrom: string | null;
-  m365TenantId: string | null;
-  m365ClientId: string | null;
-  hasM365ClientSecret: boolean;
-  m365SenderUpn: string | null;
+  m365ConnectedEmail: string | null;
+  m365ConnectedAt: string | null;
+  m365Connected: boolean;
   updatedAt: string | null;
 }
 
@@ -24,10 +23,6 @@ export interface UpdateEmailSettingsInput {
   smtpUser?: string;
   smtpPassword?: string;
   smtpFrom?: string;
-  m365TenantId?: string;
-  m365ClientId?: string;
-  m365ClientSecret?: string;
-  m365SenderUpn?: string;
 }
 
 const QUERY_KEY = ["email-settings"];
@@ -47,6 +42,26 @@ export function useUpdateEmailSettings() {
   return useMutation({
     mutationFn: async (input: UpdateEmailSettingsInput) => {
       const { data } = await apiClient.put<EmailSettings>("/email-settings", input);
+      return data;
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: QUERY_KEY }),
+  });
+}
+
+export function useConnectMicrosoft365() {
+  return useMutation({
+    mutationFn: async () => {
+      const { data } = await apiClient.get<{ url: string }>("/email-settings/m365/connect");
+      return data;
+    },
+  });
+}
+
+export function useDisconnectMicrosoft365() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async () => {
+      const { data } = await apiClient.delete<EmailSettings>("/email-settings/m365");
       return data;
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: QUERY_KEY }),

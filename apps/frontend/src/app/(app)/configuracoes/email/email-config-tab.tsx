@@ -1,19 +1,32 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { toast } from "sonner";
+import { CheckCircle2, ExternalLink } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useEmailSettings, useUpdateEmailSettings, type EmailProvider, type UpdateEmailSettingsInput } from "@/hooks/use-email-settings";
+import {
+  useConnectMicrosoft365,
+  useDisconnectMicrosoft365,
+  useEmailSettings,
+  useUpdateEmailSettings,
+  type EmailProvider,
+  type UpdateEmailSettingsInput,
+} from "@/hooks/use-email-settings";
 import { getApiErrorMessage } from "@/lib/api-client";
 
 export function EmailConfigTab() {
   const { data: settings, isLoading } = useEmailSettings();
   const updateSettings = useUpdateEmailSettings();
+  const connectM365 = useConnectMicrosoft365();
+  const disconnectM365 = useDisconnectMicrosoft365();
   const [form, setForm] = useState<UpdateEmailSettingsInput & { provider: EmailProvider }>({ provider: "SMTP" });
+  const searchParams = useSearchParams();
 
   useEffect(() => {
     if (!settings) return;
@@ -23,19 +36,40 @@ export function EmailConfigTab() {
       smtpPort: settings.smtpPort ?? undefined,
       smtpUser: settings.smtpUser ?? undefined,
       smtpFrom: settings.smtpFrom ?? undefined,
-      m365TenantId: settings.m365TenantId ?? undefined,
-      m365ClientId: settings.m365ClientId ?? undefined,
-      m365SenderUpn: settings.m365SenderUpn ?? undefined,
     });
   }, [settings]);
+
+  useEffect(() => {
+    const m365 = searchParams.get("m365");
+    if (m365 === "connected") toast.success("Microsoft 365 conectado com sucesso");
+    if (m365 === "error") toast.error("Não foi possível conectar com a Microsoft — tente novamente");
+  }, [searchParams]);
 
   async function handleSave() {
     try {
       await updateSettings.mutateAsync(form);
       toast.success("Configuração de e-mail salva");
-      setForm((prev) => ({ ...prev, smtpPassword: undefined, m365ClientSecret: undefined }));
+      setForm((prev) => ({ ...prev, smtpPassword: undefined }));
     } catch (error) {
       toast.error(getApiErrorMessage(error, "Erro ao salvar configuração de e-mail"));
+    }
+  }
+
+  async function handleConnect() {
+    try {
+      const { url } = await connectM365.mutateAsync();
+      window.location.href = url;
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, "Erro ao iniciar conexão com a Microsoft"));
+    }
+  }
+
+  async function handleDisconnect() {
+    try {
+      await disconnectM365.mutateAsync();
+      toast.success("Microsoft 365 desconectado");
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, "Erro ao desconectar"));
     }
   }
 
@@ -86,39 +120,52 @@ export function EmailConfigTab() {
       {form.provider === "MICROSOFT365" && (
         <Card>
           <CardContent className="space-y-4 py-4">
-            <p className="text-sm text-muted-foreground">
-              Requer um App Registration no Azure AD do tenant do Microsoft 365, com a permissão de aplicativo
-              "Mail.Send" consentida por um administrador. Cole aqui as credenciais desse aplicativo.
-            </p>
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="m365TenantId">Directory (tenant) ID</Label>
-                <Input id="m365TenantId" value={form.m365TenantId ?? ""} onChange={(e) => setForm((prev) => ({ ...prev, m365TenantId: e.target.value }))} />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="m365ClientId">Application (client) ID</Label>
-                <Input id="m365ClientId" value={form.m365ClientId ?? ""} onChange={(e) => setForm((prev) => ({ ...prev, m365ClientId: e.target.value }))} />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="m365ClientSecret">
-                  {settings?.hasM365ClientSecret ? "Client secret (configurado — deixe em branco para manter)" : "Client secret"}
-                </Label>
-                <Input id="m365ClientSecret" type="password" value={form.m365ClientSecret ?? ""} onChange={(e) => setForm((prev) => ({ ...prev, m365ClientSecret: e.target.value }))} />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="m365SenderUpn">Caixa de e-mail remetente</Label>
-                <Input id="m365SenderUpn" type="email" value={form.m365SenderUpn ?? ""} onChange={(e) => setForm((prev) => ({ ...prev, m365SenderUpn: e.target.value }))} />
-              </div>
-            </div>
+            {settings?.m365Connected ? (
+              <>
+                <div className="flex items-center gap-2 rounded-md border border-border bg-muted/40 p-3">
+                  <CheckCircle2 className="h-5 w-5 shrink-0 text-green-600" />
+                  <div className="text-sm">
+                    <p className="font-medium">Conectado como {settings.m365ConnectedEmail ?? "conta Microsoft"}</p>
+                    {settings.m365ConnectedAt && (
+                      <p className="text-xs text-muted-foreground">
+                        Conectado em {new Date(settings.m365ConnectedAt).toLocaleString("pt-BR")}
+                      </p>
+                    )}
+                  </div>
+                  <Badge className="ml-auto">Ativo</Badge>
+                </div>
+                <div className="flex justify-end gap-2">
+                  <Button variant="outline" onClick={handleConnect} disabled={connectM365.isPending}>
+                    Trocar conta
+                  </Button>
+                  <Button variant="destructive" onClick={handleDisconnect} disabled={disconnectM365.isPending}>
+                    Desconectar
+                  </Button>
+                </div>
+              </>
+            ) : (
+              <>
+                <p className="text-sm text-muted-foreground">
+                  Conecte a caixa de e-mail que vai enviar relatórios e notificações — basta entrar com a conta Microsoft
+                  e autorizar o envio. Nenhum dado técnico do Azure precisa ser cadastrado aqui.
+                </p>
+                <Button onClick={handleConnect} disabled={connectM365.isPending}>
+                  <ExternalLink className="mr-2 h-4 w-4" />
+                  {connectM365.isPending ? "Conectando..." : "Conectar com Microsoft"}
+                </Button>
+              </>
+            )}
           </CardContent>
         </Card>
       )}
 
-      <div className="flex justify-end">
-        <Button onClick={handleSave} disabled={updateSettings.isPending}>
-          {updateSettings.isPending ? "Salvando..." : "Salvar"}
-        </Button>
-      </div>
+      {form.provider === "SMTP" && (
+        <div className="flex justify-end">
+          <Button onClick={handleSave} disabled={updateSettings.isPending}>
+            {updateSettings.isPending ? "Salvando..." : "Salvar"}
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

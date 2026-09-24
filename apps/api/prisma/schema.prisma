@@ -104,6 +104,22 @@ model Plan {
   @@map("plans")
 }
 
+/**
+ * Singleton (uma única linha, id fixo) com configuração global da
+ * Plataforma — hoje só o App Registration multi-tenant do Azure AD usado
+ * pelo fluxo "Conectar com Microsoft" de Configurações > E-mail (OAuth2
+ * delegado). Cadastrado uma vez pelo Super Admin em Plataforma > E-mail;
+ * nenhum tenant final vê nem edita este client id/secret.
+ */
+model PlatformSettings {
+  id                        String   @id @default("singleton")
+  m365ClientId              String?
+  m365ClientSecretEncrypted String?
+  updatedAt                 DateTime @updatedAt
+
+  @@map("platform_settings")
+}
+
 // Global (not tenant-scoped) researched catalog of exact printer models —
 // same category as Plan/Permission: platform-wide hardware facts, not
 // tenant commercial data (see PlatformController's own comment). Populated
@@ -1345,14 +1361,25 @@ model TenantEmailSettings {
   smtpPasswordEncrypted String? // AES-256-GCM via SecretCryptoService, nunca em texto puro
   smtpFrom              String?
 
-  // Microsoft 365 — Microsoft Graph, client-credentials (app-only). Requer um
-  // App Registration no Azure AD do próprio tenant final com a permissão
-  // Mail.Send (aplicativo) consentida por um admin — não algo que dá pra
-  // gerar por aqui, só armazenar/usar o que o usuário colar.
+  // Microsoft 365 — legado: client-credentials (app-only) com um App
+  // Registration que o próprio tenant final tinha que criar no Azure AD dele
+  // e colar aqui. Substituído pelo fluxo OAuth2 delegado abaixo (login com a
+  // conta Microsoft, usando o App Registration único da Plataforma — ver
+  // PlatformSettings), mas os campos ficam pra não quebrar quem já tinha
+  // configurado assim (MailerService tenta o fluxo novo primeiro, cai pra
+  // este só se não houver refresh token).
   m365TenantId              String?
   m365ClientId              String?
   m365ClientSecretEncrypted String?
   m365SenderUpn             String? // caixa de e-mail usada como remetente (users/{upn}/sendMail)
+
+  // Microsoft 365 — OAuth2 delegado (Authorization Code + offline_access),
+  // usando o App Registration único cadastrado em Plataforma > E-mail
+  // (PlatformSettings). O tenant só faz login com a própria conta Microsoft
+  // e concede a permissão Mail.Send — nunca cria nem cola credencial de app.
+  m365RefreshTokenEncrypted String?
+  m365ConnectedEmail        String? // conta Microsoft conectada, preenchida automaticamente pelo Graph
+  m365ConnectedAt           DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

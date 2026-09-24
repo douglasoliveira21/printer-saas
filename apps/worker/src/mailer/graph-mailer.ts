@@ -50,6 +50,87 @@ async function getAccessToken(creds: GraphCredentials): Promise<string> {
  * create; this code just uses whatever client id/secret/sender they paste
  * into Configurações > E-mail.
  */
+interface DelegatedGraphCredentials {
+  clientId: string; // App Registration único da Plataforma (PlatformSettings), não do tenant
+  clientSecret: string;
+  refreshToken: string;
+}
+
+/**
+ * Refreshes a delegated access token via the same `/common/token` endpoint,
+ * using the refresh token stored for this specific tenant's Microsoft
+ * account (not the app-only client-credentials cache above — this is one
+ * refresh token per tenant, never shared/cached across tenants). Microsoft
+ * may rotate the refresh token on each call; the caller must persist
+ * `refreshToken` back if it comes back different, or the connection quietly
+ * breaks once the original one expires.
+ */
+async function refreshDelegatedToken(
+  creds: DelegatedGraphCredentials,
+): Promise<{ accessToken: string; refreshToken: string } | null> {
+  const response = await fetch('https://login.microsoftonline.com/common/oauth2/v2.0/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      client_id: creds.clientId,
+      client_secret: creds.clientSecret,
+      grant_type: 'refresh_token',
+      refresh_token: creds.refreshToken,
+      scope: 'offline_access Mail.Send',
+    }),
+  });
+
+  if (!response.ok) {
+    logger.error(`Falha ao renovar token delegado do Microsoft 365 (${response.status}): ${await response.text()}`);
+    return null;
+  }
+
+  const json = (await response.json()) as { access_token: string; refresh_token?: string };
+  return { accessToken: json.access_token, refreshToken: json.refresh_token ?? creds.refreshToken };
+}
+
+/**
+ * Sends via Microsoft Graph's delegated `POST /me/sendMail` — the tenant
+ * connected their own Microsoft account through Configurações > E-mail >
+ * "Conectar com Microsoft" (Authorization Code + offline_access), so this
+ * acts as that person, not as an app-only service principal. Returns the
+ * (possibly rotated) refresh token alongside success, so the caller can
+ * persist it — never store the one that was passed in if a new one came back.
+ */
+export async function sendViaGraphDelegated(
+  creds: DelegatedGraphCredentials,
+  params: { to: string[]; subject: string; html: string },
+): Promise<{ sent: boolean; refreshToken: string }> {
+  try {
+    const refreshed = await refreshDelegatedToken(creds);
+    if (!refreshed) {
+      return { sent: false, refreshToken: creds.refreshToken };
+    }
+
+    const response = await fetch('https://graph.microsoft.com/v1.0/me/sendMail', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${refreshed.accessToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        message: {
+          subject: params.subject,
+          body: { contentType: 'HTML', content: params.html },
+          toRecipients: params.to.map((address) => ({ emailAddress: { address } })),
+        },
+        saveToSentItems: false,
+      }),
+    });
+
+    if (!response.ok) {
+      const body = await response.text();
+      throw new Error(`Graph sendMail (delegado) falhou (${response.status}): ${body}`);
+    }
+    return { sent: true, refreshToken: refreshed.refreshToken };
+  } catch (error) {
+    logger.error(`Falha ao enviar via Microsoft Graph (delegado): ${(error as Error).message}`);
+    return { sent: false, refreshToken: creds.refreshToken };
+  }
+}
+
 export async function sendViaGraph(creds: GraphCredentials, params: { to: string[]; subject: string; html: string }): Promise<boolean> {
   try {
     const accessToken = await getAccessToken(creds);

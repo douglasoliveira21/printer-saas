@@ -31,20 +31,4 @@ export class UpdateEmailSettingsDto {
   @IsOptional()
   @IsEmail()
   smtpFrom?: string;
-
-  @IsOptional()
-  @IsString()
-  m365TenantId?: string;
-
-  @IsOptional()
-  @IsString()
-  m365ClientId?: string;
-
-  @IsOptional()
-  @IsString()
-  m365ClientSecret?: string;
-
-  @IsOptional()
-  @IsEmail()
-  m365SenderUpn?: string;
 }
