@@ -15,10 +15,14 @@ public interface IPrinterVendorProvider
     IReadOnlyList<string> ManufacturerAliases { get; }
 
     /// <summary>
-    /// Private-enterprise OID to try for the serial number ONLY as a
-    /// fallback when the standard Printer-MIB one (RFC 3805) came back
-    /// empty — null means this provider has no verified fallback OID
-    /// (the default for every provider until one is confirmed).
+    /// Private-enterprise OIDs to try, in order, for the serial number ONLY
+    /// as a fallback when the standard Printer-MIB one (RFC 3805) came back
+    /// empty — stops at the first that answers. Empty means this provider
+    /// has no verified fallback OID (the default for every provider until
+    /// one is confirmed). More than one entry exists because different
+    /// units of the same manufacturer can implement different private MIBs
+    /// (e.g. some HP models answer HP-httpManageable-MIB, others only the
+    /// older hpicMgmt/LaserJet-common one — see VendorProviders.cs).
     /// </summary>
-    string? SerialNumberOid => null;
+    IReadOnlyList<string> SerialNumberOids => [];
 }

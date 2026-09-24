@@ -11,13 +11,22 @@ public class HpPrinterProvider : IPrinterVendorProvider
 {
     public IReadOnlyList<string> ManufacturerAliases => ["HP", "Hewlett-Packard"];
 
-    // hpHttpMgSerialNumber, from HP's own HP-httpManageable-MIB —
-    // "Serial number of entity." Confirmed against HP's published MIB
-    // (not guessed), used only as a fallback when the standard Printer-MIB
-    // prtGeneralSerialNumber (RFC 3805) comes back empty, which happens on
-    // several entry-level HP models (e.g. the LaserJet P1102w) that don't
-    // fully implement Printer-MIB but do answer this one.
-    public string? SerialNumberOid => "1.3.6.1.4.1.11.2.36.1.1.2.9";
+    // Tried in order, only as a fallback when the standard Printer-MIB
+    // prtGeneralSerialNumber (RFC 3805) comes back empty:
+    //   1. hpHttpMgSerialNumber, from HP's own HP-httpManageable-MIB —
+    //      "Serial number of entity." Some entry-level HP models implement
+    //      Printer-MIB partially but do answer this one.
+    //   2. The older hpicMgmt/LaserJet-common private table's serial field
+    //      (part of the same table exposing product/model/firmware date —
+    //      see the sibling OIDs .3.1 product number, .3.2 model name).
+    //      Confirmed working against a real HP LaserJet Pro P1102w via the
+    //      ConfigTool's SNMP diagnostic tool — that unit answers NEITHER
+    //      Printer-MIB's serial OID NOR hpHttpMgSerialNumber, only this one.
+    public IReadOnlyList<string> SerialNumberOids =>
+    [
+        "1.3.6.1.4.1.11.2.36.1.1.2.9",
+        "1.3.6.1.4.1.11.2.3.9.4.2.1.1.3.3.0",
+    ];
 }
 
 public class CanonPrinterProvider : IPrinterVendorProvider

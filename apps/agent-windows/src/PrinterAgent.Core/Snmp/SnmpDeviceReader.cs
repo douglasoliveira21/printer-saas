@@ -158,10 +158,13 @@ public class SnmpDeviceReader
             // but do answer HP's own documented hpHttpMgSerialNumber — see
             // VendorProviders.cs for the source. Only ever tried as a last
             // resort, and only a verified per-vendor OID, never a guess.
-            var vendorSerialOid = VendorProviderRegistry.Resolve(manufacturer).SerialNumberOid;
-            if (vendorSerialOid is not null)
+            foreach (var vendorSerialOid in VendorProviderRegistry.Resolve(manufacturer).SerialNumberOids)
             {
                 device.Serial = await TryGetAsync(endpoint, communityOctet, version, vendorSerialOid, timeoutMs, retries, ct);
+                if (!string.IsNullOrWhiteSpace(device.Serial))
+                {
+                    break;
+                }
             }
         }
 
@@ -461,6 +464,27 @@ public class SnmpDeviceReader
         return null;
     }
 
+    /// <summary>
+    /// SharpSnmpLib 13.0.0-beta.3's Counter32/Gauge32/Counter64 are plain
+    /// records with no custom ToString() override, so the compiler-generated
+    /// one ("Counter32 { Value = 49484 }") leaks through instead of a
+    /// parseable number — silently breaking every int.TryParse downstream of
+    /// a plain .ToString() call. That's why page counters (prtMarkerLifeCount
+    /// is always Counter32 per RFC 3805) were coming back empty even on
+    /// printers that DO answer it correctly, e.g. the HP LaserJet P1102w —
+    /// confirmed via the ConfigTool's SNMP diagnostic dump, which showed the
+    /// literal broken string being what "worked" got stored as. Integer32
+    /// and OctetString aren't affected (their ToString() already returns the
+    /// plain value), so this only special-cases the three broken types.
+    /// </summary>
+    private static string FormatSnmpData(ISnmpData data) => data switch
+    {
+        Counter32 c32 => c32.Value.ToString(),
+        Gauge32 g32 => g32.Value.ToString(),
+        Counter64 c64 => c64.Value.ToString(),
+        _ => data.ToString() ?? string.Empty,
+    };
+
     private async Task<Dictionary<string, string>> WalkAsync(IPEndPoint endpoint, OctetString community, VersionCode version, string rootOid, int timeoutMs, CancellationToken ct)
     {
         var received = await WalkRawAsync(endpoint, community, version, rootOid, timeoutMs, ct);
@@ -481,7 +505,7 @@ public class SnmpDeviceReader
             {
                 continue;
             }
-            results[variable.Id.ToString()] = variable.Data.ToString() ?? string.Empty;
+            results[variable.Id.ToString()] = FormatSnmpData(variable.Data);
         }
         return results;
     }
@@ -525,7 +549,7 @@ public class SnmpDeviceReader
                     return null;
                 }
 
-                var value = data.ToString()?.Trim();
+                var value = FormatSnmpData(data).Trim();
                 return string.IsNullOrEmpty(value) ? null : value;
             }
             catch (System.TimeoutException)
@@ -638,10 +662,13 @@ public class SnmpDeviceReader
 
         if (string.IsNullOrWhiteSpace(device.Serial))
         {
-            var vendorSerialOid = VendorProviderRegistry.Resolve(manufacturer).SerialNumberOid;
-            if (vendorSerialOid is not null)
+            foreach (var vendorSerialOid in VendorProviderRegistry.Resolve(manufacturer).SerialNumberOids)
             {
                 device.Serial = await TryGetV3Async(endpoint, privacyProvider, contextName, userName, report, vendorSerialOid, timeoutMs, retries, ct);
+                if (!string.IsNullOrWhiteSpace(device.Serial))
+                {
+                    break;
+                }
             }
         }
 
@@ -696,7 +723,7 @@ public class SnmpDeviceReader
                     return null;
                 }
 
-                var value = data.ToString()?.Trim();
+                var value = FormatSnmpData(data).Trim();
                 return string.IsNullOrEmpty(value) ? null : value;
             }
             catch (System.TimeoutException)
@@ -728,7 +755,7 @@ public class SnmpDeviceReader
             {
                 continue;
             }
-            results[variable.Id.ToString()] = variable.Data.ToString() ?? string.Empty;
+            results[variable.Id.ToString()] = FormatSnmpData(variable.Data);
         }
         return results;
     }
