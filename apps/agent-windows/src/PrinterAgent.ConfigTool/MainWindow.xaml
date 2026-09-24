@@ -38,8 +38,8 @@
                     <TextBlock x:Name="ApiUrlText" FontFamily="Consolas" FontSize="11" Foreground="{StaticResource MutedBrush}" VerticalAlignment="Center"/>
                 </StackPanel>
 
-                <StackPanel Grid.Column="2" Orientation="Horizontal">
-                    <Button x:Name="InstallButton" Content="Instalar e Iniciar" Style="{StaticResource PrimaryButton}" Margin="0,0,8,0" Click="InstallButton_Click"/>
+                <StackPanel x:Name="InstalledActionsPanel" Grid.Column="2" Orientation="Horizontal" Visibility="Collapsed">
+                    <Button x:Name="InstallButton" Content="Reinstalar / Atualizar" Style="{StaticResource PrimaryButton}" Margin="0,0,8,0" Click="InstallButton_Click"/>
                     <Button x:Name="StartButton" Content="Iniciar" Style="{StaticResource SecondaryButton}" Margin="0,0,8,0" Click="StartButton_Click"/>
                     <Button x:Name="StopButton" Content="Parar" Style="{StaticResource SecondaryButton}" Margin="0,0,8,0" Click="StopButton_Click"/>
                     <Button x:Name="UninstallButton" Content="Desinstalar" Style="{StaticResource SecondaryButton}" Click="UninstallButton_Click"/>
@@ -47,22 +47,32 @@
             </Grid>
         </Border>
 
-        <!-- Install/enrollment fields — only relevant (and visible) before the service is installed. -->
-        <StackPanel x:Name="SetupPanel" Grid.Row="1" Margin="20,16,20,4">
+        <!-- Tela de configuração inicial — a ÚNICA coisa visível enquanto o
+             Agent não está instalado nesta máquina (ver RefreshStatus): sem
+             um token válido e confirmado, não tem como chegar nas telas de
+             impressoras/ferramentas/etc. -->
+        <StackPanel x:Name="SetupPanel" Grid.Row="1" Grid.RowSpan="2" Margin="40,32,40,4" MaxWidth="640" HorizontalAlignment="Center" VerticalAlignment="Top">
+            <TextBlock Text="Configuração inicial" Style="{StaticResource TitleText}" FontSize="20" Margin="0,0,0,4"/>
+            <TextBlock Text="Informe o token de instalação para vincular este computador a um cliente antes de continuar."
+                       Style="{StaticResource CaptionText}" TextWrapping="Wrap" Margin="0,0,0,20"/>
+
             <StackPanel Margin="0,0,0,14">
                 <TextBlock x:Name="TokenSectionLabel" Text="Token de instalação" Style="{StaticResource SectionLabel}"/>
-                <TextBlock x:Name="TokenSectionCaption" Text="Gerado em: Configurações → Agents → Adicionar Agent, no SaaS. Só é necessário na primeira instalação."
+                <TextBlock x:Name="TokenSectionCaption" Text="Gerado em: Configurações → Agents → Adicionar Agent, no SaaS."
                            Style="{StaticResource CaptionText}" TextWrapping="Wrap"/>
                 <TextBox x:Name="EnrollmentTokenTextBox"/>
                 <TextBlock x:Name="SeedCustomerText" Visibility="Collapsed" FontWeight="SemiBold" Margin="0,4,0,0"/>
             </StackPanel>
 
-            <StackPanel Margin="0,0,0,4">
+            <StackPanel Margin="0,0,0,20">
                 <TextBlock Text="Redes para varredura (discovery)" Style="{StaticResource SectionLabel}"/>
                 <TextBlock Text="Separe por vírgula. Ex.: 192.168.1.0/24, 192.168.2.100-192.168.2.200"
                            Style="{StaticResource CaptionText}" TextWrapping="Wrap"/>
                 <TextBox x:Name="NetworksTextBox"/>
             </StackPanel>
+
+            <Button x:Name="SetupInstallButton" Content="Validar token e instalar" Style="{StaticResource PrimaryButton}"
+                    HorizontalAlignment="Left" Padding="16,8" Click="InstallButton_Click"/>
         </StackPanel>
 
         <!-- Sidebar + content: the 4 management screens. -->

@@ -117,6 +117,27 @@ export class AgentsService {
     return agent;
   }
 
+  /**
+   * Public, read-only: lets the ConfigTool show "é este o cliente mesmo?"
+   * before actually installing — same validity check as enroll() but never
+   * consumes the token (no update, no apiKeyHash issued). Used by the
+   * Windows Agent's installer screen right after the person types/loads a
+   * token, before the "Instalar e Iniciar" click really does anything.
+   */
+  async lookupEnrollmentToken(token: string) {
+    const agent = await this.prisma.agent.findUnique({
+      where: { enrollmentToken: token },
+      include: { customer: { select: { legalName: true, tradeName: true } } },
+    });
+    if (!agent || !agent.enrollmentTokenExpiresAt || agent.enrollmentTokenExpiresAt < new Date()) {
+      throw new UnauthorizedException('Token de instalação inválido ou expirado');
+    }
+    return {
+      agentName: agent.name,
+      customerName: agent.customer?.tradeName || agent.customer?.legalName || null,
+    };
+  }
+
   /** Public: the Windows Agent redeems its one-time token for a permanent API key. */
   async enroll(dto: EnrollAgentDto) {
     const agent = await this.prisma.agent.findUnique({ where: { enrollmentToken: dto.enrollmentToken } });

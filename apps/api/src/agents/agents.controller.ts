@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Patch, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { AgentsService } from './agents.service';
 import { CreateAgentDto } from './dto/create-agent.dto';
@@ -66,6 +66,15 @@ export class AgentsController {
 @Controller('agent-api/v1')
 export class AgentApiController {
   constructor(private readonly agentsService: AgentsService) {}
+
+  // Declarado antes de qualquer rota com :id-like pra não ter risco de
+  // colisão — "lookup" nunca é confundido com um path param aqui, mas segue
+  // o mesmo cuidado usado em outros controllers deste projeto.
+  @Public()
+  @Get('enroll/lookup')
+  lookupEnrollmentToken(@Query('token') token: string) {
+    return this.agentsService.lookupEnrollmentToken(token);
+  }
 
   @Public()
   @HttpCode(HttpStatus.OK)

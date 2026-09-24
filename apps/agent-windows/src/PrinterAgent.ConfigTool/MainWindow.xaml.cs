@@ -79,9 +79,14 @@ public partial class MainWindow : Window
         UninstallButton.IsEnabled = state != AgentServiceState.NotInstalled;
 
         var installed = state != AgentServiceState.NotInstalled;
-        // Once installed, the setup fields (token/networks) get out of the
-        // way — same information stays reachable via Configurações.
+        // Enquanto não instalado, a tela de configuração inicial é a ÚNICA
+        // coisa visível — nem o shell (impressoras/ferramentas/etc.) nem os
+        // botões de Iniciar/Parar/Desinstalar aparecem, só depois de
+        // validar o token e instalar. Uma vez instalado, o token some (fica
+        // só em Configurações) e o shell normal assume a tela toda.
         SetupPanel.Visibility = installed ? Visibility.Collapsed : Visibility.Visible;
+        InstalledActionsPanel.Visibility = installed ? Visibility.Visible : Visibility.Collapsed;
+        ShellGrid.Visibility = installed ? Visibility.Visible : Visibility.Collapsed;
         ShellGrid.IsEnabled = installed;
 
         if (installed && !_tabsInitialized)
@@ -121,11 +126,12 @@ public partial class MainWindow : Window
         }
     }
 
-    private void InstallButton_Click(object sender, RoutedEventArgs e)
+    private async void InstallButton_Click(object sender, RoutedEventArgs e)
     {
         var token = EnrollmentTokenTextBox.Text.Trim();
-
         var alreadyInstalled = _installer.GetState() != AgentServiceState.NotInstalled;
+        var apiUrl = _seed?.ApiUrl ?? WindowsServiceInstaller.DefaultApiUrl;
+
         if (!alreadyInstalled && string.IsNullOrWhiteSpace(token))
         {
             MessageBox.Show(this, "Informe o token de instalação gerado no SaaS (Configurações → Agents → Adicionar Agent).",
@@ -133,10 +139,41 @@ public partial class MainWindow : Window
             return;
         }
 
+        // Primeira instalação (ainda sem serviço): valida o token e confirma
+        // o cliente ANTES de instalar qualquer coisa — reinstalação/
+        // atualização de um Agent já enrolado não tem token novo pra
+        // validar, então pula direto pra instalação.
+        if (!alreadyInstalled)
+        {
+            string? customerName = _seed?.CustomerName;
+            if (string.IsNullOrWhiteSpace(customerName))
+            {
+                SetButtonsEnabled(false);
+                var lookup = await EnrollmentLookupClient.LookupAsync(apiUrl, token);
+                SetButtonsEnabled(true);
+
+                if (lookup is null)
+                {
+                    MessageBox.Show(this, "Token de instalação inválido ou expirado. Gere um novo em Configurações → Agents → Adicionar Agent, no SaaS.",
+                        "Vgon Printer Agent", MessageBoxButton.OK, MessageBoxImage.Error);
+                    return;
+                }
+                customerName = lookup.CustomerName;
+            }
+
+            var confirmMessage = string.IsNullOrWhiteSpace(customerName)
+                ? "Este token de instalação não está vinculado a um cliente específico. Confirma que quer continuar?"
+                : $"Este token de instalação é do cliente \"{customerName}\". Confirma que é este mesmo?";
+            var confirm = MessageBox.Show(this, confirmMessage, "Vgon Printer Agent", MessageBoxButton.YesNo, MessageBoxImage.Question);
+            if (confirm != MessageBoxResult.Yes)
+            {
+                return;
+            }
+        }
+
         try
         {
-            InstallButton.IsEnabled = false;
-            var apiUrl = _seed?.ApiUrl ?? WindowsServiceInstaller.DefaultApiUrl;
+            SetButtonsEnabled(false);
             _installer.InstallOrUpdate(apiUrl, token, NetworksTextBox.Text.Trim());
             if (_seed is not null)
             {
@@ -150,9 +187,15 @@ public partial class MainWindow : Window
         }
         finally
         {
-            InstallButton.IsEnabled = true;
+            SetButtonsEnabled(true);
             RefreshStatus();
         }
+    }
+
+    private void SetButtonsEnabled(bool enabled)
+    {
+        SetupInstallButton.IsEnabled = enabled;
+        InstallButton.IsEnabled = enabled;
     }
 
     private void StartButton_Click(object sender, RoutedEventArgs e)
