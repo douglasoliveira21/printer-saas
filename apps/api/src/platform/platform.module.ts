@@ -8,12 +8,13 @@ import { AgentReleasesController } from './agent-releases/agent-releases.control
 import { AgentReleasesService } from './agent-releases/agent-releases.service';
 import { PlatformEmailSettingsController } from './email-settings/platform-email-settings.controller';
 import { PlatformEmailSettingsService } from './email-settings/platform-email-settings.service';
+import { SecretCryptoService } from '../common/crypto/secret-crypto.service';
 import { AuthModule } from '../auth/auth.module';
 
 @Module({
   imports: [AuthModule],
   controllers: [PlatformController, PrinterCatalogController, AgentReleasesController, PlatformEmailSettingsController],
-  providers: [PlatformService, SuperAdminGuard, PrinterCatalogService, AgentReleasesService, PlatformEmailSettingsService],
+  providers: [PlatformService, SuperAdminGuard, PrinterCatalogService, AgentReleasesService, PlatformEmailSettingsService, SecretCryptoService],
   exports: [AgentReleasesService, PlatformEmailSettingsService],
 })
 export class PlatformModule {}
