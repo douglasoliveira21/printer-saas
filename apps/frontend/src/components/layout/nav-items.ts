@@ -58,7 +58,18 @@ export const NAV_ITEMS: NavItem[] = [
       { label: "Estoque", href: "/estoque" },
     ],
   },
-  { label: "Relatórios", href: "/relatorios", icon: BarChart3 },
+  {
+    label: "Relatórios",
+    href: "/relatorios",
+    icon: BarChart3,
+    children: [
+      { label: "Visão geral", href: "/relatorios" },
+      { label: "Impressões e cópias por impressora", href: "/relatorios/impressoes" },
+      { label: "Digitalizações por impressora", href: "/relatorios/digitalizacoes" },
+      { label: "Totais por cliente", href: "/relatorios/totais-por-cliente" },
+      { label: "Chamados", href: "/relatorios/chamados" },
+    ],
+  },
   { label: "Agents", href: "/agents", icon: Cpu },
   {
     label: "Configurações",

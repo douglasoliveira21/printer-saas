@@ -92,4 +92,61 @@ export class ReportsController {
       { key: 'monthlyFee', header: 'Mensalidade' },
     ]);
   }
+
+  private sendPdf(res: Response, filename: string, buffer: Buffer) {
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}.pdf"`);
+    res.send(buffer);
+  }
+
+  @Get('printers-usage/pdf')
+  @RequirePermissions('reports.view')
+  async printersUsagePdf(
+    @Query('customerId') customerId: string,
+    @Query('contractId') contractId: string | undefined,
+    @Query('from') from: string | undefined,
+    @Query('to') to: string | undefined,
+    @Res() res: Response,
+  ) {
+    const buffer = await this.reportsService.printersUsagePdf({ customerId, contractId, from, to });
+    this.sendPdf(res, 'impressoes-e-copias-por-impressora', buffer);
+  }
+
+  @Get('scans-usage/pdf')
+  @RequirePermissions('reports.view')
+  async scansUsagePdf(
+    @Query('customerId') customerId: string,
+    @Query('contractId') contractId: string | undefined,
+    @Query('from') from: string | undefined,
+    @Query('to') to: string | undefined,
+    @Res() res: Response,
+  ) {
+    const buffer = await this.reportsService.scansUsagePdf({ customerId, contractId, from, to });
+    this.sendPdf(res, 'digitalizacoes-por-impressora', buffer);
+  }
+
+  @Get('totals-by-customer/pdf')
+  @RequirePermissions('reports.view')
+  async totalsByCustomerPdf(@Query('from') from: string | undefined, @Query('to') to: string | undefined, @Res() res: Response) {
+    const buffer = await this.reportsService.totalsByCustomerPdf(from, to);
+    this.sendPdf(res, 'totais-por-cliente', buffer);
+  }
+
+  @Get('service-orders-detailed/pdf')
+  @RequirePermissions('reports.view')
+  async serviceOrdersDetailedPdf(
+    @Query('from') from: string | undefined,
+    @Query('to') to: string | undefined,
+    @Query('customerId') customerId: string | undefined,
+    @Query('columns') columns: string | undefined,
+    @Res() res: Response,
+  ) {
+    const buffer = await this.reportsService.serviceOrdersDetailedPdf({
+      from,
+      to,
+      customerId,
+      columns: columns ? columns.split(',') : [],
+    });
+    this.sendPdf(res, 'relatorio-de-chamados', buffer);
+  }
 }

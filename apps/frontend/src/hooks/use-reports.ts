@@ -25,3 +25,15 @@ export async function downloadReportCsv(path: string, filename: string, params: 
   link.remove();
   URL.revokeObjectURL(url);
 }
+
+export async function downloadReportPdf(path: string, filename: string, params: Record<string, string | undefined> = {}) {
+  const response = await apiClient.get(`/reports/${path}/pdf`, { params, responseType: "blob" });
+  const url = URL.createObjectURL(response.data);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `${filename}.pdf`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
