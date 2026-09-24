@@ -8,7 +8,7 @@ import { authStorage, type StoredUser } from "./auth-storage";
 interface AuthContextValue {
   user: StoredUser | null;
   isLoading: boolean;
-  login: (email: string, password: string) => Promise<void>;
+  login: (email: string, password: string, remember?: boolean) => Promise<void>;
   logout: () => void;
   updateUser: (patch: Partial<StoredUser>) => void;
 }
@@ -25,10 +25,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setIsLoading(false);
   }, []);
 
-  async function login(email: string, password: string) {
+  async function login(email: string, password: string, remember = true) {
     try {
       const { data } = await apiClient.post("/auth/login", { email, password });
-      authStorage.setSession(data.accessToken, data.refreshToken, data.user);
+      authStorage.setSession(data.accessToken, data.refreshToken, data.user, remember);
       setUser(data.user);
       router.push("/painel");
     } catch (error) {
