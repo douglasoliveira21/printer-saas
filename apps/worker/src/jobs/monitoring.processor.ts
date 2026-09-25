@@ -10,6 +10,7 @@ export const MONITORING_QUEUE = 'monitoring';
 export const CHECK_OFFLINE_JOB = 'check-offline';
 export const CHECK_TONER_JOB = 'check-toner';
 export const CHECK_SLA_JOB = 'check-sla';
+export const CHECK_DEVICE_ERRORS_JOB = 'check-device-errors';
 
 const TONER_WARNING_THRESHOLD = 20;
 const TONER_CRITICAL_THRESHOLD = 10;
@@ -36,6 +37,8 @@ export class MonitoringProcessor extends WorkerHost {
         return this.checkToner();
       case CHECK_SLA_JOB:
         return this.checkServiceOrderSla();
+      case CHECK_DEVICE_ERRORS_JOB:
+        return this.checkDeviceErrors();
       default:
         this.logger.warn(`Unknown job: ${job.name}`);
     }
@@ -235,6 +238,92 @@ export class MonitoringProcessor extends WorkerHost {
     }
 
     this.logger.log(`SLA check: ${alertsCreated} alerts created`);
+  }
+
+  /**
+   * Bridges the Agent's raw prtAlertTable snapshots (PrinterAlertReading —
+   * written by agents.service.ts's submitDevices, one row per code the
+   * printer itself reported active as of the last SNMP collection) into
+   * this SaaS's own Alert model, which is what the Alertas screen/bell icon
+   * actually read. That bridge never existed: PrinterAlertReading rows were
+   * being collected and stored correctly all along, just never turned into
+   * an Alert, so real active printer errors (paper jam, door open, IP
+   * conflict, etc.) never surfaced anywhere in the UI.
+   *
+   * prtAlertTable only ever lists conditions that are ACTIVE right now (RFC
+   * 3805) — it's a live snapshot, not an accumulating log — so the most
+   * recent batch of readings for a printer IS its current alert set:
+   * anything in that batch not already open gets opened, anything open
+   * whose code is no longer in that batch gets resolved.
+   */
+  private async checkDeviceErrors() {
+    const printers = await this.prisma.printer.findMany({
+      where: { status: 'MONITORED' },
+      select: { id: true, tenantId: true, model: true, ip: true },
+    });
+
+    let opened = 0;
+    let resolved = 0;
+    for (const printer of printers) {
+      const latest = await this.prisma.printerAlertReading.findFirst({
+        where: { printerId: printer.id },
+        orderBy: { collectedAt: 'desc' },
+        select: { collectedAt: true },
+      });
+      if (!latest) continue;
+
+      const currentReadings = await this.prisma.printerAlertReading.findMany({
+        where: { printerId: printer.id, collectedAt: latest.collectedAt },
+      });
+      const currentCodes = new Set(currentReadings.map((r) => r.code).filter((c): c is string => !!c));
+
+      const openAlerts = await this.prisma.alert.findMany({
+        where: { printerId: printer.id, type: 'DEVICE_ERROR', status: 'OPEN' },
+      });
+
+      for (const alert of openAlerts) {
+        const code = (alert.metadata as Record<string, unknown> | null)?.code;
+        if (typeof code === 'string' && !currentCodes.has(code)) {
+          await this.prisma.alert.update({ where: { id: alert.id }, data: { status: 'RESOLVED', resolvedAt: new Date() } });
+          resolved++;
+        }
+      }
+
+      const openCodes = new Set(
+        openAlerts.map((a) => (a.metadata as Record<string, unknown> | null)?.code).filter((c): c is string => typeof c === 'string'),
+      );
+      for (const reading of currentReadings) {
+        if (!reading.code || openCodes.has(reading.code)) continue;
+
+        await this.prisma.alert.create({
+          data: {
+            tenantId: printer.tenantId,
+            printerId: printer.id,
+            type: 'DEVICE_ERROR',
+            level: this.mapDeviceErrorSeverity(reading.severity),
+            message: reading.description
+              ? `${reading.description} (impressora ${printer.model ?? printer.ip ?? printer.id})`
+              : `Alerta ${reading.code} reportado pela impressora ${printer.model ?? printer.ip ?? printer.id}.`,
+            metadata: { code: reading.code, severity: reading.severity },
+          },
+        });
+        opened++;
+      }
+    }
+
+    this.logger.log(`Device error check: ${opened} opened, ${resolved} resolved`);
+  }
+
+  // The Agent's ClassifyAlertSeverity (SnmpDeviceReader.cs) only ever
+  // reports "critical"/"warning"/null (RFC 3805's own severity enum has no
+  // other meaningful values) — null means the printer reported a real,
+  // currently-active condition without a classified severity (e.g. an
+  // informational status like power-saver mode), which still deserves
+  // surfacing, just not as WARNING/CRITICAL without confirmation.
+  private mapDeviceErrorSeverity(raw: string | null): 'INFO' | 'WARNING' | 'CRITICAL' {
+    if (raw === 'critical') return 'CRITICAL';
+    if (raw === 'warning') return 'WARNING';
+    return 'INFO';
   }
 
   private async notifyTechnicianSla(tenantId: string, customerId: string | null, technicianId: string, orderNumber: number, isLate: boolean) {

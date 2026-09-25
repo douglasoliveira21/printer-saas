@@ -95,8 +95,33 @@ public class SnmpDeviceReader
         var sysDescrV2 = await TryGetAsync(endpoint, communityOctet, VersionCode.V2, PrinterMibOids.SysDescr, timeoutMs, retries, ct);
         var version = sysDescrV2 is not null ? VersionCode.V2 : VersionCode.V1;
 
+        var roots = new List<string>(DiagnosticRootOids);
+
+        // sysObjectID (e.g. "1.3.6.1.4.1.236.11.5.1" for a Samsung) always
+        // starts with "1.3.6.1.4.1.<IANA enterprise number>" — that prefix
+        // IS the manufacturer's own private OID tree root, discovered from
+        // the device itself rather than hardcoded per vendor. This is what
+        // makes the diagnostic actually useful for non-HP printers: without
+        // it, a Samsung/Canon/Brother/etc. unit only ever gets the standard
+        // Printer-MIB dump, missing whatever detailed print/copy/duplex
+        // breakdown counters live in that vendor's own private MIB.
+        var sysObjectId = await TryGetAsync(endpoint, communityOctet, version, "1.3.6.1.2.1.1.2.0", timeoutMs, retries, ct);
+        if (sysObjectId is not null)
+        {
+            var segments = sysObjectId.TrimStart('.').Split('.');
+            if (segments.Length > 6 && segments[0] == "1" && segments[1] == "3" && segments[2] == "6" &&
+                segments[3] == "1" && segments[4] == "4" && segments[5] == "1")
+            {
+                var enterpriseRoot = string.Join('.', segments.Take(7));
+                if (!roots.Contains(enterpriseRoot))
+                {
+                    roots.Add(enterpriseRoot);
+                }
+            }
+        }
+
         var results = new List<(string, string)>();
-        foreach (var root in DiagnosticRootOids)
+        foreach (var root in roots)
         {
             ct.ThrowIfCancellationRequested();
             var walked = await WalkAsync(endpoint, communityOctet, version, root, timeoutMs, ct);

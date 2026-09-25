@@ -123,7 +123,13 @@ public partial class ToolsTabView : UserControl
         DiagnosticResultText.Text = "";
         try
         {
-            var result = await _context.SnmpReader.DiagnosticWalkAsync(ip, community, timeoutMs: 2000, retries: 1, CancellationToken.None);
+            // Manufacturer private trees (added dynamically from the device's
+            // own sysObjectID — see DiagnosticWalkAsync) can be large enough
+            // that the 2s budget used for regular discovery cuts the walk off
+            // early; this is a one-off manual troubleshooting action, not
+            // part of the fast concurrent discovery loop, so a longer budget
+            // is fine here.
+            var result = await _context.SnmpReader.DiagnosticWalkAsync(ip, community, timeoutMs: 5000, retries: 1, CancellationToken.None);
             _lastDiagnosticResult = result.ToArray();
 
             if (_lastDiagnosticResult.Length == 0)
