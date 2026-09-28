@@ -55,7 +55,8 @@ public class AgentContext
         var modelDatabase = new ModelDatabase(NullLogger<ModelDatabase>.Instance);
         var orchestrator = new DeviceProbeOrchestrator(SnmpReader, ippClient, modelDatabase, NullLogger<DeviceProbeOrchestrator>.Instance);
         var mdnsProbe = new MdnsProbe(NullLogger<MdnsProbe>.Instance);
-        DiscoveryService = new PrinterDiscoveryService(orchestrator, mdnsProbe, NullLogger<PrinterDiscoveryService>.Instance);
+        var wsDiscoveryProbe = new WsDiscoveryProbe(NullLogger<WsDiscoveryProbe>.Instance);
+        DiscoveryService = new PrinterDiscoveryService(orchestrator, mdnsProbe, wsDiscoveryProbe, NullLogger<PrinterDiscoveryService>.Instance);
 
         ApiClient = BuildApiClient();
     }
@@ -85,55 +86,74 @@ public class AgentContext
         return new PrinterSaasApiClient(http, CredentialStore, NullLogger<PrinterSaasApiClient>.Instance);
     }
 
+    /// <summary>
+    /// Fase 6: the encrypted store (DPAPI, see SnmpV3CredentialFileStore) is
+    /// authoritative once it exists — LoadOrMigrate transparently copies
+    /// appsettings.json's plaintext "SnmpV3" section into it (and scrubs the
+    /// passwords out of the plaintext file) the first time this runs after
+    /// upgrading. Also fixes a real bug: this used to read appsettings.json
+    /// from the AGENTFOLDER root, which stopped being where the Service's
+    /// appsettings.json actually lives once Service files moved into their
+    /// own "Service" subfolder (see WindowsServiceInstaller.ServiceInstallPath)
+    /// — SNMPv3 local fallback silently never worked from the ConfigTool
+    /// since that change, on top of the plaintext-storage issue this fixes.
+    /// </summary>
     private static SnmpV3Credentials? TryCreateV3Credentials()
     {
         try
         {
-            var options = new AgentOptions();
-            var configPath = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
-                "PrinterSaaS", "Agent", "appsettings.json");
-            
-            if (!File.Exists(configPath))
+            var configPath = Path.Combine(WindowsServiceInstaller.ServiceInstallPath, "appsettings.json");
+            var plaintextFallback = ReadPlaintextV3Fallback(configPath);
+
+            var fileStore = new SnmpV3CredentialFileStore(NullLogger<SnmpV3CredentialFileStore>.Instance);
+            var stored = fileStore.LoadOrMigrate(plaintextFallback, configPath);
+            if (string.IsNullOrWhiteSpace(stored?.UserName))
             {
                 return null;
             }
 
-            var configJson = File.ReadAllText(configPath);
-            using var doc = System.Text.Json.JsonDocument.Parse(configJson);
-            if (!doc.RootElement.TryGetProperty("Agent", out var agentSection))
+            return new SnmpV3Credentials(new SnmpV3Options
             {
-                return null;
-            }
-
-            if (!agentSection.TryGetProperty("SnmpV3", out var v3Section))
-            {
-                return null;
-            }
-
-            var v3Options = new SnmpV3Options
-            {
-                UserName = v3Section.TryGetProperty("UserName", out var userName) ? userName.GetString() : null,
-                SecurityLevel = v3Section.TryGetProperty("SecurityLevel", out var secLevel) ? secLevel.GetString() ?? "authPriv" : "authPriv",
-                AuthenticationProtocol = v3Section.TryGetProperty("AuthenticationProtocol", out var authProto) ? authProto.GetString() : null,
-                AuthenticationPassword = v3Section.TryGetProperty("AuthenticationPassword", out var authPass) ? authPass.GetString() : null,
-                PrivacyProtocol = v3Section.TryGetProperty("PrivacyProtocol", out var privProto) ? privProto.GetString() : null,
-                PrivacyPassword = v3Section.TryGetProperty("PrivacyPassword", out var privPass) ? privPass.GetString() : null,
-                ContextName = v3Section.TryGetProperty("ContextName", out var ctxName) ? ctxName.GetString() : null,
-            };
-
-            // Only create credentials if UserName is provided
-            if (string.IsNullOrWhiteSpace(v3Options.UserName))
-            {
-                return null;
-            }
-
-            return new SnmpV3Credentials(v3Options);
+                UserName = stored.UserName,
+                SecurityLevel = stored.SecurityLevel,
+                AuthenticationProtocol = stored.AuthenticationProtocol,
+                AuthenticationPassword = stored.AuthenticationPassword,
+                PrivacyProtocol = stored.PrivacyProtocol,
+                PrivacyPassword = stored.PrivacyPassword,
+                ContextName = stored.ContextName,
+            });
         }
         catch
         {
             // If configuration is invalid, just fall back to v1/v2c
             return null;
         }
+    }
+
+    private static SnmpV3Options? ReadPlaintextV3Fallback(string configPath)
+    {
+        if (!File.Exists(configPath))
+        {
+            return null;
+        }
+
+        var configJson = File.ReadAllText(configPath);
+        using var doc = System.Text.Json.JsonDocument.Parse(configJson);
+        if (!doc.RootElement.TryGetProperty("Agent", out var agentSection) ||
+            !agentSection.TryGetProperty("SnmpV3", out var v3Section))
+        {
+            return null;
+        }
+
+        return new SnmpV3Options
+        {
+            UserName = v3Section.TryGetProperty("UserName", out var userName) ? userName.GetString() : null,
+            SecurityLevel = v3Section.TryGetProperty("SecurityLevel", out var secLevel) ? secLevel.GetString() ?? "authPriv" : "authPriv",
+            AuthenticationProtocol = v3Section.TryGetProperty("AuthenticationProtocol", out var authProto) ? authProto.GetString() : null,
+            AuthenticationPassword = v3Section.TryGetProperty("AuthenticationPassword", out var authPass) ? authPass.GetString() : null,
+            PrivacyProtocol = v3Section.TryGetProperty("PrivacyProtocol", out var privProto) ? privProto.GetString() : null,
+            PrivacyPassword = v3Section.TryGetProperty("PrivacyPassword", out var privPass) ? privPass.GetString() : null,
+            ContextName = v3Section.TryGetProperty("ContextName", out var ctxName) ? ctxName.GetString() : null,
+        };
     }
 }

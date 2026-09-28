@@ -63,6 +63,94 @@ public static class PrinterMibOids
     public const string PrtMarkerSuppliesDescriptionTable = "1.3.6.1.2.1.43.11.1.1.6.1";
     public const string PrtMarkerSuppliesLevelTable = "1.3.6.1.2.1.43.11.1.1.9.1";
     public const string PrtMarkerSuppliesMaxCapacityTable = "1.3.6.1.2.1.43.11.1.1.8.1";
+    // prtMarkerSuppliesColorantIndex (column 3) — links a supply row to its
+    // colorant row in prtMarkerColorantTable below; 0 = no such association
+    // (RFC 3805, column numbers verified against the published MIB text,
+    // source: https://raw.githubusercontent.com/richb-intermapper/CreatingInterMapperProbes/master/MIB%20Files/RFC3805-Printer-MIB.txt).
+    public const string PrtMarkerSuppliesColorantIndexTable = "1.3.6.1.2.1.43.11.1.1.3.1";
+    // prtMarkerSuppliesType (column 5), SYNTAX PrtMarkerSuppliesTypeTC — this
+    // textual convention is NOT defined in RFC 3805 itself, it's imported
+    // from the separately IANA-maintained IANA-PRINTER-MIB module (extended
+    // over time via PWG/IANA expert review, per RFC 8126). Enum values below
+    // verified against the authoritative IANA registry text, NOT assumed
+    // from memory: https://www.iana.org/assignments/ianaprinter-mib/ianaprinter-mib.txt
+    // (mirrored at https://raw.githubusercontent.com/librenms/librenms-mibs/master/IANA-PRINTER-MIB).
+    public const string PrtMarkerSuppliesTypeTable = "1.3.6.1.2.1.43.11.1.1.5.1";
+
+    // Printer-MIB colorant table (walked — one row per colorant a marker
+    // uses). prtMarkerColorantValue (column 4) is free text but RFC 3805
+    // requires it to use standardized ISO 10175/10180 color names ("black",
+    // "cyan", "magenta", "yellow", "red", "green", "blue", "white", "other",
+    // "unknown") — reading it directly is more reliable than the keyword
+    // match this codebase already does against prtMarkerSuppliesDescription.
+    public const string PrtMarkerColorantValueTable = "1.3.6.1.2.1.43.12.1.1.4.1";
+
+    // Printer-MIB cover table (walked — one row per cover/access panel,
+    // e.g. front door, duplexer cover). prtCoverStatus (column 3), SYNTAX
+    // PrtCoverStatusTC — imported from IANA-PRINTER-MIB same as the supplies
+    // type above; enum values sourced from the same IANA registry text.
+    public const string PrtCoverDescriptionTable = "1.3.6.1.2.1.43.6.1.1.2.1";
+    public const string PrtCoverStatusTable = "1.3.6.1.2.1.43.6.1.1.3.1";
+
+    /// <summary>
+    /// PrtMarkerSuppliesTypeTC (IANA-PRINTER-MIB). Only the values a real
+    /// printer/MFP realistically reports are mapped to a name; finishing
+    /// -equipment-only values (staples, inserts, covers, binding/banding
+    /// supply, stitching wire, shrink/paper wrap — RFC 3806 Finisher-MIB
+    /// territory) are included too since they're part of the same TC and
+    /// cost nothing to map correctly. other(1) maps to "other", not to a
+    /// specific consumable kind — that's what the device itself reported.
+    /// </summary>
+    public static readonly Dictionary<int, string> MarkerSuppliesTypeNames = new()
+    {
+        [1] = "other",
+        [2] = "unknown",
+        [3] = "toner",
+        [4] = "wasteToner",
+        [5] = "ink",
+        [6] = "inkCartridge",
+        [7] = "inkRibbon",
+        [8] = "wasteInk",
+        [9] = "opc",
+        [10] = "developer",
+        [11] = "fuserOil",
+        [12] = "solidWax",
+        [13] = "ribbonWax",
+        [14] = "wasteWax",
+        [15] = "fuser",
+        [16] = "coronaWire",
+        [17] = "fuserOilWick",
+        [18] = "cleanerUnit",
+        [19] = "fuserCleaningPad",
+        [20] = "transferUnit",
+        [21] = "tonerCartridge",
+        [22] = "fuserOiler",
+        [23] = "water",
+        [24] = "wasteWater",
+        [25] = "glueWaterAdditive",
+        [26] = "wastePaper",
+        [27] = "bindingSupply",
+        [28] = "bandingSupply",
+        [29] = "stitchingWire",
+        [30] = "shrinkWrap",
+        [31] = "paperWrap",
+        [32] = "staples",
+        [33] = "inserts",
+        [34] = "covers",
+    };
+
+    /// <summary>
+    /// PrtCoverStatusTC (IANA-PRINTER-MIB) — note value 2 is deliberately
+    /// absent from the registry (not a gap in this mapping).
+    /// </summary>
+    public static readonly Dictionary<int, string> CoverStatusNames = new()
+    {
+        [1] = "other",
+        [3] = "open",
+        [4] = "closed",
+        [5] = "interlockOpen",
+        [6] = "interlockClosed",
+    };
 
     // Printer-MIB alert table (walked — one row per active alert/error
     // condition). Vendor-agnostic standard OIDs (RFC 3805 prtAlertEntry,

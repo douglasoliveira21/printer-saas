@@ -27,6 +27,7 @@ import { CountersList } from "./counters-list";
 import { HistoryTab } from "./history-tab";
 import { TimelineTab } from "./timeline-tab";
 import { CommentsTab } from "./comments-tab";
+import { DiagnosticsSection } from "./diagnostics-section";
 
 function formatForecast(daysRemaining: number, predictedReplacementAt: string) {
   const date = new Date(predictedReplacementAt).toLocaleDateString("pt-BR");
@@ -303,6 +304,7 @@ export default function PrinterDetailPage({ params }: { params: Promise<{ id: st
               </div>
             )}
           </div>
+          <DiagnosticsSection capabilitySources={printer.capabilitySources} discoveryDiagnostics={printer.discoveryDiagnostics} />
         </TabsContent>
 
         <TabsContent value="history" className="mt-4">

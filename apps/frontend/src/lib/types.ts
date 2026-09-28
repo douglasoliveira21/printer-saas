@@ -125,6 +125,14 @@ export interface Printer {
   classificationConfidence: number | null;
   /** Tri-state per field: true = show it, false/absent = never show it (spec: never invent, never show "not supported" as if it were a real 0 reading). */
   capabilities: PrinterCapabilities | null;
+  /** Which source determined each capability field (e.g. {"color": "ipp", "a3": "printer_mib"}) — troubleshooting only, never used to decide anything by itself. */
+  capabilitySources?: Record<string, string> | null;
+  /**
+   * Fase 9 (diagnóstico) — por que campos vieram nulos na última coleta
+   * (ex.: {"snmp": "success", "counters": "table_empty", "ipp": "not_available"}).
+   * Só pra suporte/depuração, nunca usado pra decidir nada na UI.
+   */
+  discoveryDiagnostics?: Record<string, string> | null;
   /** Presence = "homologada" — matched against the global researched catalog by manufacturer+model (see AgentsService.submitDevices). */
   catalogModelId: string | null;
   catalogModel?: { id: string; manufacturer: string; model: string; confidence: string } | null;
@@ -229,7 +237,7 @@ export interface PrinterComment {
   user: { id: string; name: string } | null;
 }
 
-export type ConsumableReplacementStatus = "PREDICTED" | "CONFIRMED" | "PREMATURE" | "DISMISSED";
+export type ConsumableReplacementStatus = "PREDICTED" | "CANDIDATE" | "CONFIRMED" | "PREMATURE" | "DISMISSED";
 
 export interface ConsumableReplacement {
   id: string;

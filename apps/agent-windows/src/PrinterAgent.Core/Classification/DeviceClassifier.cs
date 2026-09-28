@@ -85,6 +85,19 @@ public static class DeviceClassifier
             hasStrongPositive = true;
             evidence.Add(new Evidence("mdns", "mDNS anuncia serviço de impressão", 0.3, false));
         }
+        // Fase 12 (WS-Discovery) — a host responding to the WS-Discovery
+        // Probe at all is NEVER positive evidence by itself (the Probe asks
+        // for the generic wsdp:Device type, which PCs, NAS boxes and ONVIF
+        // cameras answer just as readily as printers do); only a
+        // print-specific advertised Type (e.g. "print:PrintDeviceType",
+        // "wprt:PrintDeviceType") counts, same specificity requirement as
+        // the mDNS check above.
+        if (s.WsDiscoveryTypes.Any(t => t.Contains("print", StringComparison.OrdinalIgnoreCase)))
+        {
+            score += 0.3;
+            hasStrongPositive = true;
+            evidence.Add(new Evidence("ws_discovery", "WS-Discovery anuncia tipo de dispositivo de impressão", 0.3, false));
+        }
         if (s.OuiIsKnownPrinterVendor)
         {
             score += 0.15;

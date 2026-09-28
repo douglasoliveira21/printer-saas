@@ -61,7 +61,7 @@ public partial class ToolsTabView : UserControl
             }
 
             NetworkScanStatus.Text = $"Enviando {devices.Count} impressora(s) encontrada(s) ao SaaS...";
-            await _context.ApiClient.SubmitDevicesAsync(new SubmitDevicesRequest { Devices = devices }, CancellationToken.None);
+            await _context.ApiClient.SubmitDevicesAsync(new SubmitDevicesRequest { Devices = devices, CollectionId = Guid.NewGuid().ToString() }, CancellationToken.None);
             NetworkScanStatus.Text = $"{devices.Count} impressora(s) encontrada(s) e enviada(s) ao SaaS.";
         }
         catch (Exception ex)

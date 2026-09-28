@@ -18,66 +18,66 @@ enum TenantStatus {
 }
 
 model Tenant {
-  id        String       @id @default(uuid())
-  name      String
-  legalName String?
-  document  String? // CNPJ
-  email     String?
-  phone     String?
-  address   String?
-  timezone  String       @default("America/Sao_Paulo")
-  currency  String       @default("BRL")
-  logoUrl   String?
-  status    TenantStatus @default(ACTIVE)
-  isDemo    Boolean      @default(false)
+  id                           String       @id @default(uuid())
+  name                         String
+  legalName                    String?
+  document                     String? // CNPJ
+  email                        String?
+  phone                        String?
+  address                      String?
+  timezone                     String       @default("America/Sao_Paulo")
+  currency                     String       @default("BRL")
+  logoUrl                      String?
+  status                       TenantStatus @default(ACTIVE)
+  isDemo                       Boolean      @default(false)
   // Configurações > Alertas > "Alertas de falha na comunicação" — null usa o
   // default global (AGENT_OFFLINE_THRESHOLD_SECONDS/PRINTER_OFFLINE_THRESHOLD_SECONDS
   // no .env), mesmo comportamento de antes desta feature.
   agentOfflineThresholdHours   Int?
   printerOfflineThresholdHours Int?
-  planId    String?
-  plan      Plan?        @relation(fields: [planId], references: [id])
-  createdAt DateTime     @default(now())
-  updatedAt DateTime     @updatedAt
+  planId                       String?
+  plan                         Plan?        @relation(fields: [planId], references: [id])
+  createdAt                    DateTime     @default(now())
+  updatedAt                    DateTime     @updatedAt
 
-  users                   User[]
-  roles                   Role[]
-  customers               Customer[]
-  agents                  Agent[]
-  printers                Printer[]
-  snmpV3Credentials       SnmpV3Credential[]
-  serviceOrders           ServiceOrder[]
-  contracts               Contract[]
-  auditLogs               AuditLog[]
-  alerts                  Alert[]
-  inventoryItems          InventoryItem[]
-  inventoryMovements      InventoryMovement[]
-  financialEntries        FinancialEntry[]
-  consumableReplacements  ConsumableReplacement[]
-  printerComments         PrinterComment[]
-  monthlyClosings         MonthlyClosing[]
-  contractPrinters        ContractPrinter[]
-  contractFixedCosts      ContractFixedCost[]
-  contractEmailRecipients ContractEmailRecipient[]
-  contractReadjustments   ContractReadjustment[]
-  contractPricingTiers    ContractPricingTier[]
-  reportEmailRecipients   ReportEmailRecipient[]
-  userPermissions         UserPermission[]
-  userVisibleCustomers    UserVisibleCustomer[]
-  emailSettings           TenantEmailSettings?
-  notificationTypeSettings NotificationTypeSetting[]
-  notificationTypeCustomers NotificationTypeCustomer[]
-  reportDeliveries        ReportDelivery[]
-  reportDeliveryCustomers ReportDeliveryCustomer[]
-  serviceOrderParts       ServiceOrderPart[]
-  serviceOrderPhotos      ServiceOrderPhoto[]
-  workingHours            TenantWorkingHours[]
+  users                          User[]
+  roles                          Role[]
+  customers                      Customer[]
+  agents                         Agent[]
+  printers                       Printer[]
+  snmpV3Credentials              SnmpV3Credential[]
+  serviceOrders                  ServiceOrder[]
+  contracts                      Contract[]
+  auditLogs                      AuditLog[]
+  alerts                         Alert[]
+  inventoryItems                 InventoryItem[]
+  inventoryMovements             InventoryMovement[]
+  financialEntries               FinancialEntry[]
+  consumableReplacements         ConsumableReplacement[]
+  printerComments                PrinterComment[]
+  monthlyClosings                MonthlyClosing[]
+  contractPrinters               ContractPrinter[]
+  contractFixedCosts             ContractFixedCost[]
+  contractEmailRecipients        ContractEmailRecipient[]
+  contractReadjustments          ContractReadjustment[]
+  contractPricingTiers           ContractPricingTier[]
+  reportEmailRecipients          ReportEmailRecipient[]
+  userPermissions                UserPermission[]
+  userVisibleCustomers           UserVisibleCustomer[]
+  emailSettings                  TenantEmailSettings?
+  notificationTypeSettings       NotificationTypeSetting[]
+  notificationTypeCustomers      NotificationTypeCustomer[]
+  reportDeliveries               ReportDelivery[]
+  reportDeliveryCustomers        ReportDeliveryCustomer[]
+  serviceOrderParts              ServiceOrderPart[]
+  serviceOrderPhotos             ServiceOrderPhoto[]
+  workingHours                   TenantWorkingHours[]
   preventiveMaintenanceSchedules PreventiveMaintenanceSchedule[]
-  printerErrorCodes       PrinterErrorCodeCatalog[]
-  serviceOrderTypes       ServiceOrderTypeCatalog[]
-  departments             Department[]
-  closingSettings         TenantClosingSettings?
-  supplyLevelFilters      SupplyLevelFilter[]
+  printerErrorCodes              PrinterErrorCodeCatalog[]
+  serviceOrderTypes              ServiceOrderTypeCatalog[]
+  departments                    Department[]
+  closingSettings                TenantClosingSettings?
+  supplyLevelFilters             SupplyLevelFilter[]
 
   @@map("tenants")
 }
@@ -168,16 +168,16 @@ model PrinterCatalogModel {
 // PrinterAgent.Core, which never trusts a thumbprint the server supplies on
 // its own, only compares against one compiled into the Agent itself).
 model AgentRelease {
-  id                     String   @id @default(uuid())
-  version                String // SemVer, e.g. "1.1.0"
-  downloadUrl            String
-  sha256                 String // hex digest of the .msi, checked before the Agent trusts the signature at all
-  signingCertThumbprint  String? // informational only — the Agent's real trust check is its own compiled-in constant, not this field
-  releaseNotes           String?
-  isActive               Boolean  @default(true)
-  publishedAt            DateTime @default(now())
-  createdAt              DateTime @default(now())
-  updatedAt              DateTime @updatedAt
+  id                    String   @id @default(uuid())
+  version               String // SemVer, e.g. "1.1.0"
+  downloadUrl           String
+  sha256                String // hex digest of the .msi, checked before the Agent trusts the signature at all
+  signingCertThumbprint String? // informational only — the Agent's real trust check is its own compiled-in constant, not this field
+  releaseNotes          String?
+  isActive              Boolean  @default(true)
+  publishedAt           DateTime @default(now())
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
 
   @@map("agent_releases")
 }
@@ -428,16 +428,16 @@ model Customer {
   createdAt             DateTime           @default(now())
   updatedAt             DateTime           @updatedAt
 
-  locations        Location[]
-  printers         Printer[]
-  contracts        Contract[]
-  serviceOrders    ServiceOrder[]
-  financialEntries FinancialEntry[]
-  portalUsers      User[]
-  monthlyClosings  MonthlyClosing[]
-  workingHours     CustomerWorkingHours[]
-  agents           Agent[]
-  visibleToUsers   UserVisibleCustomer[]
+  locations                Location[]
+  printers                 Printer[]
+  contracts                Contract[]
+  serviceOrders            ServiceOrder[]
+  financialEntries         FinancialEntry[]
+  portalUsers              User[]
+  monthlyClosings          MonthlyClosing[]
+  workingHours             CustomerWorkingHours[]
+  agents                   Agent[]
+  visibleToUsers           UserVisibleCustomer[]
   notificationTypeSettings NotificationTypeCustomer[]
   reportDeliveries         ReportDeliveryCustomer[]
   supplyLevelFilters       SupplyLevelFilter[]
@@ -576,10 +576,33 @@ model Agent {
   createdAt                 DateTime          @default(now())
   updatedAt                 DateTime          @updatedAt
 
-  printers Printer[]
+  printers         Printer[]
+  agentSubmissions AgentSubmission[]
 
   @@index([tenantId])
   @@map("agents")
+}
+
+// Idempotency guard for POST /agent-api/v1/devices (Fase 2 — see
+// AgentsService.submitDevices). The Agent generates one collectionId (UUID)
+// per discovery/collection batch and resends the SAME id on every retry of
+// that same batch (via OfflineQueue) — a batch reaching here twice (e.g. the
+// API committed successfully but the HTTP response was lost, so the Agent
+// treated it as a failure and requeued it) is recognized by the unique
+// constraint on collectionId, not reprocessed a second time. Not
+// tenant-scoped — same reasoning as PrinterAlertReading/CounterReading
+// (purely an Agent-facing bookkeeping table, resolved by agentId, never
+// queried per-tenant from the app side).
+model AgentSubmission {
+  id           String   @id @default(uuid())
+  agentId      String
+  agent        Agent    @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  collectionId String   @unique
+  deviceCount  Int
+  processedAt  DateTime @default(now())
+
+  @@index([agentId, processedAt])
+  @@map("agent_submissions")
 }
 
 // ---------------------------------------------------------------------------
@@ -740,18 +763,35 @@ model Printer {
 
 // Raw + derived counter snapshot per collection
 model CounterReading {
-  id          String   @id @default(uuid())
-  printerId   String
-  printer     Printer  @relation(fields: [printerId], references: [id], onDelete: Cascade)
-  total       Int?
-  blackWhite  Int?
-  color       Int?
-  copies      Int?
-  raw         Json? // original values + OIDs as received from agent
-  collectedAt DateTime @default(now())
+  id            String               @id @default(uuid())
+  printerId     String
+  printer       Printer              @relation(fields: [printerId], references: [id], onDelete: Cascade)
+  total         Int?
+  blackWhite    Int?
+  color         Int?
+  copies        Int?
+  raw           Json? // original values + OIDs as received from agent
+  collectedAt   DateTime             @default(now())
+  // Fase 3 (proteção contra regressão) — comparado contra a leitura anterior
+  // deste printer no momento da coleta (AgentsService.processDevices), nunca
+  // recalculado depois. O valor bruto informado pela impressora SEMPRE é
+  // gravado, mesmo quando regredido (spec: nunca descartar/zerar) — isto só
+  // classifica a leitura, não filtra nada. A causa real (reset de fábrica,
+  // troca de equipamento, engano de fingerprint, erro de leitura) não é
+  // determinável automaticamente — REGRESSED é só um fato observado, nunca
+  // uma acusação. O cálculo de "páginas no período" para relatórios/cobrança
+  // já é seguro independente disso — ver calculatePeriodUsage em
+  // packages/shared/src/billing.ts (nunca gera delta negativo).
+  status        CounterReadingStatus @default(NORMAL)
+  previousTotal Int? // snapshot do "total" da leitura anterior — só preenchido quando status=REGRESSED, evita precisar de outra consulta pra auditoria
 
   @@index([printerId, collectedAt])
   @@map("counter_readings")
+}
+
+enum CounterReadingStatus {
+  NORMAL
+  REGRESSED
 }
 
 model ConsumableReading {
@@ -793,9 +833,17 @@ model PrinterAlertReading {
 
 enum ConsumableReplacementStatus {
   PREDICTED // forecast computed, no replacement seen yet
-  CONFIRMED // level jumped back up — treated as an actual physical replacement
+  // Fase 4 (debounce): a jump big enough to look like a replacement was seen
+  // ONCE, but not confirmed yet — waiting for the NEXT reading to see if the
+  // elevated level actually persists (a real swap) or falls back down (a
+  // noisy/one-off SNMP reading, or someone resetting a toner-low alert on
+  // the panel without actually swapping the cartridge). Never shown on the
+  // customer-facing printer timeline (PrintersService.timeline filters it
+  // out) — only visible via the admin replacements list, for troubleshooting.
+  CANDIDATE
+  CONFIRMED // level jumped back up and the next reading confirmed it persisted — treated as an actual physical replacement
   PREMATURE // confirmed, but swapped with plenty of life left (possible waste)
-  DISMISSED // manually discarded by the user
+  DISMISSED // manually discarded by the user, OR a CANDIDATE that didn't persist on the next reading (turned out to be noise)
 }
 
 // Tracks the lifecycle of a printer's consumable (toner/drum/etc.) from
@@ -938,15 +986,15 @@ model PreventiveMaintenanceSchedule {
 // manufacturer error/status code yet, so nothing auto-matches against this
 // table yet; see the module's own doc comment for what's still pending.
 model PrinterErrorCodeCatalog {
-  id           String    @id @default(uuid())
+  id           String     @id @default(uuid())
   tenantId     String
-  tenant       Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant       Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   manufacturer String
   code         String
   description  String
   severity     AlertLevel @default(WARNING)
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
 
   @@index([tenantId])
   @@map("printer_error_code_catalog")
@@ -1014,19 +1062,19 @@ model ServiceOrder {
   createdByUserId String?
   createdBy       User?     @relation("createdServiceOrders", fields: [createdByUserId], references: [id])
 
-  type             String? // legado, sem uso na UI nova — ver serviceType
-  serviceType      ServiceOrderType?
+  type                      String? // legado, sem uso na UI nova — ver serviceType
+  serviceType               ServiceOrderType?
   // Catálogo gerenciável (Configurações > Chamados) que substitui o enum
   // acima na UI nova — o enum fica só como valor legado/fallback pra
   // registros antigos, nunca removido (migração aditiva, ver
   // ServiceOrderTypeCatalog).
   serviceOrderTypeCatalogId String?
   serviceOrderTypeCatalog   ServiceOrderTypeCatalog? @relation(fields: [serviceOrderTypeCatalogId], references: [id])
-  priority         ServiceOrderPriority @default(MEDIUM)
-  status           ServiceOrderStatus   @default(OPEN)
-  description      String?
-  symptoms         String[]             @default([])
-  counterAtOpening Int? // snapshot do contador total do printer no momento da abertura
+  priority                  ServiceOrderPriority     @default(MEDIUM)
+  status                    ServiceOrderStatus       @default(OPEN)
+  description               String?
+  symptoms                  String[]                 @default([])
+  counterAtOpening          Int? // snapshot do contador total do printer no momento da abertura
 
   diagnosis       String?
   causeIdentified String?
@@ -1077,15 +1125,15 @@ model ServiceOrder {
 // tenant gerencia (nome, preço padrão do serviço, linhas em branco na
 // impressão).
 model ServiceOrderTypeCatalog {
-  id                String        @id @default(uuid())
+  id                String   @id @default(uuid())
   tenantId          String
-  tenant            Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant            Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   name              String
-  defaultPrice      Decimal?      @db.Decimal(12, 2)
-  blankLinesOnPrint Int           @default(0)
-  active            Boolean       @default(true)
-  createdAt         DateTime      @default(now())
-  updatedAt         DateTime      @updatedAt
+  defaultPrice      Decimal? @db.Decimal(12, 2)
+  blankLinesOnPrint Int      @default(0)
+  active            Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 
   serviceOrders ServiceOrder[]
 
@@ -1146,18 +1194,18 @@ model Contract {
   printerId  String?
   printer    Printer? @relation(fields: [printerId], references: [id])
 
-  startDate         DateTime
-  endDate           DateTime?
-  monthlyFee        Decimal        @db.Decimal(12, 2)
-  franchisePages    Int            @default(0)
-  overagePriceBw    Decimal        @default(0) @db.Decimal(12, 4)
-  overagePriceColor Decimal        @default(0) @db.Decimal(12, 4)
-  billingDay        Int            @default(1)
-  slaHours          Int?
-  readjustmentIndex String?
-  status            ContractStatus @default(DRAFT)
-  notes             String?
-  printNotesOnClosing Boolean @default(false)
+  startDate           DateTime
+  endDate             DateTime?
+  monthlyFee          Decimal        @db.Decimal(12, 2)
+  franchisePages      Int            @default(0)
+  overagePriceBw      Decimal        @default(0) @db.Decimal(12, 4)
+  overagePriceColor   Decimal        @default(0) @db.Decimal(12, 4)
+  billingDay          Int            @default(1)
+  slaHours            Int?
+  readjustmentIndex   String?
+  status              ContractStatus @default(DRAFT)
+  notes               String?
+  printNotesOnClosing Boolean        @default(false)
 
   // Default per-page cost, used as a fallback for any linked ContractPrinter
   // that doesn't have its own override (spec: "custo padrão"). Supersedes
@@ -1426,14 +1474,14 @@ enum NotificationType {
 // (User.notifyTicket*) — as duas coisas precisam permitir pro e-mail sair.
 // Sem linha configurada pra um tipo = habilitado pra todos os clientes.
 model NotificationTypeSetting {
-  id           String            @id @default(uuid())
+  id           String                     @id @default(uuid())
   tenantId     String
-  tenant       Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant       Tenant                     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   type         NotificationType
-  allCustomers Boolean           @default(true)
+  allCustomers Boolean                    @default(true)
   customers    NotificationTypeCustomer[]
-  createdAt    DateTime          @default(now())
-  updatedAt    DateTime          @updatedAt
+  createdAt    DateTime                   @default(now())
+  updatedAt    DateTime                   @updatedAt
 
   @@unique([tenantId, type])
   @@map("notification_type_settings")
@@ -1468,15 +1516,15 @@ enum CustomerEmailField {
 // específica, usando um e-mail já cadastrado no próprio Customer (nunca um
 // e-mail digitado à mão aqui).
 model ReportDelivery {
-  id           String              @id @default(uuid())
+  id           String                   @id @default(uuid())
   tenantId     String
-  tenant       Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant       Tenant                   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   reportType   ReportType
-  allCustomers Boolean             @default(true)
-  emailField   CustomerEmailField  @default(EMAIL)
+  allCustomers Boolean                  @default(true)
+  emailField   CustomerEmailField       @default(EMAIL)
   customers    ReportDeliveryCustomer[]
-  createdAt    DateTime            @default(now())
-  updatedAt    DateTime            @updatedAt
+  createdAt    DateTime                 @default(now())
+  updatedAt    DateTime                 @updatedAt
 
   @@unique([tenantId, reportType])
   @@map("report_deliveries")
@@ -1500,11 +1548,11 @@ model ReportDeliveryCustomer {
 // ---------------------------------------------------------------------------
 
 model InventoryItem {
-  id          String   @id @default(uuid())
-  tenantId    String
-  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  name        String
-  type        String
+  id                    String   @id @default(uuid())
+  tenantId              String
+  tenant                Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name                  String
+  type                  String
   // Campos abaixo só existem para peças/suprimentos "de catálogo" (toner,
   // cilindro, fusor, etc.) — todos opcionais no banco porque itens de
   // estoque genéricos anteriores a esta feature não têm esse detalhamento.

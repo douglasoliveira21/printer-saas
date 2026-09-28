@@ -2,7 +2,7 @@ import { BadRequestException, Injectable, NotFoundException, UnauthorizedExcepti
 import { ConfigService } from '@nestjs/config';
 import * as argon2 from 'argon2';
 import { randomBytes } from 'node:crypto';
-import type { Agent } from '@prisma/client';
+import { Prisma, type Agent } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { TenantPrismaService } from '../prisma/tenant-prisma.service';
 import type { CreateAgentDto } from './dto/create-agent.dto';
@@ -10,6 +10,15 @@ import type { UpdateAgentDto } from './dto/update-agent.dto';
 import type { EnrollAgentDto, HeartbeatDto, SubmitDevicesDto } from './dto/agent-payloads.dto';
 import { SecretCryptoService } from '../common/crypto/secret-crypto.service';
 import { AgentReleasesService } from '../platform/agent-releases/agent-releases.service';
+
+// Either the raw PrismaService or a Prisma.$transaction callback's `tx` —
+// submitDevices runs its whole body against whichever one it's given, so
+// the idempotency guard (a row insert) and the actual device processing
+// commit or roll back together (Fase 2 — see submitDevices below).
+type Db = Pick<
+  Prisma.TransactionClient,
+  'printer' | 'counterReading' | 'consumableReading' | 'printerAlertReading' | 'consumableReplacement' | 'printerCatalogModel'
+>;
 
 const ENROLLMENT_TOKEN_TTL_MS = 24 * 60 * 60 * 1000;
 // A level jump this large between consecutive readings can't be explained by
@@ -239,9 +248,45 @@ export class AgentsService {
    * spec §23) or, for a known printer, appends counter/consumable history
    * and resolves IP churn via fingerprint dedup (see §68-69).
    */
+  /**
+   * Fase 2 (idempotência): when the Agent sends a collectionId, the whole
+   * batch is processed inside a transaction guarded by a unique-constraint
+   * insert into AgentSubmission. A batch reaching here a second time with
+   * the same collectionId — the exact "API committed, but the HTTP response
+   * got lost, so the Agent thought it failed and requeued the same batch"
+   * scenario the OfflineQueue's retry exists for — hits the unique
+   * violation and is recognized as already-processed instead of creating a
+   * second CounterReading/ConsumableReading/PrinterAlertReading for the
+   * same reading. Two concurrent requests with the same collectionId race
+   * on the same unique constraint — only one wins, the other is treated as
+   * a duplicate, never as an error surfaced to the Agent (both attempts
+   * still return success). Older Agents that don't send a collectionId
+   * (pre-Fase-2) skip the guard entirely and behave exactly as before —
+   * no idempotency, same as today.
+   */
   async submitDevices(agent: Agent, dto: SubmitDevicesDto) {
+    if (!dto.collectionId) {
+      return this.processDevices(agent, dto.devices, this.prisma);
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      try {
+        await tx.agentSubmission.create({
+          data: { agentId: agent.id, collectionId: dto.collectionId!, deviceCount: dto.devices.length },
+        });
+      } catch (err) {
+        if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+          return { processed: 0, results: [], deduplicated: true };
+        }
+        throw err;
+      }
+      return this.processDevices(agent, dto.devices, tx);
+    });
+  }
+
+  private async processDevices(agent: Agent, devices: SubmitDevicesDto['devices'], db: Db) {
     const results = [];
-    for (const device of dto.devices) {
+    for (const device of devices) {
       // Server-side re-validation of the Agent's own classification —
       // never just trust the client. Manual/USB additions (AddPrinterDialog,
       // UsbPrinterDiscoveryService) don't run the classifier at all and
@@ -264,7 +309,7 @@ export class AgentsService {
       const supportsA3 = device.capabilities?.a3 ?? device.supportsA3 ?? undefined;
       const capabilities = device.capabilities ? (device.capabilities as any) : undefined;
 
-      const printer = await this.prisma.printer.upsert({
+      const printer = await db.printer.upsert({
         where: { tenantId_fingerprint: { tenantId: agent.tenantId, fingerprint } },
         create: {
           tenantId: agent.tenantId,
@@ -317,11 +362,12 @@ export class AgentsService {
       });
 
       if (device.manufacturer || device.model) {
-        await this.applyCatalogMatch(printer.id, device.manufacturer, device.model);
+        await this.applyCatalogMatch(db, printer.id, device.manufacturer, device.model);
       }
 
       if (device.counters) {
-        await this.prisma.counterReading.create({
+        const { status, previousTotal } = await this.classifyCounterReading(db, printer.id, device.counters.total);
+        await db.counterReading.create({
           data: {
             printerId: printer.id,
             total: device.counters.total,
@@ -329,6 +375,8 @@ export class AgentsService {
             color: device.counters.color,
             copies: device.counters.copies,
             raw: device.counters.raw as any,
+            status,
+            previousTotal,
           },
         });
       }
@@ -337,9 +385,9 @@ export class AgentsService {
         for (const c of device.consumables) {
           const levelPercent = c.levelPercent !== undefined ? Math.round(c.levelPercent) : undefined;
           if (levelPercent !== undefined) {
-            await this.detectReplacement(agent.tenantId, printer.id, c.type, c.color ?? null, levelPercent);
+            await this.detectReplacement(db, agent.tenantId, printer.id, c.type, c.color ?? null, levelPercent);
           }
-          await this.prisma.consumableReading.create({
+          await db.consumableReading.create({
             data: {
               printerId: printer.id,
               type: c.type,
@@ -354,7 +402,7 @@ export class AgentsService {
       }
 
       if (device.alerts?.length) {
-        await this.prisma.printerAlertReading.createMany({
+        await db.printerAlertReading.createMany({
           data: device.alerts.map((a) => ({
             printerId: printer.id,
             code: a.code,
@@ -375,23 +423,90 @@ export class AgentsService {
    * otherwise). Confirms/creates a ConsumableReplacement record when that
    * happens, flagging it PREMATURE if there was still plenty of life left.
    */
-  private async detectReplacement(tenantId: string, printerId: string, type: string, color: string | null, newLevel: number) {
-    const previous = await this.prisma.consumableReading.findFirst({
+  /**
+   * Fase 3 (proteção contra regressão de contadores) — compara o "total"
+   * novo contra a leitura mais recente já gravada para este printer. Uma
+   * queda (novo < anterior) NÃO é descartada nem zerada (spec: nunca
+   * transformar ausência/anomalia em 0) — o valor bruto é sempre gravado,
+   * só marcado como REGRESSED para auditoria; a causa real (reset de
+   * fábrica, troca de equipamento/controladora, fingerprint incorreto, erro
+   * de leitura pontual) não é determinável aqui, e não deve ser assumida.
+   * Compara só contra a leitura imediatamente anterior (não a "correta
+   * conhecida" mais antiga) — o mesmo padrão já usado em detectReplacement.
+   */
+  private async classifyCounterReading(
+    db: Db,
+    printerId: string,
+    newTotal: number | undefined,
+  ): Promise<{ status: 'NORMAL' | 'REGRESSED'; previousTotal: number | undefined }> {
+    if (newTotal === undefined || newTotal === null) {
+      return { status: 'NORMAL', previousTotal: undefined };
+    }
+    const previous = await db.counterReading.findFirst({
+      where: { printerId, total: { not: null } },
+      orderBy: { collectedAt: 'desc' },
+      select: { total: true },
+    });
+    if (previous?.total === null || previous?.total === undefined) {
+      return { status: 'NORMAL', previousTotal: undefined };
+    }
+    if (newTotal < previous.total) {
+      return { status: 'REGRESSED', previousTotal: previous.total };
+    }
+    return { status: 'NORMAL', previousTotal: undefined };
+  }
+
+  /**
+   * Fase 4 (debounce): a jump this big is raised as CANDIDATE first, never
+   * CONFIRMED/PREMATURE on the spot — a single noisy SNMP reading, or
+   * someone resetting a toner-low warning on the printer's own panel
+   * without actually swapping the cartridge, can produce exactly this kind
+   * of one-off spike. Confirmation only happens once the NEXT reading shows
+   * the elevated level actually held — CANDIDATE rows are excluded from the
+   * customer-facing timeline (see PrintersService.timeline) precisely so a
+   * false alarm never gets shown as a real event before it's confirmed.
+   */
+  private async detectReplacement(db: Db, tenantId: string, printerId: string, type: string, color: string | null, newLevel: number) {
+    const previous = await db.consumableReading.findFirst({
       where: { printerId, type, color },
       orderBy: { collectedAt: 'desc' },
       select: { levelPercent: true },
     });
     if (previous?.levelPercent === null || previous?.levelPercent === undefined) return;
+
+    // A candidate already raised from the PREVIOUS reading — this call
+    // decides whether it persisted (confirm) or was a one-off (dismiss),
+    // and never raises a second candidate from the same reading.
+    const candidate = await db.consumableReplacement.findFirst({ where: { printerId, type, color, status: 'CANDIDATE' } });
+    if (candidate) {
+      const baseline = candidate.levelPercentAtReplacement;
+      const persisted = baseline !== null && newLevel - baseline >= REPLACEMENT_JUMP_THRESHOLD;
+      if (persisted) {
+        const status = baseline! > PREMATURE_REPLACEMENT_LEVEL ? 'PREMATURE' : 'CONFIRMED';
+        await db.consumableReplacement.update({ where: { id: candidate.id }, data: { status, replacedAt: new Date() } });
+      } else {
+        // Didn't hold — was noise, not a real swap. If this candidate came
+        // from an upgraded PREDICTED row (had a forecast date), revert it
+        // back to PREDICTED instead of discarding the forecast entirely.
+        await db.consumableReplacement.update({
+          where: { id: candidate.id },
+          data: { status: candidate.predictedAt !== null ? 'PREDICTED' : 'DISMISSED', levelPercentAtReplacement: null },
+        });
+      }
+      return;
+    }
+
     if (newLevel - previous.levelPercent < REPLACEMENT_JUMP_THRESHOLD) return;
 
-    const status = previous.levelPercent > PREMATURE_REPLACEMENT_LEVEL ? 'PREMATURE' : 'CONFIRMED';
-    const updated = await this.prisma.consumableReplacement.updateMany({
-      where: { printerId, type, color, status: 'PREDICTED' },
-      data: { status, replacedAt: new Date(), levelPercentAtReplacement: previous.levelPercent },
-    });
-    if (updated.count === 0) {
-      await this.prisma.consumableReplacement.create({
-        data: { tenantId, printerId, type, color, replacedAt: new Date(), levelPercentAtReplacement: previous.levelPercent, status },
+    const existingPredicted = await db.consumableReplacement.findFirst({ where: { printerId, type, color, status: 'PREDICTED' } });
+    if (existingPredicted) {
+      await db.consumableReplacement.update({
+        where: { id: existingPredicted.id },
+        data: { status: 'CANDIDATE', levelPercentAtReplacement: previous.levelPercent },
+      });
+    } else {
+      await db.consumableReplacement.create({
+        data: { tenantId, printerId, type, color, levelPercentAtReplacement: previous.levelPercent, status: 'CANDIDATE' },
       });
     }
   }
@@ -413,10 +528,10 @@ export class AgentsService {
    * already confirmed live (true or false) is never overwritten by the
    * catalog, same priority rule already used for A3 elsewhere in this file.
    */
-  private async applyCatalogMatch(printerId: string, manufacturer: string | undefined, model: string | undefined) {
+  private async applyCatalogMatch(db: Db, printerId: string, manufacturer: string | undefined, model: string | undefined) {
     if (!model && !manufacturer) return;
 
-    const candidates = await this.prisma.printerCatalogModel.findMany({
+    const candidates = await db.printerCatalogModel.findMany({
       where: manufacturer ? { manufacturer: { equals: manufacturer, mode: 'insensitive' } } : undefined,
     });
     const modelLower = model?.toLowerCase();
@@ -428,7 +543,7 @@ export class AgentsService {
     });
     if (!match) return;
 
-    const printer = await this.prisma.printer.findUnique({ where: { id: printerId } });
+    const printer = await db.printer.findUnique({ where: { id: printerId } });
     if (!printer) return;
 
     const currentCaps = (printer.capabilities as Record<string, boolean | null>) ?? {};
@@ -444,7 +559,7 @@ export class AgentsService {
       }
     }
 
-    await this.prisma.printer.update({
+    await db.printer.update({
       where: { id: printerId },
       data: {
         catalogModelId: match.id,

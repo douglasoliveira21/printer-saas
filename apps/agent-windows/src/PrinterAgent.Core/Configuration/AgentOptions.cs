@@ -37,6 +37,17 @@ public class AgentOptions
     /// <summary>Max concurrent SNMP/ping probes during a discovery sweep — never scan a /24 all at once.</summary>
     public int DiscoveryConcurrency { get; set; } = 16;
 
+    /// <summary>
+    /// Fase 7 (validação de Network Range) — total host ceiling across all
+    /// configured network targets combined, checked before a sweep starts.
+    /// Default (8192) comfortably covers a /19 (largest realistic printer
+    /// VLAN this product would expect), while cleanly rejecting a /16
+    /// (65 534 hosts) or larger typed in by mistake instead of silently
+    /// kicking off an hours-long scan. Raise it if a real deployment
+    /// genuinely needs more.
+    /// </summary>
+    public int MaximumDiscoveryHosts { get; set; } = 8192;
+
     /// <summary>Max number of pending submissions kept in the offline queue (spec §39) before oldest entries are dropped.</summary>
     public int OfflineQueueMaxEntries { get; set; } = 200;
 

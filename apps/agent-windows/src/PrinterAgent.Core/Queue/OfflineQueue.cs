@@ -32,6 +32,18 @@ public class OfflineQueue
         _path = Path.Combine(dir, "offline-queue.json");
     }
 
+    /// <summary>Test-only seam — points the queue at an arbitrary file instead of the real ProgramData path, so tests never touch the machine's actual queue.</summary>
+    internal OfflineQueue(string queueFilePath, AgentOptions options, ILogger<OfflineQueue> logger)
+    {
+        _options = options;
+        _logger = logger;
+        Directory.CreateDirectory(Path.GetDirectoryName(queueFilePath)!);
+        _path = queueFilePath;
+    }
+
+    /// <summary>Test-only accessor for the backing file path.</summary>
+    internal string QueueFilePath => _path;
+
     public async Task EnqueueAsync(SubmitDevicesRequest batch)
     {
         await _lock.WaitAsync();
@@ -102,9 +114,26 @@ public class OfflineQueue
         }
     }
 
+    /// <summary>
+    /// Writes to a temp file first, flushes it fully to disk, then atomically
+    /// replaces the real queue file — never the other way around. The old
+    /// code did <c>File.Create(_path)</c> directly, which truncates the real
+    /// file BEFORE the new content is written; a crash/power loss in that
+    /// window (mid-serialize) left the queue file empty or half-written,
+    /// losing every pending batch, not just the one being written. With this
+    /// order, a crash before <see cref="File.Move"/> leaves the previous,
+    /// still-valid queue file completely untouched — <see cref="File.Move"/>
+    /// with <c>overwrite: true</c> on the same volume is what actually
+    /// performs the atomic swap (NTFS rename, not a copy).
+    /// </summary>
     private async Task WriteAllAsync(List<SubmitDevicesRequest> pending)
     {
-        await using var stream = File.Create(_path);
-        await JsonSerializer.SerializeAsync(stream, pending);
+        var tempPath = _path + ".tmp";
+        await using (var stream = File.Create(tempPath))
+        {
+            await JsonSerializer.SerializeAsync(stream, pending);
+            await stream.FlushAsync();
+        }
+        File.Move(tempPath, _path, overwrite: true);
     }
 }

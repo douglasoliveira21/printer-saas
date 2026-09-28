@@ -105,7 +105,15 @@ public class IppClient
         WriteAttribute(0x48, "attributes-natural-language", "en");
         WriteAttribute(0x45, "printer-uri", printerUri);
 
-        var requested = new[] { "printer-make-and-model", "color-supported", "sides-supported", "media-supported", "printer-uuid" };
+        var requested = new[]
+        {
+            "printer-make-and-model", "color-supported", "sides-supported", "media-supported", "printer-uuid",
+            // Fase 13 (IPP avançado) — RFC 8011 §5.4.11/§5.4.12 (printer-state,
+            // printer-state-reasons), PWG5100.13 §5.6.39/§5.6.40
+            // (printer-supply, printer-supply-description), RFC 8011 §5.4.16
+            // (media-ready).
+            "printer-state", "printer-state-reasons", "printer-supply", "printer-supply-description", "media-ready",
+        };
         WriteAttribute(0x44, "requested-attributes", requested[0]);
         for (var i = 1; i < requested.Length; i++)
         {
@@ -116,7 +124,7 @@ public class IppClient
         return stream.ToArray();
     }
 
-    private static IppProbeResult ParseResponse(byte[] data)
+    internal static IppProbeResult ParseResponse(byte[] data)
     {
         var result = new IppProbeResult();
         if (data.Length < 8)
@@ -196,7 +204,105 @@ public class IppClient
             result.A3Supported = mediaValues.Any(v => v.Contains("iso_a3", StringComparison.OrdinalIgnoreCase) || v.Contains("a3_297", StringComparison.OrdinalIgnoreCase));
         }
 
+        // Fase 13 (IPP avançado) — printer-state (RFC 8011 §5.4.11, type1
+        // enum: 3=idle, 4=processing, 5=stopped — verified against the IANA
+        // IPP registrations, not assumed).
+        if (attributes.TryGetValue("printer-state", out var stateValues) && int.TryParse(stateValues.FirstOrDefault(), out var stateCode))
+        {
+            result.PrinterState = stateCode switch
+            {
+                3 => "idle",
+                4 => "processing",
+                5 => "stopped",
+                _ => null,
+            };
+        }
+
+        // printer-state-reasons (RFC 8011 §5.4.12) — "none" is the device
+        // explicitly saying "nothing to report", never a reason worth
+        // surfacing as one.
+        if (attributes.TryGetValue("printer-state-reasons", out var reasonValues))
+        {
+            var reasons = reasonValues.Where(r => !string.Equals(r, "none", StringComparison.OrdinalIgnoreCase)).ToList();
+            result.PrinterStateReasons = reasons.Count > 0 ? reasons : null;
+        }
+
+        // printer-supply / printer-supply-description (PWG5100.13 §5.6.39-40)
+        // — positionally paired, same order, same cardinality (confirmed via
+        // the PWG's own IPP mailing list + the CUPS implementation, which
+        // maps marker-names 1:1 to printer-supply-description).
+        if (attributes.TryGetValue("printer-supply", out var supplyValues))
+        {
+            var descriptions = attributes.GetValueOrDefault("printer-supply-description") ?? [];
+            var supplies = new List<IppSupply>();
+            for (var i = 0; i < supplyValues.Count; i++)
+            {
+                var supply = ParseSupply(supplyValues[i]);
+                if (i < descriptions.Count)
+                {
+                    supply.Description = descriptions[i];
+                }
+                supplies.Add(supply);
+            }
+            result.Supplies = supplies.Count > 0 ? supplies : null;
+        }
+
+        // media-ready (RFC 8011 §5.4.16) — raw, never interpreted.
+        if (attributes.TryGetValue("media-ready", out var mediaReadyValues))
+        {
+            result.MediaReady = mediaReadyValues.Count > 0 ? mediaReadyValues : null;
+        }
+
         return result;
+    }
+
+    /// <summary>
+    /// Decodes one printer-supply octetString value — an unordered ASCII
+    /// "key=value;key=value;..." text payload (PWG5100.13 §5.6.39, per the
+    /// PWG's own IPP mailing-list clarification of that section — this is
+    /// NOT a fixed binary struct). Only the keys this client uses are
+    /// pulled out; unrecognized keys (index, markerindex, class, unit,
+    /// colorantindex, colorantrole, coloranttonality...) are ignored.
+    /// </summary>
+    internal static IppSupply ParseSupply(string raw)
+    {
+        var supply = new IppSupply();
+        foreach (var pair in raw.Split(';', StringSplitOptions.RemoveEmptyEntries))
+        {
+            var eq = pair.IndexOf('=');
+            if (eq < 0) continue;
+            var key = pair[..eq].Trim();
+            var value = pair[(eq + 1)..].Trim();
+
+            switch (key)
+            {
+                case "type":
+                    supply.Type = value;
+                    break;
+                case "level":
+                    // -2 = unknown, -1 = unlimited (same RFC 3805 sentinel
+                    // convention SnmpDeviceReader already applies) — never
+                    // reported as a real level.
+                    if (int.TryParse(value, out var level) && level >= 0)
+                    {
+                        supply.Level = level;
+                    }
+                    break;
+                case "maxcapacity":
+                    if (int.TryParse(value, out var maxCapacity) && maxCapacity >= 0)
+                    {
+                        supply.MaxCapacity = maxCapacity;
+                    }
+                    break;
+                case "colorantname":
+                    if (!value.Equals("unknown", StringComparison.OrdinalIgnoreCase) && !value.Equals("other", StringComparison.OrdinalIgnoreCase))
+                    {
+                        supply.ColorantName = value;
+                    }
+                    break;
+            }
+        }
+        return supply;
     }
 
     /// <summary>Only the value tags this client actually cares about — anything else is skipped (returns null), never guessed.</summary>
@@ -204,7 +310,7 @@ public class IppClient
     {
         0x22 => bytes.Length > 0 && bytes[0] != 0 ? "true" : "false", // boolean
         0x21 or 0x23 => bytes.Length == 4 ? ((bytes[0] << 24) | (bytes[1] << 16) | (bytes[2] << 8) | bytes[3]).ToString() : null, // integer/enum
-        0x41 or 0x44 or 0x45 or 0x47 or 0x48 or 0x42 => Encoding.UTF8.GetString(bytes), // textWithoutLanguage/keyword/uri/charset/naturalLanguage/nameWithoutLanguage
+        0x41 or 0x44 or 0x45 or 0x47 or 0x48 or 0x42 or 0x30 => Encoding.UTF8.GetString(bytes), // textWithoutLanguage/keyword/uri/charset/naturalLanguage/nameWithoutLanguage/octetString
         _ => null,
     };
 }

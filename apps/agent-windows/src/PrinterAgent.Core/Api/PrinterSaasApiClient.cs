@@ -20,6 +20,20 @@ public class PrinterSaasApiClient
         PropertyNameCaseInsensitive = true,
     };
 
+    // Fase 5 (HttpClient / timeouts): the underlying HttpClient's own
+    // Timeout (set once in Program.cs's AddHttpClient<PrinterSaasApiClient>,
+    // 30s in the Service / 15s in the ConfigTool) is the ceiling EVERY call
+    // through this class shares by default — fine for SubmitDevices (runs
+    // every 15min-1h, a slower response there just delays the next cycle a
+    // bit) but too generous for Heartbeat/GetConfig, which run every 30s in
+    // AgentWorker's tight loop: letting either take up to 30s to fail means
+    // the "every 30s" heartbeat can barely keep its own cadence. These two
+    // get a shorter, explicit ceiling layered on top via a linked
+    // CancellationTokenSource — never longer than the client's own Timeout,
+    // only ever shorter.
+    private static readonly TimeSpan HeartbeatTimeout = TimeSpan.FromSeconds(10);
+    private static readonly TimeSpan ConfigTimeout = TimeSpan.FromSeconds(10);
+
     private readonly HttpClient _http;
     private readonly AgentCredentialStore _credentialStore;
     private readonly ILogger<PrinterSaasApiClient> _logger;
@@ -64,7 +78,9 @@ public class PrinterSaasApiClient
         try
         {
             ApplyStoredCredentials();
-            var response = await _http.PostAsJsonAsync("api/v1/agent-api/v1/heartbeat", request, JsonOptions, ct);
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            cts.CancelAfter(HeartbeatTimeout);
+            var response = await _http.PostAsJsonAsync("api/v1/agent-api/v1/heartbeat", request, JsonOptions, cts.Token);
             return response.IsSuccessStatusCode;
         }
         catch (Exception ex)
@@ -79,12 +95,14 @@ public class PrinterSaasApiClient
         try
         {
             ApplyStoredCredentials();
-            var response = await _http.GetAsync("api/v1/agent-api/v1/config", ct);
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            cts.CancelAfter(ConfigTimeout);
+            var response = await _http.GetAsync("api/v1/agent-api/v1/config", cts.Token);
             if (!response.IsSuccessStatusCode)
             {
                 return null;
             }
-            return await response.Content.ReadFromJsonAsync<AgentConfigResponse>(JsonOptions, ct);
+            return await response.Content.ReadFromJsonAsync<AgentConfigResponse>(JsonOptions, cts.Token);
         }
         catch (Exception ex)
         {

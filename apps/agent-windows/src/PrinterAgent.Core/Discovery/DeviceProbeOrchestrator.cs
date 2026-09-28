@@ -33,9 +33,9 @@ public class DeviceProbeOrchestrator
         _logger = logger;
     }
 
-    public async Task<DiscoveredDevice?> ProbeAsync(
+    public async Task<ProbeOutcome> ProbeAsync(
         IPAddress ip, string community, int snmpTimeoutMs, int snmpRetries, int auxTimeoutMs,
-        IReadOnlyDictionary<string, List<string>> mdnsResults, CancellationToken ct)
+        IReadOnlyDictionary<string, List<string>> mdnsResults, IReadOnlyDictionary<string, List<string>> wsDiscoveryResults, CancellationToken ct)
     {
         var ipText = ip.ToString();
         // ConcurrentDictionary, not Dictionary — snmpTask and ippTask below
@@ -78,11 +78,35 @@ public class DeviceProbeOrchestrator
         }
         diagnostics["tcp_ports"] = openPorts.Count > 0 ? "success" : "not_available";
 
+        // Fase 9 (diagnóstico) — SnmpDeviceReader already determines these
+        // two booleans internally (used by the classifier), but they were
+        // discarded once classification was done — this is what turns a
+        // silent "counter: null" into something diagnosable: "SNMP
+        // responded, but this specific table came back empty" is a very
+        // different situation from "SNMP never responded at all" (already
+        // covered by diagnostics["snmp"]), and a technician staring at a
+        // printer with no counters needs to know which one it is. Only set
+        // when SNMP responded at all — when it didn't, diagnostics["snmp"]
+        // already explains the absence, a redundant "not_available" here
+        // wouldn't add information.
+        if (snmp is not null)
+        {
+            diagnostics["counters"] = snmp.PrinterMibCountersFound ? "success" : "table_empty";
+            diagnostics["supplies"] = snmp.PrinterMibSuppliesFound ? "success" : "table_empty";
+        }
+
         var mac = snmp?.Device.Mac ?? ArpResolver.ResolveMac(ip);
         diagnostics["arp"] = mac is not null ? "success" : "not_available";
 
         var mdnsServices = mdnsResults.GetValueOrDefault(ipText) ?? [];
         diagnostics["mdns"] = mdnsServices.Count > 0 ? "success" : "not_available";
+
+        // Fase 12 (WS-Discovery) — same "one multicast query for the whole
+        // sweep, not per host" shape as mDNS above; DeviceClassifier is what
+        // actually decides whether the advertised Types mean anything (see
+        // its own comment — responding at all is never enough by itself).
+        var wsDiscoveryTypes = wsDiscoveryResults.GetValueOrDefault(ipText) ?? [];
+        diagnostics["ws_discovery"] = wsDiscoveryTypes.Count > 0 ? "success" : "not_available";
 
         var (ouiVendor, isPrinterVendor, isInfraVendor) = OuiVendorLookup.Lookup(mac);
 
@@ -95,16 +119,24 @@ public class DeviceProbeOrchestrator
             Ipp = ipp,
             OpenTcpPorts = openPorts,
             MdnsServices = mdnsServices,
+            WsDiscoveryTypes = wsDiscoveryTypes,
             OuiVendor = ouiVendor,
             OuiIsKnownPrinterVendor = isPrinterVendor,
             OuiIsKnownInfraVendor = isInfraVendor,
         };
 
         var classification = DeviceClassifier.Classify(signals);
+        // Fase 8 (telemetria) — SNMP/IPP outcomes are reported for EVERY
+        // host probed, not just ones that turned out to be printers, so
+        // PrinterDiscoveryService can aggregate real per-cycle counters
+        // (snmp_success/failure, ipp_success/failure) instead of only ever
+        // seeing the subset that got classified as a printer.
+        var snmpResponded = snmp is not null;
+        var ippResponded = ipp is { Responded: true };
         if (classification.Type is not (DeviceType.Printer or DeviceType.Mfp or DeviceType.Plotter))
         {
             _logger.LogDebug("{Ip} classified as {Type} (confidence {Confidence:0.00}) — not a printer", ipText, classification.Type, classification.Confidence);
-            return null;
+            return new ProbeOutcome(null, snmpResponded, ippResponded, classification.Type != DeviceType.Unknown);
         }
 
         var device = snmp?.Device ?? new DiscoveredDevice { Ip = ipText };
@@ -194,10 +226,10 @@ public class DeviceProbeOrchestrator
         device.ClassificationEvidence = classification.Evidence.Select(e => e.ToString()).ToList();
         device.Diagnostics = new Dictionary<string, string>(diagnostics);
 
-        return device;
+        return new ProbeOutcome(device, snmpResponded, ippResponded, Classified: true);
     }
 
-    private static void MergeIppData(DiscoveredDevice device, IppProbeResult? ipp, bool modelFromPrinterMib)
+    internal static void MergeIppData(DiscoveredDevice device, IppProbeResult? ipp, bool modelFromPrinterMib)
     {
         if (ipp is not { Responded: true })
         {
@@ -242,6 +274,73 @@ public class DeviceProbeOrchestrator
             device.SupportsA3 = ipp.A3Supported;
             device.CapabilitySources["a3"] = "ipp";
         }
+
+        // Fase 13 (IPP avançado) — IPP-only fields, no Printer-MIB
+        // equivalent in this codebase, so there's no "which source wins"
+        // question here.
+        device.PrinterState = ipp.PrinterState;
+        device.MediaReady = ipp.MediaReady;
+
+        // printer-supply/-description only fills in consumables the
+        // Printer-MIB supplies table (SnmpDeviceReader.ReadSuppliesAsync)
+        // didn't find at all — SNMP stays the preferred source (it also
+        // gives colorant/type detail IPP's simpler encoding may not), same
+        // gap-fill priority already used for Duplex/A3 above.
+        if ((device.Consumables is null or { Count: 0 }) && ipp.Supplies is { Count: > 0 })
+        {
+            device.Consumables = ipp.Supplies
+                .Where(s => !string.IsNullOrWhiteSpace(s.Description) || !string.IsNullOrWhiteSpace(s.Type))
+                .Select(s => new DeviceConsumable
+                {
+                    Type = s.Type ?? "other",
+                    Color = s.ColorantName?.ToLowerInvariant(),
+                    Name = s.Description,
+                    LevelPercent = s is { Level: not null, MaxCapacity: > 0 }
+                        ? Math.Round(s.Level.Value * 100.0 / s.MaxCapacity.Value, 1)
+                        : null,
+                    Capacity = s.MaxCapacity?.ToString(),
+                })
+                .ToList();
+            if (device.Consumables.Count > 0)
+            {
+                device.CapabilitySources["supplies"] = "ipp";
+            }
+        }
+
+        // printer-state-reasons folded into the same alert pipeline as
+        // Printer-MIB's prtAlertTable and the Fase 11 cover-open synthetic
+        // alerts — reusing it instead of adding a separate surface for what
+        // is, functionally, the same kind of information from a different
+        // protocol. Severity comes straight from the RFC 8011 §5.4.12
+        // suffix convention ("-error"/"-warning"/"-report"), never guessed.
+        if (ipp.PrinterStateReasons is { Count: > 0 })
+        {
+            var stateReasonAlerts = ipp.PrinterStateReasons.Select(reason => new DeviceAlert
+            {
+                Code = reason,
+                Description = HumanizeStateReason(reason),
+                Severity = reason switch
+                {
+                    _ when reason.EndsWith("-error", StringComparison.OrdinalIgnoreCase) => "critical",
+                    _ when reason.EndsWith("-warning", StringComparison.OrdinalIgnoreCase) => "warning",
+                    _ => null,
+                },
+            }).ToList();
+            device.Alerts = device.Alerts is null ? stateReasonAlerts : [.. device.Alerts, .. stateReasonAlerts];
+        }
+    }
+
+    /// <summary>"media-jam-error" → "media jam" — strips the RFC 8011 severity suffix and turns hyphens into spaces; purely cosmetic, the Code field keeps the exact keyword the device reported.</summary>
+    private static string HumanizeStateReason(string reason)
+    {
+        var withoutSuffix = reason switch
+        {
+            _ when reason.EndsWith("-error", StringComparison.OrdinalIgnoreCase) => reason[..^"-error".Length],
+            _ when reason.EndsWith("-warning", StringComparison.OrdinalIgnoreCase) => reason[..^"-warning".Length],
+            _ when reason.EndsWith("-report", StringComparison.OrdinalIgnoreCase) => reason[..^"-report".Length],
+            _ => reason,
+        };
+        return withoutSuffix.Replace('-', ' ');
     }
 
     private static async Task<T?> SafeAsync<T>(Func<Task<T?>> probe, string name, ConcurrentDictionary<string, string> diagnostics, ILogger logger) where T : class
@@ -260,3 +359,12 @@ public class DeviceProbeOrchestrator
         }
     }
 }
+
+/// <summary>
+/// Fase 8 (telemetria) — what a single host probe found, whether or not it
+/// ended up classified as a printer. <see cref="Device"/> is null for any
+/// host that wasn't (same meaning as the old bare-nullable return this
+/// replaced); the three flags let the caller aggregate per-cycle counters
+/// across every host, not just the ones that made it into the result list.
+/// </summary>
+public record ProbeOutcome(DiscoveredDevice? Device, bool SnmpResponded, bool IppResponded, bool Classified);

@@ -48,6 +48,12 @@ public class DiscoveredDevice
 
     /// <summary>Per-protocol outcome (e.g. {"snmp": "success", "ipp": "success", "mdns": "not_available"}) — troubleshooting only, never used to decide anything itself.</summary>
     public Dictionary<string, string>? Diagnostics { get; set; }
+
+    /// <summary>Fase 13 (IPP avançado) — "idle"/"processing"/"stopped" (IPP printer-state), or null when unavailable/device doesn't speak IPP.</summary>
+    public string? PrinterState { get; set; }
+
+    /// <summary>Fase 13 — media currently loaded in the device's trays (IPP media-ready), exactly as reported. Raw/informational, never interpreted.</summary>
+    public List<string>? MediaReady { get; set; }
 }
 
 /// <summary>
@@ -96,6 +102,18 @@ public class DeviceAlert
 public class SubmitDevicesRequest
 {
     public required List<DiscoveredDevice> Devices { get; set; }
+
+    /// <summary>
+    /// Fase 2 (idempotência) — gerado uma vez por lote de descoberta/coleta
+    /// (ver AgentWorker.RunDiscoveryAndCollectionAsync) e reenviado sem
+    /// alteração em qualquer retry desse MESMO lote via OfflineQueue
+    /// (serializa junto com o resto do objeto). A API usa isso pra
+    /// reconhecer um reenvio do mesmo lote (ex.: resposta perdida por rede
+    /// depois de já ter sido gravado) em vez de duplicar leituras. Nulo
+    /// nunca acontece em uso normal — só existiria em algum chamador antigo
+    /// que monte o objeto manualmente sem passar por AgentWorker.
+    /// </summary>
+    public string? CollectionId { get; set; }
 }
 
 public class EnrollRequest

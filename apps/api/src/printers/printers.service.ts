@@ -173,7 +173,13 @@ export class PrintersService {
   async timeline(id: string) {
     await this.findOne(id);
     const [replacements, serviceOrders] = await Promise.all([
-      this.tenantPrisma.client.consumableReplacement.findMany({ where: { printerId: id }, orderBy: { createdAt: 'desc' } }),
+      // CANDIDATE excluded on purpose (Fase 4) — an unconfirmed jump that
+      // might just be a noisy reading has no business showing up as a real
+      // event on the customer-facing timeline before it's confirmed.
+      this.tenantPrisma.client.consumableReplacement.findMany({
+        where: { printerId: id, status: { not: 'CANDIDATE' } },
+        orderBy: { createdAt: 'desc' },
+      }),
       this.tenantPrisma.client.serviceOrder.findMany({ where: { printerId: id }, orderBy: { createdAt: 'desc' } }),
     ]);
 

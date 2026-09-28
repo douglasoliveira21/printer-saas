@@ -1,3 +1,4 @@
+using System.Net;
 using Microsoft.Extensions.Options;
 using PrinterAgent.Core.Api;
 using PrinterAgent.Core.Configuration;
@@ -67,14 +68,19 @@ public class AgentWorker : BackgroundService
                 if (options.DiscoveryEnabled && now - _lastDiscovery >= TimeSpan.FromSeconds(options.DiscoveryIntervalSeconds))
                 {
                     _lastDiscovery = now;
-                    await RunDiscoveryAndCollectionAsync(options, stoppingToken);
+                    _logger.LogDebug("Starting full discovery cycle");
+                    await RunDiscoveryAsync(options, stoppingToken);
                 }
                 else if (now - _lastCollection >= TimeSpan.FromSeconds(options.CollectionIntervalSeconds))
                 {
-                    // Re-collect from already-known devices without a full
-                    // network sweep — cheaper, runs far more often than discovery.
+                    // Fase 10 (separar Discovery de Collection) — re-probes
+                    // only the printers the SaaS already knows about for
+                    // this Agent, not the whole configured network range.
+                    // Full discovery (above) is what catches anything
+                    // genuinely new, on its own longer interval.
                     _lastCollection = now;
-                    await RunDiscoveryAndCollectionAsync(options, stoppingToken);
+                    _logger.LogDebug("Starting collection-only cycle");
+                    await RunCollectionOnlyAsync(options, stoppingToken);
                 }
 
                 // Checked last, after everything else in this cycle has
@@ -127,15 +133,49 @@ public class AgentWorker : BackgroundService
         _snmpV3CredentialStore.UpdateFromRemote(remote?.SnmpV3);
     }
 
-    private async Task RunDiscoveryAndCollectionAsync(AgentOptions options, CancellationToken ct)
+    private async Task RunDiscoveryAsync(AgentOptions options, CancellationToken ct)
     {
         var devices = await _discovery.ScanAsync(options, ct);
+        await SubmitDiscoveredDevicesAsync(devices, ct);
+    }
+
+    /// <summary>
+    /// Fase 10 (separar Discovery de Collection) — fetches this Agent's own
+    /// printer inventory from the SaaS (GET /agent-api/v1/printers — the
+    /// same "Printer Inventory" the phase's own diagram describes) and only
+    /// re-probes MONITORED printers with a real IP, instead of sweeping the
+    /// configured network range again. A printer that's only DISCOVERED
+    /// (never claimed) or IGNORED/DECOMMISSIONED is deliberately excluded —
+    /// nobody is tracking it, re-probing it every cycle would be pure waste.
+    /// If the API call itself fails (network/API down), this cycle is
+    /// simply skipped — it does NOT fall back to a full network sweep,
+    /// which would silently defeat the whole point of this fase and
+    /// surprise an operator who scoped CollectionIntervalSeconds
+    /// specifically to be cheap.
+    /// </summary>
+    private async Task RunCollectionOnlyAsync(AgentOptions options, CancellationToken ct)
+    {
+        var printers = await _apiClient.ListPrintersAsync(ct);
+        var knownIps = printers
+            .Where(p => p.Status == "MONITORED" && !string.IsNullOrWhiteSpace(p.Ip))
+            .Select(p => IPAddress.TryParse(p.Ip, out var ip) ? ip : null)
+            .Where(ip => ip is not null)
+            .Select(ip => ip!)
+            .Distinct()
+            .ToList();
+
+        var devices = await _discovery.CollectAsync(knownIps, options, ct);
+        await SubmitDiscoveredDevicesAsync(devices, ct);
+    }
+
+    private async Task SubmitDiscoveredDevicesAsync(List<DiscoveredDevice> devices, CancellationToken ct)
+    {
         if (devices.Count == 0)
         {
             return;
         }
 
-        var batch = new SubmitDevicesRequest { Devices = devices };
+        var batch = new SubmitDevicesRequest { Devices = devices, CollectionId = Guid.NewGuid().ToString() };
         var sent = await _apiClient.SubmitDevicesAsync(batch, ct);
         if (!sent)
         {
@@ -163,6 +203,15 @@ public class AgentWorker : BackgroundService
 
         if (stillPending.Count > 0)
         {
+            // Fase 8 (telemetria) — this case was previously silent: the
+            // batches went right back into the queue with no signal at all
+            // that the flush attempt itself failed. This is the log line
+            // that answers "por que o Agent desse cliente parou de
+            // coletar?" when the real cause is a persistently unreachable
+            // API, not the discovery side at all.
+            _logger.LogWarning(
+                "offline_queue_size={StillPending} — {Failed} of {Attempted} queued batch(es) still couldn't reach the API this cycle",
+                stillPending.Count, stillPending.Count, pending.Count);
             await _offlineQueue.RequeueAsync(stillPending);
         }
     }

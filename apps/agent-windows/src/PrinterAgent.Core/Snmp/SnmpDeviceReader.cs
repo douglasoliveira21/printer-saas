@@ -213,7 +213,9 @@ public class SnmpDeviceReader
         device.Capabilities.Duplex = await DetectSupportsDuplexAsync(endpoint, communityOctet, version, timeoutMs, ct);
         if (device.Capabilities.Duplex is not null) device.CapabilitySources["duplex"] = "printer_mib";
 
-        device.Alerts = await ReadAlertsAsync(endpoint, communityOctet, version, timeoutMs, ct);
+        device.Alerts = MergeAlerts(
+            await ReadAlertsAsync(endpoint, communityOctet, version, timeoutMs, ct),
+            await ReadCoverAlertsAsync(endpoint, communityOctet, version, timeoutMs, ct));
 
         // sysDescr alone (plain MIB-II) answers from routers, switches, NAS
         // boxes, servers with an SNMP agent installed too — this reader just
@@ -253,7 +255,17 @@ public class SnmpDeviceReader
         }
 
         var colorants = await WalkAsync(endpoint, community, version, PrinterMibOids.PrtMarkerProcessColorantsTable, timeoutMs, ct);
+        return ClassifyCounters(lifeCounts, colorants);
+    }
 
+    /// <summary>
+    /// Fase 14 (testes finais) — extracted so this classification (the
+    /// actual "which marker is mono vs. color" logic) is directly
+    /// unit-testable without a live SNMP walk: v1/v2c and v3 share this one
+    /// implementation instead of duplicating it.
+    /// </summary>
+    internal static DeviceCounters ClassifyCounters(Dictionary<string, string> lifeCounts, Dictionary<string, string> colorants)
+    {
         int? total = null, blackWhite = null, color = null;
         foreach (var (oid, raw) in lifeCounts)
         {
@@ -297,6 +309,9 @@ public class SnmpDeviceReader
 
             var levels = await WalkAsync(endpoint, community, version, PrinterMibOids.PrtMarkerSuppliesLevelTable, timeoutMs, ct);
             var capacities = await WalkAsync(endpoint, community, version, PrinterMibOids.PrtMarkerSuppliesMaxCapacityTable, timeoutMs, ct);
+            var types = await WalkAsync(endpoint, community, version, PrinterMibOids.PrtMarkerSuppliesTypeTable, timeoutMs, ct);
+            var colorantIndexes = await WalkAsync(endpoint, community, version, PrinterMibOids.PrtMarkerSuppliesColorantIndexTable, timeoutMs, ct);
+            var colorantValues = await WalkAsync(endpoint, community, version, PrinterMibOids.PrtMarkerColorantValueTable, timeoutMs, ct);
 
             var result = new List<DeviceConsumable>();
             foreach (var (oid, description) in descriptions)
@@ -308,9 +323,8 @@ public class SnmpDeviceReader
                     continue;
                 }
 
-                var color = PrinterMibOids.SupplyColorKeywords
-                    .FirstOrDefault(k => name.Contains(k.Keyword, StringComparison.OrdinalIgnoreCase))
-                    .Color;
+                var color = ResolveSupplyColor(name, index, colorantIndexes, colorantValues,
+                    PrinterMibOids.PrtMarkerSuppliesColorantIndexTable, PrinterMibOids.PrtMarkerColorantValueTable);
 
                 double? levelPercent = null;
                 if (levels.TryGetValue($"{PrinterMibOids.PrtMarkerSuppliesLevelTable}.{index}", out var levelRaw) &&
@@ -323,7 +337,7 @@ public class SnmpDeviceReader
 
                 result.Add(new DeviceConsumable
                 {
-                    Type = "toner",
+                    Type = ResolveSupplyType(index, types, PrinterMibOids.PrtMarkerSuppliesTypeTable),
                     Color = color,
                     Name = name,
                     LevelPercent = levelPercent,
@@ -338,6 +352,122 @@ public class SnmpDeviceReader
             _logger.LogDebug(ex, "Supplies table not available for {Endpoint}", endpoint);
             return null;
         }
+    }
+
+    /// <summary>
+    /// prtMarkerSuppliesType (PrtMarkerSuppliesTypeTC, IANA-PRINTER-MIB — see
+    /// PrinterMibOids.MarkerSuppliesTypeNames for the sourced enum). Falls
+    /// back to "toner" — never null, DeviceConsumable.Type is required —
+    /// only when the device genuinely doesn't answer this column at all,
+    /// which was this codebase's entire previous behavior for every device
+    /// (spec §67: this is a documented fallback, not a new guess).
+    /// </summary>
+    internal static string ResolveSupplyType(string index, Dictionary<string, string> types, string typeTableOid) =>
+        types.TryGetValue($"{typeTableOid}.{index}", out var raw) &&
+        int.TryParse(raw, out var typeValue) &&
+        PrinterMibOids.MarkerSuppliesTypeNames.TryGetValue(typeValue, out var name)
+            ? name
+            : "toner";
+
+    /// <summary>
+    /// Prefers the real prtMarkerColorantValue (RFC 3805: standardized ISO
+    /// 10175/10180 color name, via prtMarkerSuppliesColorantIndex) over the
+    /// keyword match against the free-text supply description — falls back
+    /// to the keyword match only when the device has no colorant table row
+    /// for this supply (colorantIndex 0, or table not implemented at all).
+    /// </summary>
+    internal static string? ResolveSupplyColor(
+        string name, string index,
+        Dictionary<string, string> colorantIndexes, Dictionary<string, string> colorantValues,
+        string colorantIndexTableOid, string colorantValueTableOid)
+    {
+        if (colorantIndexes.TryGetValue($"{colorantIndexTableOid}.{index}", out var colorantIndexRaw) &&
+            int.TryParse(colorantIndexRaw, out var colorantIndex) && colorantIndex > 0 &&
+            colorantValues.TryGetValue($"{colorantValueTableOid}.{colorantIndex}", out var colorantValue))
+        {
+            var trimmed = colorantValue.Trim();
+            if (trimmed.Length > 0 && !trimmed.Equals("other", StringComparison.OrdinalIgnoreCase) &&
+                !trimmed.Equals("unknown", StringComparison.OrdinalIgnoreCase))
+            {
+                return trimmed.ToLowerInvariant();
+            }
+        }
+
+        return PrinterMibOids.SupplyColorKeywords
+            .FirstOrDefault(k => name.Contains(k.Keyword, StringComparison.OrdinalIgnoreCase))
+            .Color;
+    }
+
+    private static List<DeviceAlert>? MergeAlerts(List<DeviceAlert>? alerts, List<DeviceAlert>? coverAlerts)
+    {
+        if (coverAlerts is null || coverAlerts.Count == 0)
+        {
+            return alerts;
+        }
+        var merged = alerts is null ? new List<DeviceAlert>() : new List<DeviceAlert>(alerts);
+        merged.AddRange(coverAlerts);
+        return merged;
+    }
+
+    /// <summary>
+    /// Walks the Printer-MIB cover table (RFC 3805 prtCoverTable — one row
+    /// per cover/access panel, e.g. front door, duplexer cover) and reports
+    /// only the covers that aren't closed as synthetic alerts, reusing the
+    /// existing prtAlertTable pipeline instead of adding a whole new DB
+    /// table/schema for something that's closed on the overwhelming
+    /// majority of polls. Code is "COVER_OPEN"/"COVER_INTERLOCK_OPEN" (never
+    /// collides with a real prtAlertCode, which RFC 3805 defines as a
+    /// dotted-numeric string) so the alert bridge and UI can tell them
+    /// apart from a genuine device-reported alert if that's ever needed.
+    /// </summary>
+    private async Task<List<DeviceAlert>?> ReadCoverAlertsAsync(IPEndPoint endpoint, OctetString community, VersionCode version, int timeoutMs, CancellationToken ct)
+    {
+        try
+        {
+            var statuses = await WalkAsync(endpoint, community, version, PrinterMibOids.PrtCoverStatusTable, timeoutMs, ct);
+            if (statuses.Count == 0)
+            {
+                return null;
+            }
+            var descriptions = await WalkAsync(endpoint, community, version, PrinterMibOids.PrtCoverDescriptionTable, timeoutMs, ct);
+            return BuildCoverAlerts(statuses, descriptions, PrinterMibOids.PrtCoverStatusTable, PrinterMibOids.PrtCoverDescriptionTable);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "Cover table not available for {Endpoint}", endpoint);
+            return null;
+        }
+    }
+
+    internal static List<DeviceAlert>? BuildCoverAlerts(
+        Dictionary<string, string> statuses, Dictionary<string, string> descriptions,
+        string statusTableOid, string descriptionTableOid)
+    {
+        var result = new List<DeviceAlert>();
+        foreach (var (oid, raw) in statuses)
+        {
+            if (!int.TryParse(raw, out var statusValue) ||
+                !PrinterMibOids.CoverStatusNames.TryGetValue(statusValue, out var statusName))
+            {
+                continue;
+            }
+            // other(1) and closed(4) are not alert-worthy — only a
+            // definitively OPEN state (regular or interlock) is.
+            if (statusName is not ("open" or "interlockOpen"))
+            {
+                continue;
+            }
+
+            var index = oid[(oid.LastIndexOf('.') + 1)..];
+            var description = descriptions.GetValueOrDefault($"{descriptionTableOid}.{index}")?.Trim();
+            result.Add(new DeviceAlert
+            {
+                Code = statusName == "interlockOpen" ? "COVER_INTERLOCK_OPEN" : "COVER_OPEN",
+                Description = string.IsNullOrWhiteSpace(description) ? "Tampa/painel aberto" : description,
+                Severity = "warning",
+            });
+        }
+        return result.Count > 0 ? result : null;
     }
 
     /// <summary>
@@ -526,7 +656,7 @@ public class SnmpDeviceReader
     /// and OctetString aren't affected (their ToString() already returns the
     /// plain value), so this only special-cases the three broken types.
     /// </summary>
-    private static string FormatSnmpData(ISnmpData data) => data switch
+    internal static string FormatSnmpData(ISnmpData data) => data switch
     {
         Counter32 c32 => c32.Value.ToString(),
         Gauge32 g32 => g32.Value.ToString(),
@@ -731,7 +861,9 @@ public class SnmpDeviceReader
         device.Capabilities.Duplex = await DetectSupportsDuplexV3Async(endpoint, privacyProvider, contextName, userName, report, timeoutMs, ct);
         if (device.Capabilities.Duplex is not null) device.CapabilitySources["duplex"] = "printer_mib";
 
-        device.Alerts = await ReadAlertsV3Async(endpoint, privacyProvider, contextName, userName, report, timeoutMs, ct);
+        device.Alerts = MergeAlerts(
+            await ReadAlertsV3Async(endpoint, privacyProvider, contextName, userName, report, timeoutMs, ct),
+            await ReadCoverAlertsV3Async(endpoint, privacyProvider, contextName, userName, report, timeoutMs, ct));
 
         return new SnmpProbeResult
         {
@@ -882,35 +1014,7 @@ public class SnmpDeviceReader
         }
 
         var colorants = await WalkV3Async(endpoint, privacyProvider, contextName, userName, report, PrinterMibOids.PrtMarkerProcessColorantsTable, timeoutMs, ct);
-
-        int? total = null, blackWhite = null, color = null;
-        foreach (var (oid, raw) in lifeCounts)
-        {
-            if (!int.TryParse(raw, out var count))
-            {
-                continue;
-            }
-            total = (total ?? 0) + count;
-
-            var index = oid[(oid.LastIndexOf('.') + 1)..];
-            var colorant = colorants.GetValueOrDefault($"{PrinterMibOids.PrtMarkerProcessColorantsTable}.{index}");
-            if (colorant is null)
-            {
-                continue;
-            }
-
-            var isMono = !new[] { "cyan", "magenta", "yellow" }.Any(c => colorant.Contains(c, StringComparison.OrdinalIgnoreCase));
-            if (isMono)
-            {
-                blackWhite = (blackWhite ?? 0) + count;
-            }
-            else
-            {
-                color = (color ?? 0) + count;
-            }
-        }
-
-        return new DeviceCounters { Total = total, BlackWhite = blackWhite, Color = color };
+        return ClassifyCounters(lifeCounts, colorants);
     }
 
     private async Task<List<DeviceConsumable>?> ReadSuppliesV3Async(IPEndPoint endpoint, IPrivacyProvider privacyProvider, OctetString contextName, OctetString userName, ISnmpMessage report, int timeoutMs, CancellationToken ct)
@@ -925,6 +1029,9 @@ public class SnmpDeviceReader
 
             var levels = await WalkV3Async(endpoint, privacyProvider, contextName, userName, report, PrinterMibOids.PrtMarkerSuppliesLevelTable, timeoutMs, ct);
             var capacities = await WalkV3Async(endpoint, privacyProvider, contextName, userName, report, PrinterMibOids.PrtMarkerSuppliesMaxCapacityTable, timeoutMs, ct);
+            var types = await WalkV3Async(endpoint, privacyProvider, contextName, userName, report, PrinterMibOids.PrtMarkerSuppliesTypeTable, timeoutMs, ct);
+            var colorantIndexes = await WalkV3Async(endpoint, privacyProvider, contextName, userName, report, PrinterMibOids.PrtMarkerSuppliesColorantIndexTable, timeoutMs, ct);
+            var colorantValues = await WalkV3Async(endpoint, privacyProvider, contextName, userName, report, PrinterMibOids.PrtMarkerColorantValueTable, timeoutMs, ct);
 
             var result = new List<DeviceConsumable>();
             foreach (var (oid, description) in descriptions)
@@ -936,9 +1043,8 @@ public class SnmpDeviceReader
                     continue;
                 }
 
-                var color = PrinterMibOids.SupplyColorKeywords
-                    .FirstOrDefault(k => name.Contains(k.Keyword, StringComparison.OrdinalIgnoreCase))
-                    .Color;
+                var color = ResolveSupplyColor(name, index, colorantIndexes, colorantValues,
+                    PrinterMibOids.PrtMarkerSuppliesColorantIndexTable, PrinterMibOids.PrtMarkerColorantValueTable);
 
                 double? levelPercent = null;
                 if (levels.TryGetValue($"{PrinterMibOids.PrtMarkerSuppliesLevelTable}.{index}", out var levelRaw) &&
@@ -950,7 +1056,7 @@ public class SnmpDeviceReader
 
                 result.Add(new DeviceConsumable
                 {
-                    Type = "toner",
+                    Type = ResolveSupplyType(index, types, PrinterMibOids.PrtMarkerSuppliesTypeTable),
                     Color = color,
                     Name = name,
                     LevelPercent = levelPercent,
@@ -963,6 +1069,25 @@ public class SnmpDeviceReader
         catch (Exception ex)
         {
             _logger.LogDebug(ex, "Supplies table not available for {Endpoint}", endpoint);
+            return null;
+        }
+    }
+
+    private async Task<List<DeviceAlert>?> ReadCoverAlertsV3Async(IPEndPoint endpoint, IPrivacyProvider privacyProvider, OctetString contextName, OctetString userName, ISnmpMessage report, int timeoutMs, CancellationToken ct)
+    {
+        try
+        {
+            var statuses = await WalkV3Async(endpoint, privacyProvider, contextName, userName, report, PrinterMibOids.PrtCoverStatusTable, timeoutMs, ct);
+            if (statuses.Count == 0)
+            {
+                return null;
+            }
+            var descriptions = await WalkV3Async(endpoint, privacyProvider, contextName, userName, report, PrinterMibOids.PrtCoverDescriptionTable, timeoutMs, ct);
+            return BuildCoverAlerts(statuses, descriptions, PrinterMibOids.PrtCoverStatusTable, PrinterMibOids.PrtCoverDescriptionTable);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "Cover table not available for {Endpoint}", endpoint);
             return null;
         }
     }

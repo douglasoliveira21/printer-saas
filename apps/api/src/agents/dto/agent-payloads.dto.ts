@@ -7,6 +7,7 @@ import {
   IsNumber,
   IsOptional,
   IsString,
+  IsUUID,
   ValidateNested,
 } from 'class-validator';
 
@@ -219,4 +220,11 @@ export class SubmitDevicesDto {
   @ValidateNested({ each: true })
   @Type(() => DeviceDto)
   devices!: DeviceDto[];
+
+  // Optional so Agents older than this feature (no collectionId sent) keep
+  // working exactly as before — see AgentsService.submitDevices, which only
+  // applies the idempotency guard when this is present.
+  @IsOptional()
+  @IsUUID()
+  collectionId?: string;
 }

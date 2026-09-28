@@ -62,16 +62,38 @@ try
     // only matters before that first successful poll, or if the server has
     // nothing configured for this Agent at all.
     builder.Services.AddSingleton<SnmpV3EngineDiscovery>();
+    builder.Services.AddSingleton<SnmpV3CredentialFileStore>();
     builder.Services.AddSingleton<SnmpV3CredentialStore>(sp =>
     {
         var options = sp.GetRequiredService<IOptions<AgentOptions>>().Value;
-        if (string.IsNullOrWhiteSpace(options.SnmpV3?.UserName))
+        // Fase 6: the encrypted store is authoritative once it exists;
+        // LoadOrMigrate transparently copies appsettings.json's plaintext
+        // "SnmpV3" section into it (and scrubs the passwords out of the
+        // plaintext file) the first time this runs after upgrading — see
+        // SnmpV3CredentialFileStore's own doc comment.
+        var fileStore = sp.GetRequiredService<SnmpV3CredentialFileStore>();
+        // The Service's own exe already runs from the installed Service
+        // folder (see WindowsServiceInstaller.ServiceInstallPath, a
+        // ConfigTool-only type this project can't reference) — its own
+        // appsettings.json is always right next to it.
+        var appsettingsPath = Path.Combine(AppContext.BaseDirectory, "appsettings.json");
+        var stored = fileStore.LoadOrMigrate(options.SnmpV3, appsettingsPath);
+        if (string.IsNullOrWhiteSpace(stored?.UserName))
         {
             return new SnmpV3CredentialStore(null);
         }
         try
         {
-            return new SnmpV3CredentialStore(new SnmpV3Credentials(options.SnmpV3));
+            return new SnmpV3CredentialStore(new SnmpV3Credentials(new SnmpV3Options
+            {
+                UserName = stored.UserName,
+                SecurityLevel = stored.SecurityLevel,
+                AuthenticationProtocol = stored.AuthenticationProtocol,
+                AuthenticationPassword = stored.AuthenticationPassword,
+                PrivacyProtocol = stored.PrivacyProtocol,
+                PrivacyPassword = stored.PrivacyPassword,
+                ContextName = stored.ContextName,
+            }));
         }
         catch (Exception ex)
         {
@@ -90,6 +112,7 @@ try
     
     builder.Services.AddSingleton<ModelDatabase>();
     builder.Services.AddSingleton<MdnsProbe>();
+    builder.Services.AddSingleton<WsDiscoveryProbe>();
     builder.Services.AddSingleton<DeviceProbeOrchestrator>();
     builder.Services.AddSingleton<PrinterDiscoveryService>();
     builder.Services.AddSingleton<AgentUpdateChecker>();

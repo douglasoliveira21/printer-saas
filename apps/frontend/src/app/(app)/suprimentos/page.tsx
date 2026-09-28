@@ -19,6 +19,9 @@ function urgencyVariant(daysRemaining: number): "destructive" | "secondary" | "o
 
 const REPLACEMENT_STATUS_LABEL: Record<ConsumableReplacementStatus, string> = {
   PREDICTED: "Prevista",
+  // Salto de nível visto uma vez, aguardando a próxima leitura confirmar que
+  // não foi só uma leitura ruidosa antes de virar uma troca de verdade.
+  CANDIDATE: "Aguardando confirmação",
   CONFIRMED: "Confirmada",
   PREMATURE: "Prematura",
   DISMISSED: "Descartada",
@@ -26,6 +29,7 @@ const REPLACEMENT_STATUS_LABEL: Record<ConsumableReplacementStatus, string> = {
 
 const REPLACEMENT_STATUS_VARIANT: Record<ConsumableReplacementStatus, "default" | "secondary" | "destructive" | "outline"> = {
   PREDICTED: "outline",
+  CANDIDATE: "outline",
   CONFIRMED: "default",
   PREMATURE: "destructive",
   DISMISSED: "secondary",
@@ -127,6 +131,7 @@ export default function SuprimentosPage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="PREDICTED">Previstas</SelectItem>
+                <SelectItem value="CANDIDATE">Aguardando confirmação</SelectItem>
                 <SelectItem value="CONFIRMED">Confirmadas</SelectItem>
                 <SelectItem value="PREMATURE">Prematuras</SelectItem>
                 <SelectItem value="DISMISSED">Descartadas</SelectItem>

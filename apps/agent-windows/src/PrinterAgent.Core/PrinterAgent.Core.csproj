@@ -17,4 +17,8 @@
     <EmbeddedResource Include="Discovery\printer-model-database.json" />
   </ItemGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="PrinterAgent.Core.Tests" />
+  </ItemGroup>
+
 </Project>
