@@ -213,6 +213,20 @@ class DeviceDto {
 
   @IsOptional()
   diagnostics?: Record<string, string>;
+
+  // Fase 13 (IPP avançado) — printer-state/media-ready. Faltavam aqui desde
+  // que o Agent passou a enviá-los: com `forbidNonWhitelisted: true` (ver
+  // main.ts), a API rejeitava o lote INTEIRO com 400 assim que um device
+  // continha qualquer um desses dois campos — o que fazia a varredura
+  // "encontrar" impressoras no Agent, mas nenhuma delas chegar a ser salva.
+  @IsOptional()
+  @IsString()
+  printerState?: string;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  mediaReady?: string[];
 }
 
 export class SubmitDevicesDto {

@@ -22,14 +22,16 @@ public class DeviceProbeOrchestrator
     private readonly SnmpDeviceReader _snmpReader;
     private readonly IppClient _ippClient;
     private readonly ModelDatabase _modelDatabase;
+    private readonly SamsungCountersClient _samsungCountersClient;
     private readonly ILogger<DeviceProbeOrchestrator> _logger;
 
     public DeviceProbeOrchestrator(
-        SnmpDeviceReader snmpReader, IppClient ippClient, ModelDatabase modelDatabase, ILogger<DeviceProbeOrchestrator> logger)
+        SnmpDeviceReader snmpReader, IppClient ippClient, ModelDatabase modelDatabase, SamsungCountersClient samsungCountersClient, ILogger<DeviceProbeOrchestrator> logger)
     {
         _snmpReader = snmpReader;
         _ippClient = ippClient;
         _modelDatabase = modelDatabase;
+        _samsungCountersClient = samsungCountersClient;
         _logger = logger;
     }
 
@@ -145,6 +147,21 @@ public class DeviceProbeOrchestrator
 
         MergeIppData(device, ipp, modelFromPrinterMib: snmp?.ModelFromPrinterMib ?? false);
 
+        // Samsung's SyncThru embedded web page exposes a print/copy/scan/
+        // duplex breakdown Printer-MIB has no OID for at all (confirmed
+        // against a real SL-M4070FR — see SamsungCountersClient's own doc
+        // comment). Only tried once the manufacturer is already confirmed
+        // Samsung by SNMP/IPP above — never guessed for anything else.
+        if (!string.IsNullOrWhiteSpace(device.Manufacturer) && device.Manufacturer.Contains("Samsung", StringComparison.OrdinalIgnoreCase))
+        {
+            var samsungCounters = await SafeAsync(
+                () => _samsungCountersClient.ProbeAsync(ipText, auxTimeoutMs, ct), "samsung_counters", diagnostics, _logger);
+            if (samsungCounters is not null)
+            {
+                MergeSamsungCounters(device, samsungCounters);
+            }
+        }
+
         // Must run against the RAW model string, before the display-name
         // rewrite below replaces it — only fires for a specifically
         // identified unit (exact match), never a fuzzy family guess.
@@ -227,6 +244,39 @@ public class DeviceProbeOrchestrator
         device.Diagnostics = new Dictionary<string, string>(diagnostics);
 
         return new ProbeOutcome(device, snmpResponded, ippResponded, Classified: true);
+    }
+
+    /// <summary>
+    /// Samsung SyncThru's breakdown never overrides SNMP's Total/BlackWhite/
+    /// Color (Printer-MIB stays the authoritative source for those — it's
+    /// the one this whole pipeline already trusts and cross-checks
+    /// elsewhere). Copies has no SNMP source at all today, so this is
+    /// always additive there. Duplex/report/fax/grand-total have nowhere
+    /// else to live in <see cref="DeviceCounters"/> yet, so they go into
+    /// Raw — the field this codebase already documents as "original values
+    /// as received from agent", exactly what this is.
+    /// </summary>
+    internal static void MergeSamsungCounters(DiscoveredDevice device, SamsungCounterSnapshot counters)
+    {
+        device.Counters ??= new DeviceCounters();
+        device.Counters.Copies ??= counters.CopyTotal;
+
+        device.Counters.Raw ??= new Dictionary<string, object?>();
+        void SetIfPresent(string key, int? value)
+        {
+            if (value is not null) device.Counters.Raw[key] = value;
+        }
+        SetIfPresent("samsung_print_total", counters.PrintTotal);
+        SetIfPresent("samsung_fax_total", counters.FaxTotal);
+        SetIfPresent("samsung_report_total", counters.ReportTotal);
+        SetIfPresent("samsung_grand_total", counters.GrandTotal);
+        SetIfPresent("samsung_duplex_total", counters.DuplexTotal);
+        SetIfPresent("samsung_scan_total", counters.ScanTotal);
+
+        if (counters.CopyTotal is not null)
+        {
+            device.CapabilitySources["copies"] = "samsung_syncthru";
+        }
     }
 
     internal static void MergeIppData(DiscoveredDevice device, IppProbeResult? ipp, bool modelFromPrinterMib)

@@ -5,6 +5,7 @@ using PrinterAgent.Core.Discovery;
 using PrinterAgent.Core.Discovery.Dns;
 using PrinterAgent.Core.Discovery.Ipp;
 using PrinterAgent.Core.Snmp;
+using PrinterAgent.Core.Vendors;
 using Xunit;
 
 namespace PrinterAgent.Core.Tests;
@@ -16,8 +17,9 @@ public class PrinterDiscoveryServiceTests
     {
         var snmpReader = new SnmpDeviceReader(NullLogger<SnmpDeviceReader>.Instance);
         var ippClient = new IppClient(new HttpClient(), NullLogger<IppClient>.Instance);
+        var samsungCountersClient = new SamsungCountersClient(new HttpClient(), NullLogger<SamsungCountersClient>.Instance);
         var modelDatabase = new ModelDatabase(NullLogger<ModelDatabase>.Instance);
-        var orchestrator = new DeviceProbeOrchestrator(snmpReader, ippClient, modelDatabase, NullLogger<DeviceProbeOrchestrator>.Instance);
+        var orchestrator = new DeviceProbeOrchestrator(snmpReader, ippClient, modelDatabase, samsungCountersClient, NullLogger<DeviceProbeOrchestrator>.Instance);
         var mdnsProbe = new MdnsProbe(NullLogger<MdnsProbe>.Instance);
         var wsDiscoveryProbe = new WsDiscoveryProbe(NullLogger<WsDiscoveryProbe>.Instance);
         return new PrinterDiscoveryService(orchestrator, mdnsProbe, wsDiscoveryProbe, NullLogger<PrinterDiscoveryService>.Instance);
@@ -66,8 +68,9 @@ public class PrinterDiscoveryServiceTests
     {
         var snmpReader = new SnmpDeviceReader(NullLogger<SnmpDeviceReader>.Instance);
         var ippClient = new IppClient(new HttpClient(), NullLogger<IppClient>.Instance);
+        var samsungCountersClient = new SamsungCountersClient(new HttpClient(), NullLogger<SamsungCountersClient>.Instance);
         var modelDatabase = new ModelDatabase(NullLogger<ModelDatabase>.Instance);
-        var orchestrator = new DeviceProbeOrchestrator(snmpReader, ippClient, modelDatabase, NullLogger<DeviceProbeOrchestrator>.Instance);
+        var orchestrator = new DeviceProbeOrchestrator(snmpReader, ippClient, modelDatabase, samsungCountersClient, NullLogger<DeviceProbeOrchestrator>.Instance);
         var mdnsProbe = new MdnsProbe(NullLogger<MdnsProbe>.Instance);
         var wsDiscoveryProbe = new WsDiscoveryProbe(NullLogger<WsDiscoveryProbe>.Instance);
         var capturingLogger = new CapturingLogger<PrinterDiscoveryService>();
@@ -102,8 +105,9 @@ public class PrinterDiscoveryServiceTests
     {
         var snmpReader = new SnmpDeviceReader(NullLogger<SnmpDeviceReader>.Instance);
         var ippClient = new IppClient(new HttpClient(), NullLogger<IppClient>.Instance);
+        var samsungCountersClient = new SamsungCountersClient(new HttpClient(), NullLogger<SamsungCountersClient>.Instance);
         var modelDatabase = new ModelDatabase(NullLogger<ModelDatabase>.Instance);
-        var orchestrator = new DeviceProbeOrchestrator(snmpReader, ippClient, modelDatabase, NullLogger<DeviceProbeOrchestrator>.Instance);
+        var orchestrator = new DeviceProbeOrchestrator(snmpReader, ippClient, modelDatabase, samsungCountersClient, NullLogger<DeviceProbeOrchestrator>.Instance);
         var mdnsProbe = new MdnsProbe(NullLogger<MdnsProbe>.Instance);
         var wsDiscoveryProbe = new WsDiscoveryProbe(NullLogger<WsDiscoveryProbe>.Instance);
         var capturingLogger = new CapturingLogger<PrinterDiscoveryService>();

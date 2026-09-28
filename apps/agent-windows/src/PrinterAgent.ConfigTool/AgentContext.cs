@@ -9,6 +9,7 @@ using PrinterAgent.Core.Discovery;
 using PrinterAgent.Core.Discovery.Dns;
 using PrinterAgent.Core.Discovery.Ipp;
 using PrinterAgent.Core.Snmp;
+using PrinterAgent.Core.Vendors;
 
 namespace PrinterAgent.ConfigTool;
 
@@ -53,7 +54,8 @@ public class AgentContext
 
         var ippClient = new IppClient(new HttpClient { Timeout = TimeSpan.FromSeconds(5) }, NullLogger<IppClient>.Instance);
         var modelDatabase = new ModelDatabase(NullLogger<ModelDatabase>.Instance);
-        var orchestrator = new DeviceProbeOrchestrator(SnmpReader, ippClient, modelDatabase, NullLogger<DeviceProbeOrchestrator>.Instance);
+        var samsungCountersClient = new SamsungCountersClient(new HttpClient { Timeout = TimeSpan.FromSeconds(5) }, NullLogger<SamsungCountersClient>.Instance);
+        var orchestrator = new DeviceProbeOrchestrator(SnmpReader, ippClient, modelDatabase, samsungCountersClient, NullLogger<DeviceProbeOrchestrator>.Instance);
         var mdnsProbe = new MdnsProbe(NullLogger<MdnsProbe>.Instance);
         var wsDiscoveryProbe = new WsDiscoveryProbe(NullLogger<WsDiscoveryProbe>.Instance);
         DiscoveryService = new PrinterDiscoveryService(orchestrator, mdnsProbe, wsDiscoveryProbe, NullLogger<PrinterDiscoveryService>.Instance);
