@@ -12,9 +12,9 @@ export function CountersList({ counter, capabilities }: { counter: CounterReadin
     { label: "Geral P&B", value: counter?.blackWhite },
     { label: "Geral colorida total", value: counter?.color, requires: ["color"] },
     { label: "Geral cor única", value: undefined, requires: ["color"] },
-    { label: "Impressão P&B", value: undefined },
+    { label: "Impressão P&B", value: counter?.printPages },
     { label: "Impressão colorida total", value: undefined, requires: ["color"] },
-    { label: "Cópia P&B", value: undefined, requires: ["copy"] },
+    { label: "Cópia P&B", value: counter?.copies, requires: ["copy"] },
     // Cópia/A3 "colorida" precisam da impressora ser colorida E ter a
     // outra capacidade ao mesmo tempo — antes só checava uma das duas, o
     // que mostrava "colorida" pra multifuncional P&B com cópia (ou pra
@@ -25,7 +25,7 @@ export function CountersList({ counter, capabilities }: { counter: CounterReadin
     { label: "A3 P&B", value: undefined, requires: ["a3"] },
     { label: "Cópia A3 colorida total", value: undefined, requires: ["a3", "copy", "color"] },
     { label: "Cópia A3 P&B", value: undefined, requires: ["a3", "copy"] },
-    { label: "Duplex", value: undefined, requires: ["duplex"] },
+    { label: "Duplex", value: counter?.duplexPages, requires: ["duplex"] },
     { label: "Impressão A3 colorida total", value: undefined, requires: ["a3", "color"] },
   ];
 

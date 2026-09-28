@@ -189,6 +189,8 @@ export interface CounterReading {
   blackWhite: number | null;
   color: number | null;
   copies: number | null;
+  printPages: number | null;
+  duplexPages: number | null;
   collectedAt: string;
 }
 

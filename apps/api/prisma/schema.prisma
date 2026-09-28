@@ -770,6 +770,14 @@ model CounterReading {
   blackWhite    Int?
   color         Int?
   copies        Int?
+  // Impressões via driver/rede, separado de cópias via painel — sem OID
+  // Printer-MIB (RFC 3805 não distingue origem do job), só disponível hoje
+  // via fonte vendor-specific (ex.: SamsungCountersClient no Agent). null
+  // quando o dispositivo/fonte não distingue isso de "total".
+  printPages    Int?
+  // Folhas duplex — mesma limitação de printPages: sem OID padrão, só
+  // disponível via fonte vendor-specific até agora.
+  duplexPages   Int?
   raw           Json? // original values + OIDs as received from agent
   collectedAt   DateTime             @default(now())
   // Fase 3 (proteção contra regressão) — comparado contra a leitura anterior

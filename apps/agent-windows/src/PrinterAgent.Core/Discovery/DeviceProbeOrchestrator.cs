@@ -260,22 +260,32 @@ public class DeviceProbeOrchestrator
     {
         device.Counters ??= new DeviceCounters();
         device.Counters.Copies ??= counters.CopyTotal;
+        device.Counters.PrintPages ??= counters.PrintTotal;
+        device.Counters.DuplexPages ??= counters.DuplexTotal;
 
+        // Fax/report/grand-total have no dedicated field in DeviceCounters
+        // yet (no UI surfaces them today) — kept in Raw for audit/troubleshooting.
         device.Counters.Raw ??= new Dictionary<string, object?>();
         void SetIfPresent(string key, int? value)
         {
             if (value is not null) device.Counters.Raw[key] = value;
         }
-        SetIfPresent("samsung_print_total", counters.PrintTotal);
         SetIfPresent("samsung_fax_total", counters.FaxTotal);
         SetIfPresent("samsung_report_total", counters.ReportTotal);
         SetIfPresent("samsung_grand_total", counters.GrandTotal);
-        SetIfPresent("samsung_duplex_total", counters.DuplexTotal);
         SetIfPresent("samsung_scan_total", counters.ScanTotal);
 
         if (counters.CopyTotal is not null)
         {
             device.CapabilitySources["copies"] = "samsung_syncthru";
+        }
+        if (counters.PrintTotal is not null)
+        {
+            device.CapabilitySources["printPages"] = "samsung_syncthru";
+        }
+        if (counters.DuplexTotal is not null)
+        {
+            device.CapabilitySources["duplexPages"] = "samsung_syncthru";
         }
     }
 

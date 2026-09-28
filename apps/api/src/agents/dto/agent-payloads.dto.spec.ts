@@ -32,7 +32,7 @@ describe('SubmitDevicesDto — todo campo que o Agent envia precisa estar whitel
           model: 'SL-M4070FR',
           firmware: 'V4.00.01.15',
           sysDescr: 'Samsung SL-M4070FR',
-          counters: { total: 272, blackWhite: 262, color: 0, copies: 22, raw: { samsung_duplex_total: 10 } },
+          counters: { total: 272, blackWhite: 262, color: 0, copies: 22, printPages: 242, duplexPages: 10, raw: { samsung_report_total: 8 } },
           consumables: [{ type: 'toner', color: 'black', levelPercent: 83, capacity: '15000', name: 'Black Toner Cartridge' }],
           collectionMethod: 'SNMP',
           supportsA3: false,

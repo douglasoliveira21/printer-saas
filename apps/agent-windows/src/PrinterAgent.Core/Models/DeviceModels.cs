@@ -78,6 +78,18 @@ public class DeviceCounters
     public int? BlackWhite { get; set; }
     public int? Color { get; set; }
     public int? Copies { get; set; }
+
+    /// <summary>
+    /// Prints originated from network/driver jobs, separate from copies —
+    /// no Printer-MIB OID (RFC 3805 doesn't distinguish job origin), only
+    /// available today via a vendor-specific source (see
+    /// Vendors/SamsungCountersClient.cs).
+    /// </summary>
+    public int? PrintPages { get; set; }
+
+    /// <summary>Duplex sheet/page count — same limitation as <see cref="PrintPages"/>, no standard OID.</summary>
+    public int? DuplexPages { get; set; }
+
     public Dictionary<string, object?>? Raw { get; set; }
 }
 

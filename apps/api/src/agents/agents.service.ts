@@ -374,6 +374,8 @@ export class AgentsService {
             blackWhite: device.counters.blackWhite,
             color: device.counters.color,
             copies: device.counters.copies,
+            printPages: device.counters.printPages,
+            duplexPages: device.counters.duplexPages,
             raw: device.counters.raw as any,
             status,
             previousTotal,

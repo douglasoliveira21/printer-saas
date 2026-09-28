@@ -60,6 +60,14 @@ class DeviceCountersDto {
   copies?: number;
 
   @IsOptional()
+  @IsInt()
+  printPages?: number;
+
+  @IsOptional()
+  @IsInt()
+  duplexPages?: number;
+
+  @IsOptional()
   raw?: Record<string, unknown>;
 }
 

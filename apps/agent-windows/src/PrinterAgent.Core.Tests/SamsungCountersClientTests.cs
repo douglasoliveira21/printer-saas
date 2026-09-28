@@ -85,7 +85,7 @@ public class SamsungCountersClientTests
     }
 
     [Fact]
-    public void MergeSamsungCounters_preenche_Copies_quando_SNMP_nao_tinha_nenhum_contador()
+    public void MergeSamsungCounters_preenche_Copies_PrintPages_e_DuplexPages_quando_SNMP_nao_tinha_nenhum_contador()
     {
         var device = new DiscoveredDevice { Counters = null };
         var snapshot = SamsungCountersClient.Parse(RealSampleResponse);
@@ -93,7 +93,11 @@ public class SamsungCountersClientTests
         DeviceProbeOrchestrator.MergeSamsungCounters(device, snapshot);
 
         Assert.Equal(22, device.Counters!.Copies);
+        Assert.Equal(242, device.Counters.PrintPages);
+        Assert.Equal(10, device.Counters.DuplexPages);
         Assert.Equal("samsung_syncthru", device.CapabilitySources["copies"]);
+        Assert.Equal("samsung_syncthru", device.CapabilitySources["printPages"]);
+        Assert.Equal("samsung_syncthru", device.CapabilitySources["duplexPages"]);
     }
 
     [Fact]
@@ -110,20 +114,37 @@ public class SamsungCountersClientTests
         Assert.Equal(999, device.Counters.Total);
         Assert.Equal(999, device.Counters.BlackWhite);
         Assert.Equal(0, device.Counters.Color);
-        Assert.Equal(22, device.Counters.Copies); // só o campo sem fonte SNMP é preenchido
+        Assert.Equal(22, device.Counters.Copies); // só os campos sem fonte SNMP são preenchidos
+        Assert.Equal(242, device.Counters.PrintPages);
+        Assert.Equal(10, device.Counters.DuplexPages);
     }
 
     [Fact]
-    public void MergeSamsungCounters_guarda_duplex_relatorio_fax_e_scan_no_campo_Raw()
+    public void MergeSamsungCounters_nao_sobrescreve_PrintPages_DuplexPages_ja_preenchidos_por_outra_fonte()
+    {
+        var device = new DiscoveredDevice
+        {
+            Counters = new DeviceCounters { PrintPages = 1, DuplexPages = 2 },
+        };
+        var snapshot = SamsungCountersClient.Parse(RealSampleResponse);
+
+        DeviceProbeOrchestrator.MergeSamsungCounters(device, snapshot);
+
+        Assert.Equal(1, device.Counters.PrintPages);
+        Assert.Equal(2, device.Counters.DuplexPages);
+    }
+
+    [Fact]
+    public void MergeSamsungCounters_guarda_relatorio_fax_e_scan_no_campo_Raw_por_falta_de_coluna_propria()
     {
         var device = new DiscoveredDevice();
         var snapshot = SamsungCountersClient.Parse(RealSampleResponse);
 
         DeviceProbeOrchestrator.MergeSamsungCounters(device, snapshot);
 
-        Assert.Equal(10, device.Counters!.Raw!["samsung_duplex_total"]);
-        Assert.Equal(76, device.Counters.Raw["samsung_scan_total"]);
+        Assert.Equal(76, device.Counters!.Raw!["samsung_scan_total"]);
         Assert.Equal(8, device.Counters.Raw["samsung_report_total"]);
         Assert.Equal(272, device.Counters.Raw["samsung_grand_total"]);
+        Assert.False(device.Counters.Raw.ContainsKey("samsung_duplex_total")); // agora tem coluna própria (DuplexPages)
     }
 }
